@@ -1,4 +1,11 @@
 const express = require('express');
+// TEMPORAL - Eliminar después de fix
+const upload = {
+  array: () => (req, res, next) => next()
+};
+const projectUpload = {
+  array: () => (req, res, next) => next()
+};
 const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -12,8 +19,40 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tecel_secret_key_2023';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { 
+    rejectUnauthorized: false 
+  },
+  // FORZAR IPv4 y agregar configuraciones de conexión
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20
 });
+
+// Manejar errores de conexión
+pool.on('error', (err, client) => {
+  console.error('❌ Error inesperado en el pool de PostgreSQL:', err);
+});
+
+// Función para verificar conexión
+async function testConnection() {
+  try {
+    const client = await pool.connect();
+    console.log('✅ Conexión a Supabase PostgreSQL exitosa');
+    client.release();
+  } catch (error) {
+    console.error('❌ Error conectando a Supabase:', error.message);
+    
+    // Debug info
+    const dbUrl = process.env.DATABASE_URL;
+    if (dbUrl) {
+      const maskedUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
+      console.log('🔍 Database URL:', maskedUrl);
+    }
+  }
+}
+
+// Ejecutar test de conexión al iniciar
+testConnection();
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -34,7 +73,7 @@ const pool = new Pool({
 // Middleware
 app.use(cors({
   origin: [
-    'http://tecel-app-production.up.railway.app', // Tu URL de Railway
+    'https://tecel-app.onrender.com',  // ← Tu nueva URL
     'http://localhost:3000',
     'http://localhost:8080',
     'http://192.168.1.34:3000'
@@ -54,12 +93,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(express.static(path.join(__dirname))); // Sirve todos los archivos desde la raíz
-
-// Crear carpeta uploads si no existe
-const fs = require('fs');
-if (!fs.existsSync('uploads')) {
-    fs.mkdirSync('uploads');
-}
 
 // Middleware de autenticación
 const authenticateToken = (req, res, next) => {
