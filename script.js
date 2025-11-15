@@ -41,6 +41,7 @@ let currentSuggestionId = null;
 let currentLibraryCategory = 'all';
 let libraryResources = [];
 
+
 // Subcategorías para cada categoría principal
 const librarySubcategories = {
   programas: [
@@ -80,8 +81,38 @@ window.conversionUploadedFiles = [];
 // INICIALIZAR ARRAY GLOBAL DE ARCHIVOS
 window.uploadedFiles = [];
 
-// API Base URL
-const API_BASE = 'http://192.168.1.34:3000/api';
+// CONFIGURACIÓN PARA PRODUCCIÓN
+const API_BASE = 'https://tecel-app.onrender.com';
+
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : 'https://tecel-app.onrender.com';
+
+// Función para hacer fetch con la URL correcta
+async function apiFetch(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
+    console.log(`🌐 API Call: ${url}`);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('❌ API Error:', error);
+        throw error;
+    }
+}
+
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
