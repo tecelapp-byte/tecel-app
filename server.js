@@ -5,7 +5,6 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
