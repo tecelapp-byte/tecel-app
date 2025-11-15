@@ -19,42 +19,36 @@ const projectUpload = {
   array: () => (req, res, next) => next()
 };
 
+// Configuración OPTIMIZADA para Session Pooler de Supabase
+// Configuración SIMPLE para Session Pooler
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { 
-    rejectUnauthorized: false 
-  },
-  // FORZAR IPv4 y agregar configuraciones de conexión
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
-  max: 20
+  ssl: { rejectUnauthorized: false }
 });
 
-// Manejar errores de conexión
-pool.on('error', (err, client) => {
-  console.error('❌ Error inesperado en el pool de PostgreSQL:', err);
-});
+// Test simple
+pool.query('SELECT NOW()')
+  .then(result => {
+    console.log('🎉 CONEXIÓN A SUPABASE EXITOSA');
+    console.log('📍 Session Pooler funcionando correctamente');
+  })
+  .catch(error => {
+    console.error('💥 ERROR DE CONEXIÓN:', error.message);
+  });
 
-// Función para verificar conexión
-async function testConnection() {
+// Test de conexión
+(async () => {
   try {
     const client = await pool.connect();
-    console.log('✅ Conexión a Supabase PostgreSQL exitosa');
+    const result = await client.query('SELECT NOW()');
+    console.log('✅ Conexión a Supabase Session Pooler exitosa');
+    console.log('   🕐 Hora del servidor:', result.rows[0].now);
     client.release();
   } catch (error) {
-    console.error('❌ Error conectando a Supabase:', error.message);
-    
-    // Debug info
-    const dbUrl = process.env.DATABASE_URL;
-    if (dbUrl) {
-      const maskedUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
-      console.log('🔍 Database URL:', maskedUrl);
-    }
+    console.error('❌ Error conectando a Session Pooler:', error.message);
+    console.log('🔍 DATABASE_URL:', process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@'));
   }
-}
-
-// Ejecutar test de conexión al iniciar
-testConnection();
+})();
 
 const { createClient } = require('@supabase/supabase-js');
 
