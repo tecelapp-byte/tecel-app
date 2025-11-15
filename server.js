@@ -1,11 +1,5 @@
 const express = require('express');
-// TEMPORAL - Eliminar después de fix
-const upload = {
-  array: () => (req, res, next) => next()
-};
-const projectUpload = {
-  array: () => (req, res, next) => next()
-};
+const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -16,6 +10,14 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'tecel_secret_key_2023';
+
+// TEMPORAL - Eliminar después de fix
+const upload = {
+  array: () => (req, res, next) => next()
+};
+const projectUpload = {
+  array: () => (req, res, next) => next()
+};
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -1336,126 +1338,6 @@ app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
   }
 });
 
-// Diagnóstico completo de archivo
-app.get('/api/debug/file-full/:fileId', authenticateToken, async (req, res) => {
-    try {
-        const { fileId } = req.params;
-        
-        const fileResult = await pool.query(
-            `SELECT pf.* FROM project_files pf WHERE pf.id = $1`,
-            [fileId]
-        );
-        
-        if (fileResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Archivo no encontrado en BD' });
-        }
-        
-        const file = fileResult.rows[0];
-        
-        // Probar diferentes rutas
-        const testPaths = [
-            { name: 'file_path', path: file.file_path },
-            { name: 'uploads/projects/filename', path: path.join(__dirname, 'uploads', 'projects', file.filename) },
-            { name: 'uploads/filename', path: path.join(__dirname, 'uploads', file.filename) },
-            { name: 'filename_only', path: path.join(__dirname, file.filename) }
-        ];
-        
-        const pathResults = testPaths.map(test => {
-            const absolutePath = test.path ? path.resolve(test.path) : null;
-            const exists = test.path && fs.existsSync(test.path);
-            let stats = null;
-            let canRead = false;
-            
-            if (exists) {
-                try {
-                    stats = fs.statSync(test.path);
-                    canRead = (fs.accessSync(test.path, fs.constants.R_OK) === undefined);
-                } catch (e) {
-                    console.log(`Error accediendo a ${test.path}:`, e.message);
-                }
-            }
-            
-            return {
-                name: test.name,
-                path: test.path,
-                absolute_path: absolutePath,
-                exists: exists,
-                can_read: canRead,
-                size: stats?.size,
-                is_file: stats?.isFile()
-            };
-        });
-        
-        const workingPath = pathResults.find(p => p.exists && p.can_read && p.is_file);
-        
-        res.json({
-            file_info: {
-                id: file.id,
-                original_name: file.original_name,
-                filename: file.filename,
-                file_path: file.file_path,
-                file_size_db: file.file_size,
-                file_type: file.file_type
-            },
-            path_analysis: pathResults,
-            working_path: workingPath,
-            recommendations: workingPath ? 
-                `Usar ruta: ${workingPath.name}` : 
-                'No se encontró una ruta válida para el archivo'
-        });
-        
-    } catch (error) {
-        console.error('Error en diagnóstico completo:', error);
-        res.status(500).json({ error: 'Error en diagnóstico' });
-    }
-});
-
-// Ruta para verificar archivos específicos
-app.get('/api/debug/file/:fileId', authenticateToken, async (req, res) => {
-    try {
-        const { fileId } = req.params;
-        
-        const fileResult = await pool.query(
-            `SELECT pf.* FROM project_files pf WHERE pf.id = $1`,
-            [fileId]
-        );
-        
-        if (fileResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Archivo no encontrado en BD' });
-        }
-        
-        const file = fileResult.rows[0];
-        const filePath = path.join(__dirname, 'uploads', 'projects', file.filename);
-        
-        const debugInfo = {
-            database: {
-                id: file.id,
-                original_name: file.original_name,
-                filename: file.filename,
-                file_path: file.file_path,
-                file_size: file.file_size
-            },
-            filesystem: {
-                absolute_path: filePath,
-                exists: fs.existsSync(filePath),
-                size: fs.existsSync(filePath) ? fs.statSync(filePath).size : null,
-                can_read: fs.existsSync(filePath) ? (fs.accessSync(filePath, fs.constants.R_OK) === undefined) : false
-            },
-            server: {
-                current_dir: __dirname,
-                uploads_dir: path.join(__dirname, 'uploads'),
-                projects_dir: path.join(__dirname, 'uploads', 'projects')
-            }
-        };
-        
-        res.json(debugInfo);
-        
-    } catch (error) {
-        console.error('Error en debug de archivo:', error);
-        res.status(500).json({ error: 'Error en debug' });
-    }
-});
-
 // Rutas de biblioteca
 app.get('/api/library', async (req, res) => {
     try {
@@ -1531,81 +1413,6 @@ app.get('/api/library/download/:resourceId', authenticateToken, async (req, res)
   }
 });
 
-// Endpoint de diagnóstico para archivos de biblioteca
-app.get('/api/library/debug/:resourceId', authenticateToken, async (req, res) => {
-    try {
-        const { resourceId } = req.params;
-        
-        const resourceResult = await pool.query(
-            'SELECT * FROM library_resources WHERE id = $1',
-            [resourceId]
-        );
-        
-        if (resourceResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Recurso no encontrado' });
-        }
-        
-        const resource = resourceResult.rows[0];
-        
-        // Probar diferentes rutas
-        const testPaths = [
-            { name: 'file_url directo', path: resource.file_url },
-            { name: 'uploads/file_url', path: path.join('uploads', resource.file_url) },
-            { name: 'absoluto file_url', path: path.join(__dirname, resource.file_url) },
-            { name: 'uploads/absoluto', path: path.join(__dirname, 'uploads', resource.file_url) },
-            { name: 'solo nombre archivo', path: path.join(__dirname, 'uploads', path.basename(resource.file_url)) }
-        ];
-        
-        const pathResults = testPaths.map(test => {
-            const absolutePath = path.resolve(test.path);
-            const exists = fs.existsSync(absolutePath);
-            let stats = null;
-            let canRead = false;
-            
-            if (exists) {
-                try {
-                    stats = fs.statSync(absolutePath);
-                    canRead = true;
-                } catch (e) {
-                    console.log(`Error accediendo a ${test.path}:`, e.message);
-                }
-            }
-            
-            return {
-                name: test.name,
-                path: test.path,
-                absolute_path: absolutePath,
-                exists: exists,
-                can_read: canRead,
-                size: stats?.size,
-                is_file: stats?.isFile()
-            };
-        });
-        
-        const workingPath = pathResults.find(p => p.exists && p.can_read && p.is_file);
-        
-        res.json({
-            resource_info: {
-                id: resource.id,
-                title: resource.title,
-                file_url: resource.file_url,
-                resource_type: resource.resource_type,
-                created_at: resource.created_at
-            },
-            path_analysis: pathResults,
-            working_path: workingPath,
-            server_info: {
-                current_dir: __dirname,
-                uploads_dir: path.join(__dirname, 'uploads'),
-                exists_uploads_dir: fs.existsSync(path.join(__dirname, 'uploads'))
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error en diagnóstico:', error);
-        res.status(500).json({ error: 'Error en diagnóstico' });
-    }
-});
 
 app.post('/api/library', authenticateToken, async (req, res) => {
   try {
@@ -1710,11 +1517,6 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-
-// Crear carpeta de proyectos si no existe
-if (!fs.existsSync('uploads/projects')) {
-    fs.mkdirSync('uploads/projects', { recursive: true });
-}
 
 // Middleware para verificar permisos de proyecto
 const checkProjectPermissions = async (req, res, next) => {
