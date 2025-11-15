@@ -1574,7 +1574,7 @@ app.get('/api/library/debug/:resourceId', authenticateToken, async (req, res) =>
     }
 });
 
-app.post('/api/library', authenticateToken, upload.array('files'), async (req, res) => {
+app.post('/api/library', authenticateToken, async (req, res) => {
   try {
     const { title, description, resource_type, external_url, main_category, subcategory, fileData, fileName, fileType } = req.body;
     
@@ -1758,7 +1758,7 @@ app.get('/api/projects/:id', async (req, res) => {
 });
 
 // Ruta POST /api/projects - COMPLETA Y CORREGIDA
-app.post('/api/projects', authenticateToken, projectUpload.array('files', 10), async (req, res) => {
+app.post('/api/projects', authenticateToken, async (req, res) => {
     let transactionClient;
     
     try {
@@ -2019,7 +2019,7 @@ app.put('/api/ideas/:id/reenable', authenticateToken, async (req, res) => {
 });
 
 // Actualizar proyecto - MEJORADA para manejar archivos a eliminar
-app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, projectUpload.array('files', 10), async (req, res) => {
+app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (req, res) => {
     let transactionClient;
     
     try {
@@ -2204,7 +2204,7 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 });
 
 // Agregar archivos a proyecto existente
-app.post('/api/projects/:id/files', authenticateToken, checkProjectPermissions, projectUpload.array('files', 10), async (req, res) => {
+app.post('/api/projects/:id/files', authenticateToken, checkProjectPermissions,async (req, res) => {
   try {
     const { id } = req.params;
     const { file, fileName, fileType } = req.body;
