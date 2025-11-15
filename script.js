@@ -82,15 +82,19 @@ window.conversionUploadedFiles = [];
 window.uploadedFiles = [];
 
 // CONFIGURACIÓN PARA PRODUCCIÓN
-const API_BASE = 'https://tecel-app.onrender.com';
+const API_BASE = 'https://tecel-app.onrender.com/api';
 
 const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
-    : 'https://tecel-app.onrender.com';
+    : 'https://tecel-app.onrender/api.com';
 
-// Función para hacer fetch con la URL correcta
+// Función corregida para fetch
 async function apiFetch(endpoint, options = {}) {
-    const url = `${API_BASE}${endpoint}`;
+    // Asegurar que el endpoint empiece con /
+    const url = endpoint.startsWith('/') 
+        ? `${API_BASE}${endpoint}`
+        : `${API_BASE}/${endpoint}`;
+    
     console.log(`🌐 API Call: ${url}`);
     
     try {
