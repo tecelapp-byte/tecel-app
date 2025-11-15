@@ -16,6 +16,13 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const { createClient } = require('@supabase/supabase-js');
+
+// Configurar Supabase (agregar después de pool)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 /* Configuración de PostgreSQL
 const pool = new Pool({
     user: 'postgres',
@@ -27,29 +34,13 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-    origin: function (origin, callback) {
-        // Permitir requests sin origin (como apps móviles)
-        if (!origin) return callback(null, true);
-        
-        // Permitir localhost y todas las IPs locales
-        if (
-            origin.startsWith('http://localhost') ||
-            origin.startsWith('http://192.168.1.') ||
-            origin.startsWith('http://10.0.0.') ||
-            origin.startsWith('http://172.16.') ||
-            origin.startsWith('http://127.0.0.1')
-        ) {
-            return callback(null, true);
-        }
-        
-        // También permitir cualquier IP en desarrollo
-        if (process.env.NODE_ENV !== 'production') {
-            return callback(null, true);
-        }
-        
-        callback(new Error('Origen no permitido por CORS'));
-    },
-    credentials: true
+  origin: [
+    'http://tecel-app-production.up.railway.app', // Tu URL de Railway
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://192.168.1.34:3000'
+  ],
+  credentials: true
 }));
 
 app.get('/api/health', (req, res) => {
@@ -64,17 +55,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(express.static(path.join(__dirname))); // Sirve todos los archivos desde la raíz
-
-// Configuración de multer para uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/')
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname)
-    }
-});
-const upload = multer({ storage: storage });
 
 // Crear carpeta uploads si no existe
 const fs = require('fs');
@@ -1264,135 +1244,64 @@ function getActivityDescription(activity) {
     }
 }
 
-// Ruta para servir archivos estáticos (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Ruta MEJORADA para descargar archivos - VERSIÓN DEFINITIVA
+// Ruta MEJORADA para descargar archivos - VERSIÓN SUPABASE
 app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
-    let filePath;
+  try {
+    const { fileId } = req.params;
     
-    try {
-        const { fileId } = req.params;
-        
-        console.log('🎯 INICIANDO DESCARGA para archivo ID:', fileId);
-        
-        // 1. Obtener información de la base de datos
-        const fileResult = await pool.query(
-            `SELECT pf.* FROM project_files pf WHERE pf.id = $1`,
-            [fileId]
-        );
-        
-        if (fileResult.rows.length === 0) {
-            console.log('❌ Archivo no encontrado en BD');
-            return res.status(404).json({ error: 'Archivo no encontrado' });
-        }
-        
-        const file = fileResult.rows[0];
-        console.log('✅ Archivo en BD:', file.original_name);
-        
-        // 2. Determinar la ruta ABSOLUTA del archivo
-        if (file.file_path && fs.existsSync(file.file_path)) {
-            filePath = path.resolve(file.file_path);
-        } else {
-            filePath = path.resolve(__dirname, 'uploads', 'projects', file.filename);
-        }
-        
-        console.log('📍 Ruta absoluta del archivo:', filePath);
-        
-        // 3. Verificar que el archivo existe
-        if (!fs.existsSync(filePath)) {
-            console.log('❌ Archivo no existe en:', filePath);
-            return res.status(404).json({ error: 'El archivo no se encuentra en el servidor' });
-        }
-        
-        // 4. Verificar que es un archivo válido
-        const stats = fs.statSync(filePath);
-        if (!stats.isFile()) {
-            console.log('❌ No es un archivo válido:', filePath);
-            return res.status(400).json({ error: 'No es un archivo válido' });
-        }
-        
-        if (stats.size === 0) {
-            console.log('❌ Archivo vacío:', filePath);
-            return res.status(400).json({ error: 'El archivo está vacío' });
-        }
-        
-        console.log('📊 Tamaño del archivo:', stats.size, 'bytes');
-        
-        // 5. Determinar el Content-Type apropiado
-        let contentType = 'application/octet-stream';
-        const ext = path.extname(file.original_name).toLowerCase();
-        
-        const mimeTypes = {
-            '.pdf': 'application/pdf',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.doc': 'application/msword',
-            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.zip': 'application/zip',
-            '.txt': 'text/plain'
-        };
-        
-        if (mimeTypes[ext]) {
-            contentType = mimeTypes[ext];
-        }
-        
-        // 6. Configurar headers CORRECTAMENTE
-        const originalName = file.original_name;
-        const safeFileName = originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
-        res.setHeader('Content-Length', stats.size);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        
-        console.log('📤 Configurando descarga:', {
-            nombre: safeFileName,
-            tipo: contentType,
-            tamaño: stats.size
-        });
-        
-        // 7. Leer y enviar el archivo MANUALMENTE
-        const fileStream = fs.createReadStream(filePath);
-        
-        fileStream.on('error', (error) => {
-            console.error('❌ Error leyendo archivo:', error);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Error al leer el archivo' });
-            } else {
-                res.end();
-            }
-        });
-        
-        fileStream.on('open', () => {
-            console.log('✅ Stream de archivo abierto, enviando datos...');
-            fileStream.pipe(res);
-        });
-        
-        fileStream.on('end', () => {
-            console.log('✅ Archivo enviado completamente');
-            res.end();
-        });
-        
-        // Manejar cierre de conexión
-        req.on('close', () => {
-            console.log('📞 Conexión cerrada por el cliente');
-            fileStream.destroy();
-        });
-        
-    } catch (error) {
-        console.error('💥 ERROR CRÍTICO en descarga:', error);
-        if (!res.headersSent) {
-            res.status(500).json({ 
-                error: 'Error interno del servidor',
-                details: error.message 
-            });
-        }
+    console.log('🎯 Solicitando descarga de archivo ID:', fileId);
+
+    // 1. Obtener información de la base de datos
+    const fileResult = await pool.query(
+      `SELECT pf.* FROM project_files pf WHERE pf.id = $1`,
+      [fileId]
+    );
+    
+    if (fileResult.rows.length === 0) {
+      console.log('❌ Archivo no encontrado en BD');
+      return res.status(404).json({ error: 'Archivo no encontrado' });
     }
+    
+    const file = fileResult.rows[0];
+    console.log('✅ Archivo en BD:', file.original_name);
+
+    // 2. Descargar de Supabase Storage
+    const fileName = file.filename;
+    const filePath = `projects/${file.project_id}/${fileName}`;
+
+    console.log('📥 Descargando de Supabase:', filePath);
+
+    const { data, error } = await supabase.storage
+      .from('tecel-files')
+      .download(filePath);
+
+    if (error) {
+      console.error('❌ Error descargando de Supabase:', error);
+      return res.status(404).json({ error: 'Archivo no encontrado en storage' });
+    }
+
+    // 3. Convertir blob a buffer
+    const arrayBuffer = await data.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // 4. Configurar headers
+    const safeFileName = file.original_name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    
+    res.setHeader('Content-Type', file.file_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    console.log('📤 Enviando archivo:', safeFileName);
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('💥 ERROR en descarga:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message 
+    });
+  }
 });
 
 // Diagnóstico completo de archivo
@@ -1531,193 +1440,63 @@ app.get('/api/library', async (req, res) => {
     }
 });
 
-// Ruta para descargar recursos de biblioteca - CORREGIDA
+// Ruta para descargar recursos de biblioteca - VERSIÓN SUPABASE
 app.get('/api/library/download/:resourceId', authenticateToken, async (req, res) => {
-    try {
-        const { resourceId } = req.params;
-        
-        console.log('📥 Solicitando descarga de recurso de biblioteca:', resourceId);
-        
-        // Obtener información del recurso
-        const resourceResult = await pool.query(
-            `SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
-             FROM library_resources lr 
-             LEFT JOIN users u ON lr.uploaded_by = u.id 
-             WHERE lr.id = $1`,
-            [resourceId]
-        );
-        
-        if (resourceResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Recurso no encontrado' });
-        }
-        
-        const resource = resourceResult.rows[0];
-        
-        if (!resource.file_url) {
-            return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
-        }
-        
-        console.log('📁 Recurso encontrado:', {
-            id: resource.id,
-            title: resource.title,
-            file_url: resource.file_url,
-            resource_type: resource.resource_type
-        });
-        
-        // Construir ruta del archivo
-        let filePath;
-        
-        if (resource.file_url.startsWith('/uploads/')) {
-            // Si la URL ya incluye /uploads/
-            filePath = path.join(__dirname, resource.file_url);
-        } else if (resource.file_url.startsWith('uploads/')) {
-            // Si la URL empieza con uploads/
-            filePath = path.join(__dirname, resource.file_url);
-        } else {
-            // Si es solo el nombre del archivo
-            filePath = path.join(__dirname, 'uploads', resource.file_url);
-        }
-        
-        console.log('📍 Ruta absoluta del archivo:', filePath);
-        
-        // Verificar que el archivo existe
-        if (!fs.existsSync(filePath)) {
-            console.error('❌ Archivo no encontrado en:', filePath);
-            
-            // Intentar rutas alternativas
-            const alternativePaths = [
-                path.join(__dirname, 'uploads', 'library', resource.file_url),
-                path.join(__dirname, 'uploads', path.basename(resource.file_url)),
-                path.join(__dirname, resource.file_url)
-            ];
-            
-            let foundPath = null;
-            for (const altPath of alternativePaths) {
-                if (fs.existsSync(altPath)) {
-                    foundPath = altPath;
-                    break;
-                }
-            }
-            
-            if (!foundPath) {
-                return res.status(404).json({ 
-                    error: 'Archivo no encontrado en el servidor',
-                    debug: {
-                        expected_path: filePath,
-                        alternative_paths: alternativePaths,
-                        file_url: resource.file_url
-                    }
-                });
-            }
-            
-            filePath = foundPath;
-            console.log('✅ Archivo encontrado en ruta alternativa:', filePath);
-        }
-        
-        // Obtener stats del archivo
-        const stats = fs.statSync(filePath);
-        if (!stats.isFile()) {
-            return res.status(400).json({ error: 'No es un archivo válido' });
-        }
-        
-        // Determinar Content-Type y extensión
-        const ext = path.extname(resource.file_url).toLowerCase();
-        let contentType = 'application/octet-stream'; // Por defecto: descarga forzada
-        
-        const mimeTypes = {
-            '.pdf': 'application/pdf',
-            '.zip': 'application/zip',
-            '.rar': 'application/x-rar-compressed',
-            '.7z': 'application/x-7z-compressed',
-            '.exe': 'application/x-msdownload',
-            '.msi': 'application/x-msi',
-            '.dmg': 'application/x-dmg',
-            '.deb': 'application/x-deb',
-            '.rpm': 'application/x-rpm',
-            '.txt': 'text/plain',
-            '.doc': 'application/msword',
-            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.xls': 'application/vnd.ms-excel',
-            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            '.ppt': 'application/vnd.ms-powerpoint',
-            '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.mp4': 'video/mp4',
-            '.avi': 'video/x-msvideo',
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.ino': 'text/plain',
-            '.cpp': 'text/plain',
-            '.h': 'text/plain',
-            '.py': 'text/plain',
-            '.js': 'application/javascript',
-            '.html': 'text/html',
-            '.css': 'text/css'
-        };
-        
-        if (mimeTypes[ext]) {
-            contentType = mimeTypes[ext];
-        }
-        
-        // Crear nombre de archivo seguro para descarga
-        let fileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        if (ext && !fileName.endsWith(ext)) {
-            fileName += ext;
-        }
-        
-        console.log('📤 Configurando descarga:', {
-            nombre: fileName,
-            tipo: contentType,
-            tamaño: stats.size,
-            extension: ext
-        });
-        
-        // Configurar headers para forzar descarga
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.setHeader('Content-Length', stats.size);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-        
-        // Enviar archivo
-        const fileStream = fs.createReadStream(filePath);
-        
-        fileStream.on('error', (error) => {
-            console.error('❌ Error leyendo archivo:', error);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Error al leer el archivo' });
-            }
-        });
-        
-        fileStream.on('open', () => {
-            console.log('✅ Stream de archivo abierto, enviando...');
-            fileStream.pipe(res);
-        });
-        
-        fileStream.on('end', () => {
-            console.log('✅ Archivo enviado completamente');
-        });
-        
-        // Manejar cierre de conexión
-        req.on('close', () => {
-            console.log('📞 Conexión cerrada por el cliente');
-            fileStream.destroy();
-        });
-        
-    } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
-        if (!res.headersSent) {
-            res.status(500).json({ 
-                error: 'Error interno del servidor',
-                message: error.message 
-            });
-        }
+  try {
+    const { resourceId } = req.params;
+    
+    console.log('📥 Solicitando recurso de biblioteca:', resourceId);
+
+    // Obtener información del recurso
+    const resourceResult = await pool.query(
+      `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
+      [resourceId]
+    );
+    
+    if (resourceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recurso no encontrado' });
     }
+
+    const resource = resourceResult.rows[0];
+    
+    if (!resource.file_url) {
+      return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
+    }
+
+    // Extraer nombre del archivo de la URL
+    const fileName = resource.file_url.split('/').pop();
+    const filePath = `library/${fileName}`;
+
+    console.log('📥 Descargando de Supabase:', filePath);
+
+    // Descargar de Supabase
+    const { data, error } = await supabase.storage
+      .from('tecel-files')
+      .download(filePath);
+
+    if (error) {
+      console.error('❌ Error descargando recurso:', error);
+      return res.status(404).json({ error: 'Archivo no encontrado en storage' });
+    }
+
+    // Convertir y enviar
+    const arrayBuffer = await data.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
+                        (fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '');
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    res.setHeader('Content-Length', buffer.length);
+    
+    console.log('📤 Enviando recurso:', safeFileName);
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('❌ Error en descarga de biblioteca:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Endpoint de diagnóstico para archivos de biblioteca
@@ -1797,34 +1576,60 @@ app.get('/api/library/debug/:resourceId', authenticateToken, async (req, res) =>
 });
 
 app.post('/api/library', authenticateToken, upload.array('files'), async (req, res) => {
-    try {
-        const { title, description, resource_type, external_url, main_category, subcategory } = req.body;
-        
-        // Procesar archivos (puedes manejar múltiples archivos ahora)
-        let file_url = null;
-        if (req.files && req.files.length > 0) {
-            // Para múltiples archivos, podrías crear un ZIP o guardar referencia al primero
-            file_url = `/uploads/${req.files[0].filename}`;
-        }
+  try {
+    const { title, description, resource_type, external_url, main_category, subcategory, fileData, fileName, fileType } = req.body;
+    
+    let file_url = null;
 
-        const result = await pool.query(
-            'INSERT INTO library_resources (title, description, resource_type, file_url, external_url, uploaded_by, main_category, subcategory) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-            [title, description, resource_type, file_url, external_url, req.user.id, main_category, subcategory]
-        );
+    // Procesar archivo si se proporciona
+    if (fileData && fileName) {
+      console.log('📤 Subiendo recurso a biblioteca...');
 
-        // Obtener recurso completo con información del uploader
-        const fullResource = await pool.query(`
-            SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
-            FROM library_resources lr 
-            LEFT JOIN users u ON lr.uploaded_by = u.id 
-            WHERE lr.id = $1
-        `, [result.rows[0].id]);
+      const fileBuffer = Buffer.from(fileData, 'base64');
+      const uniqueFileName = `library-${Date.now()}-${fileName}`;
+      const filePath = `library/${uniqueFileName}`;
 
-        res.status(201).json(fullResource.rows[0]);
-    } catch (error) {
-        console.error('Error subiendo recurso:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+      // Subir a Supabase
+      const { data, error } = await supabase.storage
+        .from('tecel-files')
+        .upload(filePath, fileBuffer, {
+          contentType: fileType || 'application/octet-stream'
+        });
+
+      if (error) {
+        console.error('❌ Error subiendo recurso:', error);
+        return res.status(500).json({ error: 'Error subiendo archivo' });
+      }
+
+      // Obtener URL pública
+      const { data: urlData } = supabase.storage
+        .from('tecel-files')
+        .getPublicUrl(filePath);
+
+      file_url = urlData.publicUrl;
     }
+
+    // Insertar en base de datos
+    const result = await pool.query(
+      'INSERT INTO library_resources (title, description, resource_type, file_url, external_url, uploaded_by, main_category, subcategory) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [title, description, resource_type, file_url, external_url, req.user.id, main_category, subcategory]
+    );
+
+    // Obtener recurso completo
+    const fullResource = await pool.query(`
+      SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
+      FROM library_resources lr 
+      LEFT JOIN users u ON lr.uploaded_by = u.id 
+      WHERE lr.id = $1
+    `, [result.rows[0].id]);
+
+    console.log('✅ Recurso de biblioteca creado:', title);
+    res.status(201).json(fullResource.rows[0]);
+
+  } catch (error) {
+    console.error('Error subiendo recurso:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Rutas de administración
@@ -1951,82 +1756,6 @@ app.get('/api/projects/:id', async (req, res) => {
         console.error('Error obteniendo proyecto:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
-});
-
-// Configuración MEJORADA de multer para archivos de proyectos
-const projectStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // Crear carpeta si no existe
-    const uploadDir = 'uploads/projects/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    // Generar nombre único pero mantener la extensión
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    // Acortar el nombre original si es muy largo, pero mantener extensión
-    const originalName = file.originalname;
-    const ext = path.extname(originalName);
-    const nameWithoutExt = path.basename(originalName, ext);
-    
-    // Limitar a 100 caracteres máximo para el nombre
-    const safeName = nameWithoutExt.substring(0, 100).replace(/[^a-zA-Z0-9]/g, '_');
-    
-    cb(null, safeName + '-' + uniqueSuffix + ext);
-  }
-});
-
-const projectUpload = multer({ 
-  storage: projectStorage,
-  limits: { 
-    fileSize: 100 * 1024 * 1024, // 100MB límite (aumentado)
-    files: 20 // Permitir hasta 20 archivos
-  },
-  fileFilter: function (req, file, cb) {
-    // Validar tipos de archivo permitidos - MÁS FLEXIBLE
-    const allowedMimes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint', 
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'image/gif',
-      'video/mp4',
-      'video/avi',
-      'application/zip',
-      'application/x-rar-compressed',
-      'application/x-7z-compressed',
-      'text/plain',
-      'application/octet-stream',
-      'inode/x-empty'
-    ];
-        
-    const allowedExts = [
-      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg',
-      '.mp4', '.avi', '.mov', '.wmv', 
-      '.zip', '.rar', '.7z', '.tar', '.gz',
-      '.txt', '.rtf', '.csv',
-      '.ino', '.cpp', '.h', '.py', '.js', '.html', '.css',
-      '.stl', '.obj', '.fbx', '.dwg', '.dxf'
-    ];        
-    
-    const fileExt = path.extname(file.originalname).toLowerCase();
-    
-    if (allowedMimes.includes(file.mimetype) || allowedExts.includes(fileExt)) {
-      cb(null, true);
-    } else {
-      console.warn(`Tipo de archivo rechazado: ${file.originalname} (${file.mimetype})`);
-      cb(new Error(`Tipo de archivo no permitido: ${file.originalname}`), false);
-    }
-  }
 });
 
 // Ruta POST /api/projects - COMPLETA Y CORREGIDA
@@ -2477,29 +2206,64 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 
 // Agregar archivos a proyecto existente
 app.post('/api/projects/:id/files', authenticateToken, checkProjectPermissions, projectUpload.array('files', 10), async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
+    const { file, fileName, fileType } = req.body;
 
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: 'No se subieron archivos' });
-        }
+    console.log('📤 Subiendo archivo a Supabase Storage...');
 
-        const files = [];
-        for (const file of req.files) {
-            const result = await pool.query(
-                'INSERT INTO project_files (project_id, filename, original_name, file_path, file_type, file_size, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                [id, file.filename, file.originalname, file.path, file.mimetype, file.size, req.user.id]
-            );
-            files.push(result.rows[0]);
-        }
-
-        // Devolver el proyecto completo actualizado
-        const projectWithDetails = await getProjectWithDetails(id);
-        res.status(201).json(projectWithDetails);
-    } catch (error) {
-        console.error('Error subiendo archivos:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+    if (!file || !fileName) {
+      return res.status(400).json({ error: 'Datos de archivo incompletos' });
     }
+
+    // Convertir base64 a buffer
+    const fileBuffer = Buffer.from(file, 'base64');
+    
+    // Generar nombre único
+    const uniqueFileName = `project-${id}-${Date.now()}-${fileName}`;
+    const filePath = `projects/${id}/${uniqueFileName}`;
+
+    // Subir a Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('tecel-files')
+      .upload(filePath, fileBuffer, {
+        contentType: fileType || 'application/octet-stream',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Error subiendo a Supabase:', error);
+      return res.status(500).json({ error: 'Error subiendo archivo: ' + error.message });
+    }
+
+    // Obtener URL pública
+    const { data: urlData } = supabase.storage
+      .from('tecel-files')
+      .getPublicUrl(filePath);
+
+    // Guardar en base de datos
+    const result = await pool.query(
+      `INSERT INTO project_files 
+       (project_id, filename, original_name, file_path, file_type, file_size, uploaded_by) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        id,
+        uniqueFileName,
+        fileName,
+        urlData.publicUrl, // Guardamos la URL pública
+        fileType || 'application/octet-stream',
+        fileBuffer.length,
+        req.user.id
+      ]
+    );
+
+    console.log('✅ Archivo subido exitosamente:', fileName);
+    res.status(201).json(result.rows[0]);
+
+  } catch (error) {
+    console.error('❌ Error en upload:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Agregar enlace a proyecto
@@ -2520,29 +2284,47 @@ app.post('/api/projects/:id/links', authenticateToken, checkProjectPermissions, 
     }
 });
 
-// Eliminar archivo de proyecto
+// Eliminar archivo de proyecto - VERSIÓN SUPABASE
 app.delete('/api/projects/:id/files/:fileId', authenticateToken, checkProjectPermissions, async (req, res) => {
-    try {
-        const { fileId } = req.params;
+  try {
+    const { fileId } = req.params;
 
-        const result = await pool.query(
-            'DELETE FROM project_files WHERE id = $1 AND project_id = $2 RETURNING *',
-            [fileId, req.params.id]
-        );
+    // 1. Obtener información del archivo
+    const fileResult = await pool.query(
+      'SELECT * FROM project_files WHERE id = $1 AND project_id = $2',
+      [fileId, req.params.id]
+    );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Archivo no encontrado' });
-        }
-
-        // Eliminar archivo físico del servidor
-        const file = result.rows[0];
-        fs.unlinkSync(file.file_path);
-
-        res.json({ message: 'Archivo eliminado correctamente' });
-    } catch (error) {
-        console.error('Error eliminando archivo:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+    if (fileResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
     }
+
+    const file = fileResult.rows[0];
+    
+    // 2. Eliminar de Supabase Storage
+    const filePath = `projects/${file.project_id}/${file.filename}`;
+    const { error: storageError } = await supabase.storage
+      .from('tecel-files')
+      .remove([filePath]);
+
+    if (storageError) {
+      console.error('❌ Error eliminando de Supabase:', storageError);
+      // Continuamos aunque falle en storage para eliminar de BD
+    }
+
+    // 3. Eliminar de base de datos
+    await pool.query(
+      'DELETE FROM project_files WHERE id = $1',
+      [fileId]
+    );
+
+    console.log('✅ Archivo eliminado:', file.original_name);
+    res.json({ message: 'Archivo eliminado correctamente' });
+
+  } catch (error) {
+    console.error('Error eliminando archivo:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Eliminar enlace de proyecto

@@ -1,0 +1,3041 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TECEL - Especialidad Electrónica</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- Modal de Login/Registro Pantalla Completa - VERSIÓN MEJORADA -->
+<div id="fullscreen-auth-modal" class="modal fullscreen-modal">
+    <div class="modal-content fullscreen-modal-content">
+        <div class="auth-container">
+            <!-- Panel Izquierdo - Información -->
+            <div class="auth-info-panel">
+                <div class="auth-logo">
+                    <div class="logo-icon large">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <h1>TECEL</h1>
+                    <p>Especialidad Electrónica</p>
+                </div>
+                
+                <div class="auth-features">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Ideas Innovadoras</h3>
+                            <p>Comparte y desarrolla proyectos electrónicos creativos</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Trabajo Colaborativo</h3>
+                            <p>Conecta con estudiantes y profesores de la especialidad</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Recursos Educativos</h3>
+                            <p>Accede a materiales y herramientas para tus proyectos</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="auth-footer">
+                    <p>¿Primera vez aquí? <span class="highlight">Únete a nuestra comunidad</span></p>
+                </div>
+            </div>
+            
+            <!-- Panel Derecho - Formularios -->
+            <div class="auth-forms-panel">
+                <div class="forms-container">
+                    <!-- Login Form -->
+                    <div id="login-form-container" class="auth-form active">
+                        <div class="form-header">
+                            <h2>Bienvenido de Vuelta</h2>
+                            <p>Ingresa a tu cuenta para continuar</p>
+                        </div>
+                        
+                        <form id="fullscreen-login-form" class="auth-form-content">
+                            <div class="form-group">
+                                <label for="fullscreen-login-email" class="form-label">
+                                    <i class="fas fa-envelope"></i>
+                                    Email
+                                </label>
+                                <input type="email" id="fullscreen-login-email" class="form-input" required 
+                                       placeholder="tu.email@ejemplo.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fullscreen-login-password" class="form-label">
+                                    <i class="fas fa-lock"></i>
+                                    Contraseña
+                                </label>
+                                <input type="password" id="fullscreen-login-password" class="form-input" required 
+                                       placeholder="Ingresa tu contraseña">
+                            </div>
+                            
+                            <button type="submit" class="btn-primary full-width login-btn">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Ingresar a TECEL
+                            </button>
+                        </form>
+                        
+                        <div class="auth-divider">
+                            <span>¿No tienes cuenta?</span>
+                        </div>
+                        
+                        <button class="btn-outline full-width" id="show-fullscreen-register">
+                            <i class="fas fa-user-plus"></i>
+                            Crear Cuenta Nueva
+                        </button>
+                    </div>
+                    
+                    <!-- Register Form -->
+                    <div id="register-form-container" class="auth-form">
+                        <div class="form-header">
+                            <h2>Crear Cuenta</h2>
+                            <p>Únete a la comunidad TECEL</p>
+                        </div>
+                        
+                        <form id="fullscreen-register-form" class="auth-form-content">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fullscreen-register-first-name" class="form-label">
+                                        <i class="fas fa-user"></i>
+                                        Nombre
+                                    </label>
+                                    <input type="text" id="fullscreen-register-first-name" class="form-input" required 
+                                           placeholder="Juan">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="fullscreen-register-last-name" class="form-label">
+                                        <i class="fas fa-user"></i>
+                                        Apellido
+                                    </label>
+                                    <input type="text" id="fullscreen-register-last-name" class="form-input" required 
+                                           placeholder="Pérez">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fullscreen-register-email" class="form-label">
+                                    <i class="fas fa-envelope"></i>
+                                    Email
+                                </label>
+                                <input type="email" id="fullscreen-register-email" class="form-input" required 
+                                       placeholder="tu.email@ejemplo.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fullscreen-register-password" class="form-label">
+                                    <i class="fas fa-lock"></i>
+                                    Contraseña
+                                </label>
+                                <input type="password" id="fullscreen-register-password" class="form-input" required 
+                                       placeholder="Crea una contraseña segura">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fullscreen-register-user-type" class="form-label">
+                                    <i class="fas fa-user-tag"></i>
+                                    Tipo de Usuario
+                                </label>
+                                <select id="fullscreen-register-user-type" class="form-select" required>
+                                    <option value="">Selecciona tu rol</option>
+                                    <option value="student">Alumno</option>
+                                    <option value="teacher">Profesor</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-row" id="fullscreen-student-fields" style="display: none;">
+                                <div class="form-group">
+                                    <label for="fullscreen-register-grade" class="form-label">
+                                        <i class="fas fa-graduation-cap"></i>
+                                        Curso
+                                    </label>
+                                    <select id="fullscreen-register-grade" class="form-select">
+                                        <option value="4to">4to Año</option>
+                                        <option value="5to">5to Año</option>
+                                        <option value="6to">6to Año</option>
+                                        <option value="7mo">7mo Año</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="fullscreen-register-specialization" class="form-label">
+                                        <i class="fas fa-cogs"></i>
+                                        Especialidad
+                                    </label>
+                                    <input type="text" id="fullscreen-register-specialization" class="form-input" 
+                                           value="Electrónica" readonly>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn-primary full-width register-btn">
+                                <i class="fas fa-rocket"></i>
+                                Crear Mi Cuenta
+                            </button>
+                        </form>
+                        
+                        <div class="auth-divider">
+                            <span>¿Ya tienes cuenta?</span>
+                        </div>
+                        
+                        <button class="btn-outline full-width" id="show-fullscreen-login">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Iniciar Sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+     <!-- Header/Navbar -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>TECEL</h1>
+                    <span>Especialidad Electrónica</span>
+                </div>
+            </div>
+            <nav class="navbar">
+                <ul>
+                    <li><a href="#" class="nav-link active" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Inicio</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="semillero">
+                        <i class="fas fa-seedling"></i>
+                        <span>Semillero</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="ideas">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Ideas Locas</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="sugerencias">
+                        <i class="fas fa-comments"></i>
+                        <span>Sugerencias</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="biblioteca">
+                        <i class="fas fa-book"></i>
+                        <span>Biblioteca</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="usuario" id="user-nav" style="display: none;">
+                        <i class="fas fa-user"></i>
+                        <span>Mi Cuenta</span>
+                    </a></li>
+                    <li><a href="#" class="nav-link" data-section="admin" id="admin-nav" style="display: none;">
+                        <i class="fas fa-cog"></i>
+                        <span>Administración</span>
+                    </a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <div class="auth-buttons" id="auth-buttons">
+                    <button class="btn-outline" id="login-btn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Ingresar</span>
+                    </button>
+                    <button class="btn-primary" id="register-btn">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Registrarse</span>
+                    </button>
+                </div>
+                <div class="user-menu" id="user-menu" style="display: none;">
+                    <div class="user-info">
+                        <span id="user-greeting"></span>
+                    </div>
+                    <button class="btn-outline" id="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Cerrar Sesión</span>
+                    </button>
+                </div>
+            </div>
+            <div class="mobile-menu">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <section id="home" class="section">
+            <div class="hero-section">
+                <div class="hero-background">
+                    <div class="hero-particles">
+                        <div class="particle"></div>
+                        <div class="particle"></div>
+                        <div class="particle"></div>
+                        <div class="particle"></div>
+                        <div class="particle"></div>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="hero-content">
+                        <div class="hero-text">
+                            <h2>Bienvenidos a <span class="highlight">TECEL</span></h2>
+                            <p>Plataforma de proyectos e ideas innovadoras de la Especialidad Electrónica</p>
+                            <div class="hero-actions">
+                                <button class="btn-primary btn-large" id="explore-projects">
+                                    <i class="fas fa-rocket"></i>
+                                    Explorar Proyectos
+                                </button>
+                                <button class="btn-outline btn-large" id="learn-more">
+                                    <i class="fas fa-info-circle"></i>
+                                    Conocer Más
+                                </button>
+                            </div>
+                        </div>
+                        <div class="hero-visual">
+                            <div class="floating-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-microchip"></i>
+                                </div>
+                                <h3>Innovación</h3>
+                                <p>Crea proyectos únicos</p>
+                            </div>
+                            <div class="floating-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <h3>Colaboración</h3>
+                                <p>Trabaja en equipo</p>
+                            </div>
+                            <div class="floating-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                                <h3>Aprendizaje</h3>
+                                <p>Comparte conocimiento</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Section -->
+                    <div id="user-hero" style="display: none;">
+                        <div class="stats-section">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-project-diagram"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="stats-projects">15</h3>
+                                        <p>Proyectos Activos</p>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-lightbulb"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="stats-ideas">32</h3>
+                                        <p>Ideas Locas</p>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="stats-users">45</h3>
+                                        <p>Usuarios Registrados</p>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-book"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="stats-resources">28</h3>
+                                        <p>Recursos Disponibles</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+<!-- Semillero de Proyectos Section -->
+        <section id="semillero" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Semillero de Proyectos</h2>
+                    <p class="section-subtitle">Explora y participa en proyectos innovadores de la comunidad</p>
+                </div>
+                
+                <div class="section-actions" id="project-actions" style="display: none;">
+                    <button class="btn-primary" id="add-project-btn">
+                        <i class="fas fa-plus"></i> Nuevo Proyecto
+                    </button>
+                </div>
+                
+                <div class="search-filter-container">
+                    <div class="search-box with-icon">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-projects" placeholder="Buscar proyectos...">
+                    </div>
+                    <div class="filter-options">
+                        <div class="filter-group">
+                            <div class="filter-buttons">
+                                <button class="filter-btn active" data-filter="all">Todos</button>
+                                <button class="filter-btn" data-filter="iniciado">Iniciados</button>
+                                <button class="filter-btn" data-filter="progreso">En Progreso</button>
+                                <button class="filter-btn" data-filter="finalizado">Finalizados</button>
+                            </div>
+                        </div>
+                        <div class="sort-group">
+                            <label>Ordenar por:</label>
+                            <select id="sort-projects">
+                                <option value="newest">Más recientes</option>
+                                <option value="oldest">Más antiguos</option>
+                                <option value="name">Nombre A-Z</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="projects-container">
+                    <div class="projects-grid" id="projects-container">
+                        <div class="loading-state">
+                            <div class="loading-spinner"></div>
+                            <p>Cargando proyectos...</p>
+                        </div>
+                    </div>
+                    <div class="empty-state" id="projects-empty" style="display: none;">
+                        <div class="empty-icon">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <h3>No hay proyectos disponibles</h3>
+                        <p>¡Sé el primero en crear un proyecto!</p>
+                        <button class="btn-primary" id="create-first-project">
+                            <i class="fas fa-plus"></i> Crear Proyecto
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ideas Locas Section -->
+<section id="ideas" class="section">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">Ideas Locas</h2>
+            <p class="section-subtitle">Comparte y explora ideas innovadoras de la comunidad</p>
+        </div>
+        
+        <div class="ideas-hero-cards">
+            <div class="idea-hero-card" id="upload-idea-card">
+                <div class="card-glow"></div>
+                <div class="card-content">
+                    <div class="card-icon-large">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <h3>Subir Nueva Idea</h3>
+                    <p>Comparte tu idea innovadora con la comunidad y recibe feedback</p>
+                    <div class="card-stats">
+                        <div class="stat">
+                            <span class="number">+50</span>
+                            <span class="label">Ideas activas</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover-effect">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+            </div>
+            
+            <div class="idea-hero-card" id="mural-ideas-card">
+                <div class="card-glow"></div>
+                <div class="card-content">
+                    <div class="card-icon-large">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <h3>Mural de Ideas</h3>
+                    <p>Explora todas las ideas compartidas por la comunidad</p>
+                    <div class="card-stats">
+                        <div class="stat">
+                            <span class="number">+120</span>
+                            <span class="label">Total ideas</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-hover-effect">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- BUSCADOR DE IDEAS - DEBE ESTAR AQUÍ -->
+        <div class="search-filter-container">
+            <div class="search-box with-icon">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-ideas" placeholder="Buscar ideas por nombre, autor o problema...">
+            </div>
+            <div class="filter-options">
+                <div class="filter-group">
+                    <select id="category-filter">
+                        <option value="all">Todas las categorías</option>
+                        <option value="electronica">Electrónica Aplicada</option>
+                        <option value="robotica">Robótica</option>
+                        <option value="iot">IoT</option>
+                        <option value="proyectos-sociales">Proyectos Sociales</option>
+                        <option value="salud">Salud</option>
+                        <option value="energia">Energía</option>
+                        <option value="automotriz">Automotriz</option>
+                    </select>
+                </div>
+                <div class="sort-group">
+                    <select id="sort-ideas">
+                        <option value="newest">Más recientes</option>
+                        <option value="popular">Más populares</option>
+                        <option value="name">Nombre A-Z</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid de Ideas -->
+            <div class="ideas-grid" id="ideas-container">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando ideas...</p>
+                </div>
+            </div>
+            <div class="empty-state" id="ideas-empty" style="display: none;">
+                <div class="empty-icon">
+                    <i class="fas fa-lightbulb"></i>
+                </div>
+                <h3>No hay ideas disponibles</h3>
+                <p>¡Sé el primero en compartir una idea innovadora!</p>
+                <button class="btn-primary" id="create-first-idea">
+                    <i class="fas fa-plus"></i> Crear Primera Idea
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Nueva Sección: Sugerencias -->
+<section id="sugerencias" class="section">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title">Sugerencias</h2>
+            <p class="section-subtitle">Comparte tus ideas para mejorar la plataforma y la comunidad</p>
+        </div>
+        
+        <div class="section-actions" id="suggestion-actions" style="display: none;">
+            <button class="btn-primary" id="add-suggestion-btn">
+                <i class="fas fa-plus"></i> Nueva Sugerencia
+            </button>
+        </div>
+
+        <!-- Estadísticas de Sugerencias -->
+        <div class="suggestions-stats">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="stats-suggestions-total">0</h3>
+                    <p>Total Sugerencias</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="stats-suggestions-pending">0</h3>
+                    <p>Pendientes</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="stats-suggestions-done">0</h3>
+                    <p>Realizadas</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buscador y Filtros de Sugerencias -->
+<div class="suggestions-search-section">
+    <div class="search-header">
+        <h3>Buscar Sugerencias</h3>
+        <p>Encuentra sugerencias específicas usando los filtros</p>
+    </div>
+    
+    <div class="search-filters-container">
+        <!-- Barra de búsqueda -->
+        <div class="search-box-main">
+            <i class="fas fa-search"></i>
+            <input type="text" id="suggestions-search-input" placeholder="Buscar por título, descripción o autor...">
+            <button class="search-clear" id="clear-suggestions-search" style="display: none;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Filtros en línea -->
+        <div class="filters-row">
+            <div class="filter-group">
+                <label for="suggestions-type-filter">
+                </label>
+                <select id="suggestions-type-filter">
+                    <option value="all">Todos los tipos</option>
+                    <option value="mejora">✨ Mejora</option>
+                    <option value="nueva_funcionalidad">🚀 Nueva Funcionalidad</option>
+                    <option value="problema">🐛 Problema</option>
+                    <option value="contenido">📚 Contenido</option>
+                    <option value="infraestructura">🏗️ Infraestructura</option>
+                    <option value="otro">💡 Otro</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="suggestions-status-filter">
+                </label>
+                <select id="suggestions-status-filter">
+                    <option value="all">Todos los estados</option>
+                    <option value="pendiente">Subidas</option>
+                    <option value="realizada">Realizadas</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="suggestions-priority-filter">
+                </label>
+                <select id="suggestions-priority-filter">
+                    <option value="all">Todas las prioridades</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="suggestions-impact-filter">
+                </label>
+                <select id="suggestions-impact-filter">
+                    <option value="all">Todos los impactos</option>
+                    <option value="alto">Alto</option>
+                    <option value="medio">Medio</option>
+                    <option value="bajo">Bajo</option>
+                </select>
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn-outline" id="reset-suggestions-filters">
+                    <i class="fas fa-redo"></i>
+                    Limpiar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Contador de resultados -->
+        <div class="results-info" id="suggestions-results-info" style="display: none;">
+            <span id="suggestions-results-count">0</span> sugerencias encontradas
+        </div>
+    </div>
+</div>
+
+        <!-- Lista de Sugerencias -->
+        <div class="suggestions-container">
+            <div class="suggestions-list" id="suggestions-container">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando sugerencias...</p>
+                </div>
+            </div>
+            
+            <div class="empty-state" id="suggestions-empty" style="display: none;">
+                <div class="empty-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3>No hay sugerencias</h3>
+                <p>¡Sé el primero en compartir una sugerencia para mejorar la plataforma!</p>
+                <button class="btn-primary" id="create-first-suggestion">
+                    <i class="fas fa-plus"></i> Crear Primera Sugerencia
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Nueva Sección: Biblioteca -->
+<section id="biblioteca" class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2 class="section-title">Biblioteca de Recursos</h2>
+      <p class="section-subtitle">Accede a materiales educativos, programas y recursos para tus proyectos</p>
+    </div>
+    
+    <div class="section-actions" id="library-actions" style="display: none;">
+      <button class="btn-primary" id="add-resource-btn">
+        <i class="fas fa-plus"></i> Subir Recurso
+      </button>
+    </div>
+
+    <!-- Cards de Categorías Principales -->
+    <div class="library-categories-grid">
+      <div class="library-category-card" id="programas-card">
+        <div class="category-card-content">
+          <div class="category-icon">
+            <i class="fas fa-laptop-code"></i>
+          </div>
+          <h3>Programas</h3>
+          <p>Software y herramientas para electrónica</p>
+          <div class="category-stats">
+            <span class="stat-count" id="programas-count">0</span>
+            <span class="stat-label">recursos</span>
+          </div>
+        </div>
+        <div class="category-card-hover">
+          <i class="fas fa-arrow-right"></i>
+        </div>
+      </div>
+
+      <div class="library-category-card" id="habilidades-tecnicas-card">
+        <div class="category-card-content">
+          <div class="category-icon">
+            <i class="fas fa-cogs"></i>
+          </div>
+          <h3>Habilidades Técnicas</h3>
+          <p>Manuales, tutoriales y guías prácticas</p>
+          <div class="category-stats">
+            <span class="stat-count" id="tecnicas-count">0</span>
+            <span class="stat-label">recursos</span>
+          </div>
+        </div>
+        <div class="category-card-hover">
+          <i class="fas fa-arrow-right"></i>
+        </div>
+      </div>
+
+      <div class="library-category-card" id="habilidades-blandas-card">
+        <div class="category-card-content">
+          <div class="category-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <h3>Habilidades Blandas</h3>
+          <p>Comunicación, trabajo en equipo y liderazgo</p>
+          <div class="category-stats">
+            <span class="stat-count" id="blandas-count">0</span>
+            <span class="stat-label">recursos</span>
+          </div>
+        </div>
+        <div class="category-card-hover">
+          <i class="fas fa-arrow-right"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista General (actual) -->
+    <div class="library-main-view">
+      <!-- Estadísticas de Biblioteca -->
+      <div class="library-stats">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-book"></i>
+          </div>
+          <div class="stat-content">
+            <h3 id="stats-resources-total">0</h3>
+            <p>Total Recursos</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-file-pdf"></i>
+          </div>
+          <div class="stat-content">
+            <h3 id="stats-resources-docs">0</h3>
+            <p>Documentos</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-video"></i>
+          </div>
+          <div class="stat-content">
+            <h3 id="stats-resources-videos">0</h3>
+            <p>Videos</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-link"></i>
+          </div>
+          <div class="stat-content">
+            <h3 id="stats-resources-links">0</h3>
+            <p>Enlaces</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros y Búsqueda -->
+      <div class="search-filter-container">
+        <div class="search-box with-icon">
+          <i class="fas fa-search"></i>
+          <input type="text" id="search-library" placeholder="Buscar recursos por título, descripción o categoría...">
+        </div>
+        <div class="filter-options">
+          <div class="filter-group">
+            <select id="library-category-filter">
+              <option value="all">Todas las categorías</option>
+              <option value="electronica">Electrónica</option>
+              <option value="programacion">Programación</option>
+              <option value="robotica">Robótica</option>
+              <option value="iot">IoT</option>
+              <option value="proyectos">Proyectos</option>
+              <option value="manuales">Manuales</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <select id="library-type-filter">
+              <option value="all">Todos los tipos</option>
+              <option value="documento">Documentos</option>
+              <option value="video">Videos</option>
+              <option value="enlace">Enlaces</option>
+              <option value="presentacion">Presentaciones</option>
+              <option value="manual">Manuales</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid de Recursos -->
+      <div class="library-grid-container">
+        <div class="library-grid" id="library-container">
+          <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Cargando recursos...</p>
+          </div>
+        </div>
+        <div class="empty-state" id="library-empty" style="display: none;">
+          <div class="empty-icon">
+            <i class="fas fa-book"></i>
+          </div>
+          <h3>No hay recursos disponibles</h3>
+          <p>¡Sé el primero en compartir un recurso educativo!</p>
+          <button class="btn-primary" id="add-resource-btn">
+            <i class="fas fa-plus"></i> Subir Primer Recurso
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Sección Mi Cuenta - COMPLETAMENTE NUEVA -->
+        <section id="usuario" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Mi Cuenta</h2>
+                    <p class="section-subtitle">Gestiona tu perfil y actividad en la plataforma</p>
+                </div>
+                
+                <div class="user-profile-container">
+                    <div class="profile-sidebar">
+                        <div class="profile-card">
+                            <div class="profile-avatar">
+                                <div class="avatar-icon">
+                                    <i class="fas fa-user-circle"></i>
+                                </div>
+                                <div class="avatar-badge">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                            </div>
+                            <div class="profile-info">
+                                <h3 id="profile-name">Cargando...</h3>
+                                <p id="profile-email">Cargando...</p>
+                                <span class="user-badge" id="profile-type">Cargando...</span>
+                            </div>
+                            <div class="profile-stats">
+                                <div class="profile-stat">
+                                    <span class="stat-value" id="profile-join-date">-</span>
+                                    <span class="stat-label">Miembro desde</span>
+                                </div>
+                                <div class="profile-stat">
+                                    <span class="stat-value" id="profile-grade">-</span>
+                                    <span class="stat-label">Curso</span>
+                                </div>
+                                <div class="profile-stat">
+                                    <span class="stat-value" id="profile-specialization">-</span>
+                                    <span class="stat-label">Especialidad</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-content">
+                        <div class="activity-section">
+                            <h3>Mi Actividad</h3>
+                            <div class="activity-grid">
+                                <div class="activity-card">
+                                    <div class="activity-icon ideas">
+                                        <i class="fas fa-lightbulb"></i>
+                                    </div>
+                                    <div class="activity-content">
+                                        <h4 id="user-ideas-count">0</h4>
+                                        <p>Ideas Publicadas</p>
+                                        <span class="activity-trend positive">
+                                            <i class="fas fa-arrow-up"></i> 12%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="activity-card">
+                                    <div class="activity-icon projects">
+                                        <i class="fas fa-project-diagram"></i>
+                                    </div>
+                                    <div class="activity-content">
+                                        <h4 id="user-projects-count">0</h4>
+                                        <p>Proyectos</p>
+                                        <span class="activity-trend positive">
+                                            <i class="fas fa-arrow-up"></i> 8%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="activity-card">
+                                    <div class="activity-icon suggestions">
+                                        <i class="fas fa-comments"></i>
+                                    </div>
+                                    <div class="activity-content">
+                                        <h4 id="user-suggestions-count">0</h4>
+                                        <p>Sugerencias</p>
+                                        <span class="activity-trend neutral">
+                                            <i class="fas fa-minus"></i> 0%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="activity-card">
+                                    <div class="activity-icon contributions">
+                                        <i class="fas fa-hand-holding-heart"></i>
+                                    </div>
+                                    <div class="activity-content">
+                                        <h4 id="user-contributions-count">0</h4>
+                                        <p>Aportes</p>
+                                        <span class="activity-trend positive">
+                                            <i class="fas fa-arrow-up"></i> 15%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="recent-activity">
+                            <h3>Actividad Reciente</h3>
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-marker"></div>
+                                    <div class="timeline-content">
+                                        <h4>Proyecto creado</h4>
+                                        <p>Creaste el proyecto "Sistema de Control Remoto"</p>
+                                        <span class="timeline-date">Hace 2 días</span>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker"></div>
+                                    <div class="timeline-content">
+                                        <h4>Idea publicada</h4>
+                                        <p>Compartiste la idea "Robot Autónomo con Arduino"</p>
+                                        <span class="timeline-date">Hace 1 semana</span>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker"></div>
+                                    <div class="timeline-content">
+                                        <h4>Sugerencia enviada</h4>
+                                        <p>Enviaste una sugerencia para mejorar la plataforma</p>
+                                        <span class="timeline-date">Hace 2 semanas</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nueva Sección: Administración -->
+        <section id="admin" class="section">
+            <div class="container">
+                <h2 class="section-title">Panel de Administración</h2>
+                
+                <div class="admin-stats">
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon users">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <h3 id="admin-users-count">0</h3>
+                            <p>Usuarios Registrados</p>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon projects">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <h3 id="admin-projects-count">0</h3>
+                            <p>Proyectos</p>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon ideas">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <h3 id="admin-ideas-count">0</h3>
+                            <p>Ideas Locas</p>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-icon suggestions">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <div class="admin-stat-info">
+                            <h3 id="admin-suggestions-count">0</h3>
+                            <p>Sugerencias</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-content">
+                    <div id="admin-users" class="admin-tab-content active">
+                        <div class="admin-table-container">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
+                                        <th>Tipo</th>
+                                        <th>Curso</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <!-- Los usuarios se cargarán dinámicamente aquí -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="admin-content" class="admin-tab-content">
+                        <div class="content-management">
+                            <div class="content-actions">
+                                <button class="btn-primary" id="refresh-content">Actualizar Contenido</button>
+                            </div>
+                            <div class="content-stats">
+                                <h4>Resumen de Contenido</h4>
+                                <div class="content-cards">
+                                    <div class="content-card">
+                                        <h5>Proyectos por Estado</h5>
+                                        <div id="projects-by-status"></div>
+                                    </div>
+                                    <div class="content-card">
+                                        <h5>Ideas por Categoría</h5>
+                                        <div id="ideas-by-category"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal para nueva sugerencia - MEJORADO ESTÉTICAMENTE -->
+<div id="new-suggestion-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2><i class="fas fa-lightbulb"></i> Nueva Sugerencia</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="suggestion-form" class="modal-body">
+            <div class="form-grid">
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Información Básica
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="suggestion-title" class="form-label">
+                                Título de la Sugerencia *
+                            </label>
+                            <input type="text" id="suggestion-title" class="form-input" required 
+                                   placeholder="Ej: Mejorar el sistema de notificaciones..."
+                                   maxlength="100">
+                            <small class="char-counter">0/100 caracteres</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="suggestion-type" class="form-label">Tipo de Sugerencia *</label>
+                            <select id="suggestion-type" class="form-select" required>
+                                <option value="">Seleccionar tipo</option>
+                                <option value="mejora">✨ Mejora de Plataforma</option>
+                                <option value="nueva_funcionalidad">🚀 Nueva Funcionalidad</option>
+                                <option value="problema">🐛 Reportar Problema</option>
+                                <option value="contenido">📚 Contenido Educativo</option>
+                                <option value="infraestructura">🏗️ Infraestructura</option>
+                                <option value="otro">💡 Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-align-left"></i>
+                            Descripción Detallada
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="suggestion-description" class="form-label">
+                                Describe tu sugerencia *
+                            </label>
+                            <textarea id="suggestion-description" class="form-textarea" rows="6" required
+                                      placeholder="Explica en detalle tu sugerencia, qué problema resuelve, cómo implementarla..."
+                                      maxlength="500"></textarea>
+                            <small class="char-counter">0/500 caracteres</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-star"></i>
+                    Prioridad e Impacto
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Nivel de Urgencia</label>
+                        <div class="priority-buttons">
+                            <button type="button" class="priority-btn active" data-priority="baja">
+                                <i class="fas fa-flag"></i>
+                                <span>Baja</span>
+                            </button>
+                            <button type="button" class="priority-btn" data-priority="media">
+                                <i class="fas fa-flag"></i>
+                                <span>Media</span>
+                            </button>
+                            <button type="button" class="priority-btn" data-priority="alta">
+                                <i class="fas fa-flag"></i>
+                                <span>Alta</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Impacto Esperado</label>
+                        <div class="impact-buttons">
+                            <button type="button" class="impact-btn active" data-impact="bajo">
+                                <span>Bajo</span>
+                            </button>
+                            <button type="button" class="impact-btn" data-impact="medio">
+                                <span>Medio</span>
+                            </button>
+                            <button type="button" class="impact-btn" data-impact="alto">
+                                <span>Alto</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="suggestion-preview">
+                <h4><i class="fas fa-eye"></i> Vista Previa</h4>
+                <div class="preview-content">
+                    <div class="preview-header">
+                        <strong id="preview-title">Título de la sugerencia aparecerá aquí</strong>
+                        <span id="preview-type" class="preview-type">Tipo</span>
+                    </div>
+                    <p id="preview-description">La descripción de tu sugerencia aparecerá aquí...</p>
+                    <div class="preview-meta">
+                        <span id="preview-priority" class="preview-priority baja">Prioridad: Baja</span>
+                        <span id="preview-impact" class="preview-impact bajo">Impacto: Bajo</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancel-suggestion">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-paper-plane"></i> Enviar Sugerencia
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Detalles de Sugerencia - CORREGIDO -->
+<div id="suggestion-detail-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2><i class="fas fa-lightbulb"></i> Detalles de la Sugerencia</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="suggestion-detail-content">
+                <!-- Header de la sugerencia -->
+                <div class="suggestion-detail-header">
+                    <h3 id="detail-suggestion-title">Cargando...</h3>
+                    <div class="suggestion-meta-badges">
+                        <span id="detail-suggestion-type" class="type-badge"></span>
+                        <span id="detail-suggestion-status" class="status-badge"></span>
+                    </div>
+                </div>
+                
+                <!-- Información del autor y fecha -->
+                <div class="suggestion-author-info">
+                    <div class="author-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="author-details">
+                        <strong id="detail-suggestion-author">Cargando...</strong>
+                        <span id="detail-suggestion-date" class="suggestion-date">Cargando...</span>
+                    </div>
+                </div>
+                
+                <!-- Prioridad e Impacto -->
+                <div class="suggestion-priority-impact">
+                    <div class="priority-impact-item">
+                        <span class="label">Prioridad:</span>
+                        <span id="detail-suggestion-priority" class="priority-value"></span>
+                    </div>
+                    <div class="priority-impact-item">
+                        <span class="label">Impacto:</span>
+                        <span id="detail-suggestion-impact" class="impact-value"></span>
+                    </div>
+                </div>
+                
+                <!-- Descripción de la sugerencia -->
+                <div class="suggestion-description-section">
+                    <h4><i class="fas fa-align-left"></i> Descripción</h4>
+                    <div class="description-content">
+                        <p id="detail-suggestion-description">Cargando...</p>
+                    </div>
+                </div>
+                
+                <!-- Información adicional -->
+                <div class="suggestion-additional-info">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <i class="fas fa-calendar"></i>
+                            <div class="info-content">
+                                <span class="info-label">Fecha de Creación</span>
+                                <span id="detail-suggestion-created-at" class="info-value">Cargando...</span>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-sync-alt"></i>
+                            <div class="info-content">
+                                <span class="info-label">Última Actualización</span>
+                                <span id="detail-suggestion-updated-at" class="info-value">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sección de comentarios - MEJORADA -->
+                <div class="suggestion-comments-section">
+                    <div class="comments-header">
+                        <h4><i class="fas fa-comments"></i> Comentarios</h4>
+                        <span id="comments-count" class="comments-count">0 comentarios</span>
+                    </div>
+                    <div id="suggestion-comments-container" class="comments-container">
+                        <div class="empty-comments">
+                            <i class="fas fa-comment-slash"></i>
+                            <p>No hay comentarios aún</p>
+                            <small>Sé el primero en comentar esta sugerencia</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Acciones de administración -->
+                <div class="admin-actions" id="suggestion-admin-actions" style="display: none;">
+                    <button type="button" class="btn-primary" id="change-suggestion-status">
+                        <i class="fas fa-sync-alt"></i> Cambiar Estado
+                    </button>
+                    <button type="button" class="btn-danger" id="delete-suggestion-btn">
+                        <i class="fas fa-trash"></i> Eliminar Sugerencia
+                    </button>
+                    <button type="button" class="btn-secondary" id="add-comment-btn">
+                        <i class="fas fa-comment"></i> Agregar Comentario
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo recurso de biblioteca - MEJORADO -->
+<div id="new-resource-modal" class="modal">
+  <div class="modal-content large">
+    <div class="modal-header">
+      <h2>Subir Recurso a Biblioteca</h2>
+      <span class="close">&times;</span>
+    </div>
+    <form id="resource-form" class="modal-body" enctype="multipart/form-data">
+      <div class="form-grid">
+        <div class="form-column">
+          <div class="form-section">
+            <h3 class="form-section-title">
+              <i class="fas fa-info-circle"></i> Información Básica
+            </h3>
+            <div class="form-group">
+              <label for="resource-title" class="form-label">Título *</label>
+              <input type="text" id="resource-title" class="form-input" required 
+                     placeholder="Ej: Manual de Arduino Básico">
+            </div>
+            <div class="form-group">
+              <label for="resource-description" class="form-label">Descripción *</label>
+              <textarea id="resource-description" class="form-textarea" rows="3" required
+                        placeholder="Describe el recurso y su utilidad..."></textarea>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-column">
+          <div class="form-section">
+            <h3 class="form-section-title">
+              <i class="fas fa-tags"></i> Categorización
+            </h3>
+            <div class="form-group">
+              <label for="resource-main-category" class="form-label">Categoría Principal *</label>
+              <select id="resource-main-category" class="form-select" required>
+                <option value="">Seleccionar categoría principal</option>
+                <option value="programas">Programas</option>
+                <option value="habilidades_tecnicas">Habilidades Técnicas</option>
+                <option value="habilidades_blandas">Habilidades Blandas</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="resource-subcategory" class="form-label">Subcategoría *</label>
+              <select id="resource-subcategory" class="form-select" required>
+                <option value="">Primero selecciona categoría principal</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="form-section-title">
+          <i class="fas fa-cube"></i> Tipo de Recurso
+        </h3>
+        <div class="form-group">
+          <label for="resource-type" class="form-label">Tipo de Recurso *</label>
+          <select id="resource-type" class="form-select" required>
+            <option value="">Seleccionar tipo</option>
+            <option value="documento">Documento (PDF, Word, etc.)</option>
+            <option value="video">Video Tutorial</option>
+            <option value="enlace">Enlace Externo</option>
+            <option value="software">Software/Programa</option>
+            <option value="presentacion">Presentación</option>
+            <option value="manual">Manual/Guía</option>
+            <option value="carpeta">Carpeta de Archivos</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Campos dinámicos según tipo de recurso -->
+      <div id="resource-file-group" class="form-section" style="display: none;">
+        <h3 class="form-section-title">
+          <i class="fas fa-file-upload"></i> Archivo
+        </h3>
+        <div class="form-group">
+          <label class="form-label">Seleccionar Archivo *</label>
+          <div class="file-upload-area" id="resource-file-upload-area">
+            <input type="file" id="resource-file" multiple 
+                   accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.rar,.txt,.ino,.cpp,.h,.py,.jpg,.jpeg,.png,.mp4,.avi">
+            <div class="upload-placeholder">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+              <small>Se permiten múltiples archivos para carpetas</small>
+            </div>
+          </div>
+          <div id="resource-file-preview" class="file-preview"></div>
+        </div>
+      </div>
+
+      <div id="resource-url-group" class="form-section" style="display: none;">
+        <h3 class="form-section-title">
+          <i class="fas fa-link"></i> Enlace Externo
+        </h3>
+        <div class="form-group">
+          <label for="resource-url" class="form-label">URL *</label>
+          <input type="url" id="resource-url" class="form-input" 
+                 placeholder="https://...">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="cancel-resource">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button type="submit" class="btn-primary">
+          <i class="fas fa-upload"></i> Subir Recurso
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal para Crear/Editar Proyecto - MEJORADO -->
+<div id="project-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="modal-header">
+            <h2 id="project-modal-title">Nuevo Proyecto</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="project-form" class="modal-body" enctype="multipart/form-data">
+            <div class="form-grid">
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Información Básica
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="project-title" class="form-label">
+                                Título del Proyecto *
+                            </label>
+                            <input type="text" id="project-title" class="form-input" required 
+                                   placeholder="Ingresa un título descriptivo para tu proyecto">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="project-year" class="form-label">Año *</label>
+                                <select id="project-year" class="form-select" required>
+                                    <option value="">Seleccionar año</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="project-status" class="form-label">Estado *</label>
+                                <select id="project-status" class="form-select" required>
+                                    <option value="iniciado">Iniciado</option>
+                                    <option value="progreso">En Progreso</option>
+                                    <option value="finalizado">Finalizado</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-align-left"></i>
+                            Descripción del Proyecto
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="project-description" class="form-label">
+                                Descripción Breve *
+                            </label>
+                            <textarea id="project-description" class="form-textarea" rows="3" required
+                                      placeholder="Describe brevemente de qué trata el proyecto"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="project-detailed-description" class="form-label">
+                                Descripción Detallada
+                            </label>
+                            <textarea id="project-detailed-description" class="form-textarea" rows="4"
+                                      placeholder="Incluye todos los detalles técnicos del proyecto"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-bullseye"></i>
+                            Objetivos y Requisitos
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="project-objectives" class="form-label">Objetivos</label>
+                            <textarea id="project-objectives" class="form-textarea" rows="3"
+                                      placeholder="¿Qué se espera lograr con este proyecto?"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="project-requirements" class="form-label">Requisitos</label>
+                            <textarea id="project-requirements" class="form-textarea" rows="3"
+                                      placeholder="¿Qué se necesita para desarrollar este proyecto?"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Problema a Resolver
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="project-problem" class="form-label">
+                                Problema que Resuelve *
+                            </label>
+                            <textarea id="project-problem" class="form-textarea" rows="3" required
+                                      placeholder="¿Qué problema específico resuelve este proyecto?"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Sección de Participantes MEJORADA -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-users"></i>
+                            Equipo de Trabajo
+                        </h3>
+                        
+                        <div class="participants-section">
+                            <div class="search-participant">
+                                <label class="form-label">Agregar Participante</label>
+                                <div class="search-box with-icon">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="student-search" 
+                                           placeholder="Buscar alumno por nombre...">
+                                </div>
+                                <div id="students-results" class="students-results"></div>
+                            </div>
+                            
+                            <!-- Estado de selección MEJORADO -->
+                            <div id="participant-selection" class="participant-selection" style="display: none;">
+                                <div class="selected-student">
+                                    <div class="student-info">
+                                        <span class="student-name" id="selected-student-name"></span>
+                                        <span class="student-details" id="selected-student-details"></span>
+                                    </div>
+                                    <button type="button" class="btn-outline btn-sm" onclick="cancelSelection()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="role-input">
+                                    <label class="form-label">Rol en el Proyecto *</label>
+                                    <div class="role-input-group">
+                                        <input type="text" id="project-student-role" 
+                                               placeholder="Ej: Programador, Diseñador, Investigador...">
+                                        <button type="button" class="btn-primary" id="add-participant-btn">
+                                            <i class="fas fa-plus"></i> Agregar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="participants-list-container">
+                                <label class="form-label">Participantes Agregados</label>
+                                <div id="project-participants" class="participants-list">
+                                    <div class="empty-participants">
+                                        <i class="fas fa-users"></i>
+                                        <p>No hay participantes agregados</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Archivos - SECCIÓN CORREGIDA -->
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-paperclip"></i>
+                    Archivos Adjuntos
+                </h3>
+                
+                <div class="form-group">
+                    <div class="file-upload-area" id="file-upload-area">
+                        <input type="file" id="project-files" name="files" multiple 
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.avi,.zip,.rar,.txt">
+                        <div class="upload-placeholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+                            <small>Formatos: PDF, Word, imágenes, videos, ZIP (máx. 50MB por archivo)</small>
+                        </div>
+                    </div>
+                    <div id="file-preview" class="file-preview"></div>
+                    <div id="upload-progress" class="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span class="progress-text">Subiendo archivos...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal(document.getElementById('project-modal'))">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> Guardar Proyecto
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Detalles de Proyecto - COMPLETAMENTE REDISEÑADO -->
+<div id="project-detail-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="modal-header">
+            <h2>Detalles del Proyecto</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body project-detail-body">
+            <!-- Header del proyecto -->
+            <div class="project-detail-header">
+                <div class="project-title-section">
+                    <h3 id="detail-project-title" class="project-detail-title"></h3>
+                    <div class="project-meta-badges">
+                        <span id="detail-status" class="status-badge-large"></span>
+                        <span class="year-badge" id="detail-year-badge"></span>
+                    </div>
+                </div>
+                <div class="project-creator">
+                    <i class="fas fa-user"></i>
+                    <span>Creado por: <strong id="detail-creator"></strong></span>
+                </div>
+            </div>
+
+            <!-- Navegación por pestañas -->
+            <div class="project-detail-tabs">
+                <button class="detail-tab active" data-tab="overview">
+                    <i class="fas fa-info-circle"></i> Resumen
+                </button>
+                <button class="detail-tab" data-tab="team">
+                    <i class="fas fa-users"></i> Equipo
+                </button>
+                <button class="detail-tab" data-tab="resources">
+                    <i class="fas fa-paperclip"></i> Recursos
+                </button>
+            </div>
+
+            <!-- Contenido de las pestañas -->
+            <div class="project-detail-content">
+                <!-- Pestaña Resumen -->
+                <div id="tab-overview" class="detail-tab-content active">
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <h4><i class="fas fa-align-left"></i> Descripción</h4>
+                            <p id="detail-description" class="info-text"></p>
+                        </div>
+                        
+                        <div class="info-card">
+                            <h4><i class="fas fa-file-alt"></i> Descripción Detallada</h4>
+                            <p id="detail-detailed-description" class="info-text"></p>
+                        </div>
+                        
+                        <div class="info-card">
+                            <h4><i class="fas fa-bullseye"></i> Objetivos</h4>
+                            <p id="detail-objectives" class="info-text"></p>
+                        </div>
+                        
+                        <div class="info-card">
+                            <h4><i class="fas fa-list-check"></i> Requisitos</h4>
+                            <p id="detail-requirements" class="info-text"></p>
+                        </div>
+                        
+                        <div class="info-card full-width">
+                            <h4><i class="fas fa-exclamation-triangle"></i> Problema que Resuelve</h4>
+                            <div class="problem-card">
+                                <i class="fas fa-lightbulb"></i>
+                                <p id="detail-problem" class="info-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña Equipo -->
+                <div id="tab-team" class="detail-tab-content">
+                    <div class="team-section">
+                        <h4>Participantes del Proyecto</h4>
+                        <div id="detail-participants" class="participants-grid"></div>
+                    </div>
+                </div>
+
+                <!-- Pestaña Recursos -->
+                <div id="tab-resources" class="detail-tab-content">
+                    <div class="resources-section">
+                        <!-- Archivos -->
+                        <div class="resource-category">
+                            <h4><i class="fas fa-file"></i> Archivos Adjuntos</h4>
+                            <div id="detail-files" class="files-grid"></div>
+                        </div>
+                        
+                        <!-- Enlaces -->
+                        <div class="resource-category">
+                            <h4><i class="fas fa-link"></i> Enlaces Relacionados</h4>
+                            <div id="detail-links" class="links-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="project-detail-actions" id="project-edit-buttons" style="display: none;">
+                <button type="button" class="btn-primary" onclick="editProject(currentProject)">
+                    <i class="fas fa-edit"></i> Editar Proyecto
+                </button>
+                <button type="button" class="btn-danger" id="delete-project-btn" style="display: none;" onclick="confirmDeleteProject(currentProject)">
+                    <i class="fas fa-trash"></i> Eliminar Proyecto
+                </button>
+                <button type="button" class="btn-outline" onclick="closeModal(document.getElementById('project-detail-modal'))">
+                    <i class="fas fa-times"></i> Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Acerca de TECEL -->
+<div id="about-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2>Acerca de TECEL</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="about-content">
+                <div class="about-section">
+                    <div class="about-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div class="about-text">
+                        <h3>¿Por qué surge TECEL?</h3>
+                        <p>TECEL nace de la necesidad de crear un espacio colaborativo donde los estudiantes y profesores de la especialidad de electrónica puedan compartir, desarrollar y materializar sus ideas innovadoras. Buscamos fomentar la creatividad y el trabajo en equipo en proyectos tecnológicos.</p>
+                    </div>
+                </div>
+                
+                <div class="about-section">
+                    <div class="about-icon">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                    <div class="about-text">
+                        <h3>¿Qué conseguimos con TECEL?</h3>
+                        <ul>
+                            <li><strong>Comunidad activa:</strong> Conectamos a estudiantes y profesores interesados en la electrónica</li>
+                            <li><strong>Innovación colaborativa:</strong> Transformamos ideas individuales en proyectos colectivos</li>
+                            <li><strong>Aprendizaje práctico:</strong> Aplicamos conocimientos teóricos en proyectos reales</li>
+                            <li><strong>Portfolio estudiantil:</strong> Los estudiantes construyen un historial de proyectos</li>
+                            <li><strong>Recursos compartidos:</strong> Biblioteca de materiales y documentación técnica</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="about-section">
+                    <div class="about-icon">
+                        <i class="fas fa-flag"></i>
+                    </div>
+                    <div class="about-text">
+                        <h3>Objetivos de la Plataforma</h3>
+                        <div class="objectives-grid">
+                            <div class="objective-card">
+                                <i class="fas fa-lightbulb"></i>
+                                <h4>Fomentar la Creatividad</h4>
+                                <p>Incentivar el desarrollo de ideas innovadoras en electrónica</p>
+                            </div>
+                            <div class="objective-card">
+                                <i class="fas fa-users"></i>
+                                <h4>Trabajo Colaborativo</h4>
+                                <p>Promover proyectos multidisciplinarios entre estudiantes</p>
+                            </div>
+                            <div class="objective-card">
+                                <i class="fas fa-graduation-cap"></i>
+                                <h4>Aprendizaje Práctico</h4>
+                                <p>Complementar la formación teórica con proyectos reales</p>
+                            </div>
+                            <div class="objective-card">
+                                <i class="fas fa-microchip"></i>
+                                <h4>Innovación Tecnológica</h4>
+                                <p>Desarrollar soluciones electrónicas para problemas reales</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="about-section">
+                    <div class="about-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="about-text">
+                        <h3>Beneficios para la Comunidad</h3>
+                        <div class="benefits-list">
+                            <div class="benefit-item">
+                                <span class="benefit-number">01</span>
+                                <div class="benefit-content">
+                                    <h4>Para Estudiantes</h4>
+                                    <p>Desarrollo de portfolio, experiencia práctica, networking y oportunidades de aprendizaje colaborativo</p>
+                                </div>
+                            </div>
+                            <div class="benefit-item">
+                                <span class="benefit-number">02</span>
+                                <div class="benefit-content">
+                                    <h4>Para Profesores</h4>
+                                    <p>Seguimiento de proyectos estudiantiles, identificación de talentos y enriquecimiento del proceso educativo</p>
+                                </div>
+                            </div>
+                            <div class="benefit-item">
+                                <span class="benefit-number">03</span>
+                                <div class="benefit-content">
+                                    <h4>Para la Especialidad</h4>
+                                    <p>Posicionamiento institucional, demostración de capacidades técnicas y atracción de nuevos estudiantes</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="closeModal(document.getElementById('about-modal'))">
+                    <i class="fas fa-check"></i> Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Proyecto -->
+<div id="confirm-delete-project-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Confirmar Eliminación</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Estás seguro de que quieres eliminar este proyecto?</h3>
+                    <p>Esta acción <strong>no se puede deshacer</strong>. Se eliminarán todos los datos del proyecto, incluyendo archivos y participantes.</p>
+                    <div class="project-info" id="delete-project-info" style="display: none;">
+                        <p><strong>Proyecto:</strong> <span id="delete-project-name"></span></p>
+                        <p><strong>Creado por:</strong> <span id="delete-project-creator"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-delete-project">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-danger" id="confirm-delete-project">
+                <i class="fas fa-trash"></i> Sí, Eliminar Proyecto
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Participante -->
+<div id="confirm-remove-participant-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Quitar Participante</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-user-minus"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Quitar participante del proyecto?</h3>
+                    <p>El participante <strong id="remove-participant-name"></strong> será removido del equipo de trabajo.</p>
+                    <p class="text-warning">Esta acción no se puede deshacer.</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-remove-participant">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-danger" id="confirm-remove-participant">
+                <i class="fas fa-user-times"></i> Sí, Quitar Participante
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Quitar Archivo -->
+<div id="confirm-remove-file-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Quitar Archivo</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-file-exclamation"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Quitar archivo del proyecto?</h3>
+                    <p>El archivo <strong id="remove-file-name"></strong> será removido del proyecto.</p>
+                    <p class="text-info">Nota: El archivo seguirá disponible en el servidor.</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-remove-file">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-warning" id="confirm-remove-file">
+                <i class="fas fa-file-export"></i> Sí, Quitar Archivo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Archivo Físicamente -->
+<div id="confirm-delete-file-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Eliminar Archivo</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Eliminar archivo permanentemente?</h3>
+                    <p>El archivo <strong id="delete-file-name"></strong> será <strong>eliminado completamente</strong> del servidor.</p>
+                    <p class="text-danger">Esta acción es irreversible y no se puede deshacer.</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-delete-file">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-danger" id="confirm-delete-file">
+                <i class="fas fa-trash"></i> Sí, Eliminar Permanentemente
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Subir Nueva Idea -->
+<div id="upload-idea-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2>Subir Nueva Idea</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="idea-form" class="modal-body">
+            <div class="form-grid">
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-lightbulb"></i>
+                            Información Básica
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="idea-name" class="form-label">
+                                Nombre de la Idea *
+                            </label>
+                            <input type="text" id="idea-name" class="form-input" required 
+                                   placeholder="Ej: Robot Autónomo para Limpieza de Paneles Solares"
+                                   maxlength="100">
+                            <small class="char-counter">0/100 caracteres</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="idea-category" class="form-label">
+                                Categoría *
+                            </label>
+                            <select id="idea-category" class="form-select" required>
+                                <option value="">Seleccionar categoría</option>
+                                <option value="electronica">Electrónica Aplicada</option>
+                                <option value="robotica">Robótica</option>
+                                <option value="iot">IoT (Internet de las Cosas)</option>
+                                <option value="proyectos-sociales">Proyectos Sociales</option>
+                                <option value="salud">Salud</option>
+                                <option value="energia">Energía</option>
+                                <option value="automotriz">Automotriz</option>
+                                <option value="programacion">Programación</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Problema a Resolver
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="idea-problem" class="form-label">
+                                ¿Qué problema resuelve tu idea? *
+                            </label>
+                            <textarea id="idea-problem" class="form-textarea" rows="4" required
+                                      placeholder="Describe el problema específico que tu idea busca solucionar..."
+                                      maxlength="300"></textarea>
+                            <small class="char-counter">0/300 caracteres</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-align-left"></i>
+                    Descripción Detallada
+                </h3>
+                
+                <div class="form-group">
+                    <label for="idea-description" class="form-label">
+                        Describe tu idea en detalle *
+                    </label>
+                    <textarea id="idea-description" class="form-textarea" rows="6" required
+                              placeholder="Explica cómo funciona tu idea, qué tecnologías utilizaría, qué beneficios tendría..."
+                              maxlength="1000"></textarea>
+                    <small class="char-counter">0/1000 caracteres</small>
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Información Adicional
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Nivel de Complejidad</label>
+                        <div class="complexity-buttons">
+                            <button type="button" class="complexity-btn active" data-complexity="baja">
+                                <i class="fas fa-star"></i>
+                                <span>Baja</span>
+                            </button>
+                            <button type="button" class="complexity-btn" data-complexity="media">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <span>Media</span>
+                            </button>
+                            <button type="button" class="complexity-btn" data-complexity="alta">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <span>Alta</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">¿Requiere Presupuesto?</label>
+                        <div class="budget-buttons">
+                            <button type="button" class="budget-btn active" data-budget="bajo">
+                                <span>Bajo ($)</span>
+                            </button>
+                            <button type="button" class="budget-btn" data-budget="medio">
+                                <span>Medio ($$)</span>
+                            </button>
+                            <button type="button" class="budget-btn" data-budget="alto">
+                                <span>Alto ($$$)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancel-idea">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-paper-plane"></i> Publicar Idea
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Detalles de Idea -->
+<div id="idea-detail-modal" class="modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2>Detalles de la Idea</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="idea-detail-content">
+                <div class="idea-detail-header">
+                    <h3 id="detail-idea-name"></h3>
+                    <div class="idea-meta-badges">
+                        <span id="detail-idea-category" class="category-badge"></span>
+                        <span id="detail-idea-complexity" class="complexity-badge"></span>
+                        <span id="detail-idea-budget" class="budget-badge"></span>
+                    </div>
+                </div>
+                
+                <div class="idea-detail-info">
+                    <div class="info-section">
+                        <h4><i class="fas fa-user"></i> Autor</h4>
+                        <p id="detail-idea-author"></p>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i class="fas fa-calendar"></i> Fecha de Creación</h4>
+                        <p id="detail-idea-date"></p>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Problema que Resuelve</h4>
+                        <div class="problem-card">
+                            <p id="detail-idea-problem"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i class="fas fa-align-left"></i> Descripción Detallada</h4>
+                        <p id="detail-idea-description"></p>
+                    </div>
+
+                    <!-- Sección de Participantes (NUEVA) -->
+                    <div class="info-section">
+                        <h4><i class="fas fa-users"></i> Participantes</h4>
+                        <div id="detail-idea-participants" class="participants-list"></div>
+                    </div>
+                </div>
+                
+                <div class="idea-detail-actions" id="idea-actions">
+                    <!-- Botones se llenarán dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Convertir Idea a Proyecto - VERSIÓN MEJORADA -->
+<div id="convert-idea-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="conversion-header">
+            <h2>Convertir Idea a Proyecto</h2>
+            <p class="conversion-subtitle">Transforma tu idea innovadora en un proyecto colaborativo</p>
+        </div>
+        
+        <div class="conversion-content">
+            <!-- Pasos del proceso -->
+            <div class="conversion-steps">
+                <div class="conversion-step step-active">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Información Básica</div>
+                </div>
+                <div class="conversion-step">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Configuración</div>
+                </div>
+                <div class="conversion-step">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Revisión</div>
+                </div>
+            </div>
+
+            <div class="conversion-form-grid">
+                <!-- Columna 1: Información de la idea original -->
+                <div class="conversion-form-column">
+                    <div class="conversion-form-section">
+                        <h4><i class="fas fa-lightbulb"></i> Idea Original</h4>
+                        
+                        <div class="idea-original-info">
+                            <h5><i class="fas fa-info-circle"></i> Información de la Idea</h5>
+                            <div class="idea-original-details">
+                                <div class="idea-original-detail">
+                                    <span class="detail-label">Nombre:</span>
+                                    <span class="detail-value" id="convert-idea-name"></span>
+                                </div>
+                                <div class="idea-original-detail">
+                                    <span class="detail-label">Autor:</span>
+                                    <span class="detail-value" id="convert-idea-author"></span>
+                                </div>
+                                <div class="idea-original-detail">
+                                    <span class="detail-label">Categoría:</span>
+                                    <span class="detail-value" id="convert-idea-category"></span>
+                                </div>
+                                <div class="idea-original-detail">
+                                    <span class="detail-label">Problema:</span>
+                                    <span class="detail-value" id="convert-idea-problem"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="conversion-origin">
+                            <p><i class="fas fa-shield-alt"></i> Este proyecto se originará a partir de la idea seleccionada</p>
+                        </div>
+                    </div>
+
+                    <!-- Sección de participantes de la idea -->
+                    <div class="conversion-form-section conversion-participants-section">
+                        <h4><i class="fas fa-users"></i> Equipo Original de la Idea</h4>
+                        <div id="conversion-participants" class="conversion-participants-list">
+                            <!-- Se llenará dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna 2: Formulario del proyecto -->
+                <div class="conversion-form-column">
+                    <form id="convert-idea-form">
+                        <div class="conversion-form-section">
+                            <h4><i class="fas fa-cog"></i> Configuración del Proyecto</h4>
+                            
+                            <div class="form-group">
+                                <label for="project-title-from-idea" class="form-label">
+                                    Título del Proyecto *
+                                </label>
+                                <input type="text" id="project-title-from-idea" class="form-input" required 
+                                       placeholder="Ingresa un título descriptivo para el proyecto">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="project-year-from-idea" class="form-label">Año *</label>
+                                    <select id="project-year-from-idea" class="form-select" required>
+                                        <option value="">Seleccionar año</option>
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="project-status-from-idea" class="form-label">Estado *</label>
+                                    <select id="project-status-from-idea" class="form-select" required>
+                                        <option value="iniciado">Iniciado</option>
+                                        <option value="progreso">En Progreso</option>
+                                        <option value="finalizado">Finalizado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="project-description-from-idea" class="form-label">
+                                    Descripción del Proyecto *
+                                </label>
+                                <textarea id="project-description-from-idea" class="form-textarea" rows="4" required
+                                          placeholder="Describe los objetivos y características principales del proyecto..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Sección de participantes del proyecto (igual que en crear proyecto) -->
+                        <div class="conversion-form-section">
+                            <h4><i class="fas fa-user-plus"></i> Agregar Participantes</h4>
+                            
+                            <div class="participants-section">
+                                <div class="search-participant">
+                                    <label class="form-label">Buscar Alumno</label>
+                                    <div class="search-box with-icon">
+                                        <i class="fas fa-search"></i>
+                                        <input type="text" id="conversion-student-search" 
+                                               placeholder="Buscar alumno por nombre...">
+                                    </div>
+                                    <div id="conversion-students-results" class="students-results"></div>
+                                </div>
+                                
+                                <div id="conversion-participant-selection" class="participant-selection" style="display: none;">
+                                    <div class="selected-student">
+                                        <div class="student-info">
+                                            <span class="student-name" id="conversion-selected-student-name"></span>
+                                            <span class="student-details" id="conversion-selected-student-details"></span>
+                                        </div>
+                                        <button type="button" class="btn-outline btn-sm" onclick="cancelConversionSelection()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="role-input">
+                                        <label class="form-label">Rol en el Proyecto *</label>
+                                        <div class="role-input-group">
+                                            <input type="text" id="conversion-student-role" 
+                                                   placeholder="Ej: Programador, Diseñador, Investigador...">
+                                            <button type="button" class="btn-primary" id="add-conversion-participant-btn">
+                                                <i class="fas fa-plus"></i> Agregar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="participants-list-container">
+                                    <label class="form-label">Participantes del Proyecto</label>
+                                    <div id="conversion-project-participants" class="participants-list">
+                                        <div class="empty-participants">
+                                            <i class="fas fa-users"></i>
+                                            <p>No hay participantes agregados</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección de archivos (igual que en crear proyecto) -->
+                        <div class="conversion-form-section full-width">
+                            <h4><i class="fas fa-paperclip"></i> Archivos Adjuntos</h4>
+                            
+                            <div class="form-group">
+                                <div class="file-upload-area" id="conversion-file-upload-area">
+                                    <input type="file" id="conversion-project-files" name="files" multiple 
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.avi,.zip,.rar,.txt">
+                                    <div class="upload-placeholder">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+                                        <small>Formatos: PDF, Word, imágenes, videos, ZIP (máx. 50MB por archivo)</small>
+                                    </div>
+                                </div>
+                                <div id="conversion-file-preview" class="file-preview"></div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="conversion-actions">
+            <button type="button" class="btn-secondary" onclick="closeModal(document.getElementById('convert-idea-modal'))">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="submit" class="btn-primary" id="convert-idea-submit-btn">
+                <i class="fas fa-rocket"></i> Crear Proyecto
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Editar Idea -->
+<div id="edit-idea-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="modal-header">
+            <h2>Editar Idea</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="edit-idea-form" class="modal-body">
+            <div class="form-grid">
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-lightbulb"></i>
+                            Información Básica
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="edit-idea-name" class="form-label">
+                                Nombre de la Idea *
+                            </label>
+                            <input type="text" id="edit-idea-name" class="form-input" required 
+                                   placeholder="Ej: Robot Autónomo para Limpieza de Paneles Solares"
+                                   maxlength="100">
+                            <small class="char-counter">0/100 caracteres</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit-idea-category" class="form-label">
+                                Categoría *
+                            </label>
+                            <select id="edit-idea-category" class="form-select" required>
+                                <option value="">Seleccionar categoría</option>
+                                <option value="electronica">Electrónica Aplicada</option>
+                                <option value="robotica">Robótica</option>
+                                <option value="iot">IoT (Internet de las Cosas)</option>
+                                <option value="proyectos-sociales">Proyectos Sociales</option>
+                                <option value="salud">Salud</option>
+                                <option value="energia">Energía</option>
+                                <option value="automotriz">Automotriz</option>
+                                <option value="programacion">Programación</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-column">
+                    <div class="form-section">
+                        <h3 class="form-section-title">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Problema a Resolver
+                        </h3>
+                        
+                        <div class="form-group">
+                            <label for="edit-idea-problem" class="form-label">
+                                ¿Qué problema resuelve tu idea? *
+                            </label>
+                            <textarea id="edit-idea-problem" class="form-textarea" rows="4" required
+                                      placeholder="Describe el problema específico que tu idea busca solucionar..."
+                                      maxlength="300"></textarea>
+                            <small class="char-counter">0/300 caracteres</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-align-left"></i>
+                    Descripción Detallada
+                </h3>
+                
+                <div class="form-group">
+                    <label for="edit-idea-description" class="form-label">
+                        Describe tu idea en detalle *
+                    </label>
+                    <textarea id="edit-idea-description" class="form-textarea" rows="6" required
+                              placeholder="Explica cómo funciona tu idea, qué tecnologías utilizaría, qué beneficios tendría..."
+                              maxlength="1000"></textarea>
+                    <small class="char-counter">0/1000 caracteres</small>
+                </div>
+            </div>
+
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Información Adicional
+                </h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Nivel de Complejidad</label>
+                        <div class="complexity-buttons">
+                            <button type="button" class="complexity-btn" data-complexity="baja">
+                                <i class="fas fa-star"></i>
+                                <span>Baja</span>
+                            </button>
+                            <button type="button" class="complexity-btn" data-complexity="media">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <span>Media</span>
+                            </button>
+                            <button type="button" class="complexity-btn" data-complexity="alta">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <span>Alta</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">¿Requiere Presupuesto?</label>
+                        <div class="budget-buttons">
+                            <button type="button" class="budget-btn" data-budget="bajo">
+                                <span>Bajo ($)</span>
+                            </button>
+                            <button type="button" class="budget-btn" data-budget="medio">
+                                <span>Medio ($$)</span>
+                            </button>
+                            <button type="button" class="budget-btn" data-budget="alto">
+                                <span>Alto ($$$)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN DE PARTICIPANTES PARA IDEAS -->
+            <div class="form-section full-width">
+                <h3 class="form-section-title">
+                    <i class="fas fa-users"></i>
+                    Equipo de Colaboradores
+                </h3>
+                
+                <div class="participants-section">
+                    <div class="search-participant">
+                        <label class="form-label">Agregar Colaborador</label>
+                        <div class="search-box with-icon">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="idea-student-search" 
+                                   placeholder="Buscar alumno por nombre...">
+                        </div>
+                        <div id="idea-students-results" class="students-results"></div>
+                    </div>
+                    
+                    <div id="idea-participant-selection" class="participant-selection" style="display: none;">
+                        <div class="selected-student">
+                            <div class="student-info">
+                                <span class="student-name" id="idea-selected-student-name"></span>
+                                <span class="student-details" id="idea-selected-student-details"></span>
+                            </div>
+                            <button type="button" class="btn-outline btn-sm" onclick="cancelIdeaSelection()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="role-input">
+                            <label class="form-label">Rol en la Idea *</label>
+                            <div class="role-input-group">
+                                <input type="text" id="idea-student-role" 
+                                       placeholder="Ej: Investigador, Diseñador, Programador...">
+                                <button type="button" class="btn-primary" id="add-idea-participant-btn">
+                                    <i class="fas fa-plus"></i> Agregar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="participants-list-container">
+                        <label class="form-label">Colaboradores Agregados</label>
+                        <div id="idea-participants" class="participants-list">
+                            <div class="empty-participants">
+                                <i class="fas fa-users"></i>
+                                <p>No hay colaboradores agregados</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancel-edit-idea">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Mural de Ideas -->
+<div id="mural-ideas-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="modal-header">
+            <h2>Mural de Ideas</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="mural-header">
+                <div class="mural-stats">
+                    <div class="stat-item">
+                        <span class="stat-number" id="mural-total-ideas">0</span>
+                        <span class="stat-label">Total de Ideas</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="mural-active-ideas">0</span>
+                        <span class="stat-label">Ideas Activas</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="mural-converted-ideas">0</span>
+                        <span class="stat-label">Convertidas a Proyectos</span>
+                    </div>
+                </div>
+                
+                <div class="mural-search">
+                    <div class="search-box with-icon">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="mural-search-input" placeholder="Buscar en todas las ideas...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mural-filters">
+                <div class="filter-group">
+                    <label>Filtrar por categoría:</label>
+                    <select id="mural-category-filter">
+                        <option value="all">Todas las categorías</option>
+                        <option value="electronica">Electrónica Aplicada</option>
+                        <option value="robotica">Robótica</option>
+                        <option value="iot">IoT</option>
+                        <option value="proyectos-sociales">Proyectos Sociales</option>
+                        <option value="salud">Salud</option>
+                        <option value="energia">Energía</option>
+                        <option value="automotriz">Automotriz</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Filtrar por estado:</label>
+                    <select id="mural-status-filter">
+                        <option value="all">Todos los estados</option>
+                        <option value="active">Solo ideas activas</option>
+                        <option value="converted">Convertidas a proyectos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mural-grid-container">
+                <div class="mural-grid" id="mural-ideas-container">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Cargando ideas...</p>
+                    </div>
+                </div>
+                
+                <div class="empty-state" id="mural-empty" style="display: none;">
+                    <div class="empty-icon">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <h3>No se encontraron ideas</h3>
+                    <p>Intenta con otros términos de búsqueda o filtros</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Sugerencia -->
+<div id="confirm-delete-suggestion-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Confirmar Eliminación</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Eliminar sugerencia?</h3>
+                    <p>Esta acción <strong>no se puede deshacer</strong>. La sugerencia será eliminada permanentemente.</p>
+                    <div class="suggestion-info">
+                        <p><strong>Sugerencia:</strong> <span id="delete-suggestion-name"></span></p>
+                        <p><strong>Autor:</strong> <span id="delete-suggestion-author"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-delete-suggestion">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-danger" id="confirm-delete-suggestion">
+                <i class="fas fa-trash"></i> Sí, Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Cambiar Estado -->
+<div id="confirm-change-status-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Cambiar Estado</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-sync-alt"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Cambiar estado de la sugerencia?</h3>
+                    <p>La sugerencia cambiará de estado:</p>
+                    <div class="status-change-info">
+                        <p><strong>Sugerencia:</strong> <span id="change-status-suggestion-name"></span></p>
+                        <p><strong>Estado actual:</strong> <span id="change-status-current" class="status-badge"></span></p>
+                        <p><strong>Nuevo estado:</strong> <span id="change-status-new" class="status-badge"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-change-status">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-primary" id="confirm-change-status">
+                <i class="fas fa-check"></i> Sí, Cambiar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Agregar Comentario -->
+<div id="add-comment-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Agregar Comentario</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="suggestion-comment-form" class="modal-body">
+            <div class="form-group">
+                <label for="comment-text" class="form-label">Comentario *</label>
+                <textarea id="comment-text" class="form-textarea" rows="5" required 
+                          placeholder="Escribe tu comentario sobre esta sugerencia..."
+                          maxlength="500"></textarea>
+                <small class="char-counter" id="comment-char-counter">0/500 caracteres</small>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="cancel-comment">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-paper-plane"></i> Publicar Comentario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Modal para Programas -->
+<div id="programas-modal" class="modal">
+  <div class="modal-content extra-large">
+    <div class="modal-header">
+      <h2><i class="fas fa-laptop-code"></i> Programas</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="category-modal-content">
+        <div class="category-stats-bar">
+          <div class="category-stat">
+            <span class="stat-number" id="programas-modal-count">0</span>
+            <span class="stat-label">Programas Disponibles</span>
+          </div>
+        </div>
+        
+        <div class="category-filters">
+          <div class="search-box with-icon">
+            <i class="fas fa-search"></i>
+            <input type="text" id="programas-search" placeholder="Buscar programas...">
+          </div>
+          <div class="filter-group">
+            <select id="programas-subcategory-filter">
+              <option value="all">Todas las subcategorías</option>
+              <option value="programacion">Programación</option>
+              <option value="simulacion">Simulación</option>
+              <option value="diseno">Diseño</option>
+              <option value="utilidades">Utilidades</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <select id="programas-type-filter">
+              <option value="all">Todos los tipos</option>
+              <option value="software">Software</option>
+              <option value="ide">IDE</option>
+              <option value="herramienta">Herramienta</option>
+              <option value="biblioteca">Biblioteca</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="category-resources-grid" id="programas-container">
+          <!-- Los recursos se cargarán aquí -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Habilidades Técnicas -->
+<div id="habilidades-tecnicas-modal" class="modal">
+  <div class="modal-content extra-large">
+    <div class="modal-header">
+      <h2><i class="fas fa-cogs"></i> Habilidades Técnicas</h2>
+      <span class="close">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="category-modal-content">
+        <div class="category-stats-bar">
+          <div class="category-stat">
+            <span class="stat-number" id="tecnicas-modal-count">0</span>
+            <span class="stat-label">Recursos Técnicos</span>
+          </div>
+        </div>
+        
+        <div class="category-filters">
+          <div class="search-box with-icon">
+            <i class="fas fa-search"></i>
+            <input type="text" id="tecnicas-search" placeholder="Buscar recursos técnicos...">
+          </div>
+          <div class="filter-group">
+            <select id="tecnicas-subcategory-filter">
+              <option value="all">Todas las subcategorías</option>
+              <option value="electronica">Electrónica</option>
+              <option value="programacion">Programación</option>
+              <option value="robotica">Robótica</option>
+              <option value="iot">IoT</option>
+              <option value="proyectos">Proyectos</option>
+              <option value="manuales">Manuales</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="category-resources-grid" id="habilidades-tecnicas-container">
+          <!-- Los recursos se cargarán aquí -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!-- Modal para Habilidades Blandas -->
+    <div id="habilidades-blandas-modal" class="modal">
+    <div class="modal-content extra-large">
+        <div class="modal-header">
+            <h2><i class="fas fa-users"></i> Habilidades Blandas</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="category-modal-content">
+                <div class="category-stats-bar">
+                <div class="category-stat">
+                    <span class="stat-number" id="blandas-modal-count">0</span>
+                    <span class="stat-label">Recursos Blandos</span>
+                </div>
+            </div>
+        
+        <div class="category-filters">
+          <div class="search-box with-icon">
+            <i class="fas fa-search"></i>
+            <input type="text" id="blandas-search" placeholder="Buscar recursos de habilidades blandas...">
+          </div>
+          <div class="filter-group">
+            <select id="blandas-subcategory-filter">
+              <option value="all">Todas las subcategorías</option>
+              <option value="comunicacion">Comunicación</option>
+              <option value="trabajo_equipo">Trabajo en Equipo</option>
+              <option value="liderazgo">Liderazgo</option>
+              <option value="presentaciones">Presentaciones</option>
+              <option value="gestion_proyectos">Gestión de Proyectos</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="category-resources-grid" id="habilidades-blandas-container">
+          <!-- Los recursos se cargarán aquí -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmación para Activar/Desactivar Usuario -->
+<div id="confirm-user-status-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Confirmar Cambio de Estado</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3 id="user-status-modal-title">¿Cambiar estado del usuario?</h3>
+                    <p>El usuario <strong id="user-status-name"></strong> será <strong id="user-status-action"></strong>.</p>
+                    <div class="user-status-info">
+                        <p><strong>Email:</strong> <span id="user-status-email"></span></p>
+                        <p><strong>Tipo:</strong> <span id="user-status-type"></span></p>
+                    </div>
+                    <p class="text-warning" id="user-status-warning"></p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-user-status">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-primary" id="confirm-user-status">
+                <i class="fas fa-check"></i> Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar Usuario -->
+<div id="confirm-delete-user-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-exclamation-triangle"></i> Eliminar Usuario</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="confirmation-content">
+                <div class="confirmation-icon warning">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <div class="confirmation-text">
+                    <h3>¿Eliminar usuario permanentemente?</h3>
+                    <p>Esta acción <strong class="text-danger">no se puede deshacer</strong>. Se eliminarán todos los datos del usuario:</p>
+                    <div class="user-delete-info">
+                        <div class="info-item">
+                            <i class="fas fa-user"></i>
+                            <span><strong>Usuario:</strong> <span id="delete-user-name"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-envelope"></i>
+                            <span><strong>Email:</strong> <span id="delete-user-email"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-tag"></i>
+                            <span><strong>Tipo:</strong> <span id="delete-user-type"></span></span>
+                        </div>
+                    </div>
+                    <div class="warning-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>Se perderán todos sus proyectos, ideas y sugerencias</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-delete-user">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-danger" id="confirm-delete-user">
+                <i class="fas fa-trash"></i> Sí, Eliminar Permanentemente
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Editar Usuario -->
+<div id="edit-user-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-edit"></i> Editar Usuario</h2>
+            <span class="close">&times;</span>
+        </div>
+        <form id="edit-user-form" class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Información del Usuario</label>
+                <div class="user-edit-info">
+                    <div class="info-display">
+                        <strong id="edit-user-name"></strong>
+                        <small id="edit-user-email"></small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-user-grade" class="form-label">
+                    <i class="fas fa-graduation-cap"></i>
+                    Curso
+                </label>
+                <select id="edit-user-grade" class="form-select">
+                    <option value="">Seleccionar curso</option>
+                    <option value="4to">4to Año</option>
+                    <option value="5to">5to Año</option>
+                    <option value="6to">6to Año</option>
+                    <option value="7mo">7mo Año</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-user-specialization" class="form-label">
+                    <i class="fas fa-cogs"></i>
+                    Especialidad
+                </label>
+                <input type="text" id="edit-user-specialization" class="form-input" 
+                       placeholder="Ingresa la especialidad">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Estado de la Cuenta</label>
+                <div class="status-toggle">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="edit-user-active">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Cuenta activa</span>
+                    </label>
+                </div>
+                <small class="form-help">Si se desactiva, el usuario no podrá iniciar sesión</small>
+            </div>
+        </form>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancel-edit-user">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" class="btn-primary" id="save-user-changes">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <div class="logo-icon">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <div class="footer-logo-text">
+                            <h3>TECEL</h3>
+                            <p>Especialidad Electrónica</p>
+                        </div>
+                    </div>
+                    <p class="footer-description">
+                        Plataforma educativa para fomentar la innovación y colaboración en proyectos electrónicos.
+                    </p>
+                </div>
+                <div class="footer-section">
+                    <h4>Enlaces Rápidos</h4>
+                <ul class="footer-links">
+                    <li><a href="#home" data-section="home">Inicio</a></li>
+                    <li><a href="#semillero" data-section="semillero">Semillero</a></li>
+                    <li><a href="#ideas" data-section="ideas">Ideas Locas</a></li>
+                    <li><a href="#biblioteca" data-section="biblioteca">Biblioteca</a></li>
+                </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contacto</h4>
+                    <div class="contact-info">
+                        <p><i class="fas fa-envelope"></i></p>
+                        <p><i class="fas fa-phone"></i> +54 11 2519-2810</p>
+                        <p><i class="fas fa-map-marker-alt"></i> Buenos Aires, Argentina</p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 TECEL - Especialidad Electrónica. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
