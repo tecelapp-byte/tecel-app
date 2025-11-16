@@ -634,6 +634,260 @@ console.log('✅ Patch línea 4159 aplicado');
     console.log('✅ Patch debug detallado aplicado');
 })();
 
+// ==================================================
+// 🚨 PATCH CRÍTICO - formData.entries is not a function
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch para formData.entries...');
+    
+    // 1. PATCH PARA handleProjectSubmit - CONVERSIÓN SEGURA DE FORMDATA
+    const originalHandleProjectSubmit = window.handleProjectSubmit;
+    
+    if (originalHandleProjectSubmit) {
+        window.handleProjectSubmit = async function(formData, projectId = null) {
+            console.log('🎯 Patch handleProjectSubmit - Conversión segura de formData');
+            
+            // VALIDAR Y CONVERTIR formData
+            let validatedFormData;
+            
+            if (formData instanceof FormData) {
+                console.log('✅ formData es instancia válida de FormData');
+                validatedFormData = formData;
+            } else if (formData && typeof formData === 'object') {
+                console.log('🔄 formData NO es FormData, convirtiendo...', formData);
+                
+                // Crear nuevo FormData
+                validatedFormData = new FormData();
+                
+                // Intentar diferentes métodos para extraer datos
+                try {
+                    // Método 1: Si tiene entries() pero no es iterable
+                    if (formData.entries && typeof formData.entries === 'function') {
+                        console.log('🔧 Usando formData.entries()');
+                        const entries = formData.entries();
+                        for (const [key, value] of entries) {
+                            validatedFormData.append(key, value);
+                        }
+                    }
+                    // Método 2: Si es un objeto plano
+                    else {
+                        console.log('🔧 Convirtiendo objeto a FormData');
+                        for (const key in formData) {
+                            if (formData.hasOwnProperty(key) && formData[key] !== undefined) {
+                                validatedFormData.append(key, formData[key]);
+                                console.log(`✅ Campo convertido: ${key} = ${formData[key]}`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error convirtiendo formData:', error);
+                    
+                    // Método 3: Recolectar datos del formulario directamente
+                    console.log('🔧 Recolectando datos del formulario directamente');
+                    const form = document.querySelector('form[id*="project"], form[action*="project"]');
+                    if (form) {
+                        validatedFormData = new FormData(form);
+                        console.log('✅ FormData recreado desde formulario HTML');
+                    } else {
+                        console.error('❌ No se pudo encontrar el formulario');
+                        throw new Error('No se pudieron obtener los datos del proyecto');
+                    }
+                }
+            } else {
+                console.error('❌ formData es inválido:', formData);
+                throw new Error('Datos del proyecto inválidos');
+            }
+            
+            // DEBUG: Mostrar contenido final del FormData
+            console.log('📦 FormData validado - Contenido:');
+            for (const [key, value] of validatedFormData.entries()) {
+                console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
+            }
+            
+            // Llamar a la función original con el FormData validado
+            try {
+                const result = await originalHandleProjectSubmit.call(this, validatedFormData, projectId);
+                console.log('✅ Proyecto guardado exitosamente');
+                return result;
+            } catch (error) {
+                console.error('❌ Error guardando proyecto:', error);
+                throw error;
+            }
+        };
+    }
+    
+    console.log('✅ Patch formData.entries aplicado');
+})();
+
+// ==================================================
+// 🚀 PATCH MEJORADO - DETECCIÓN AUTOMÁTICA DE FORMDATA
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch mejorado para formData...');
+    
+    // Función segura para convertir cualquier cosa a FormData
+    function safeToFormData(input) {
+        console.log('🔄 Convirtiendo a FormData seguro...', input);
+        
+        const formData = new FormData();
+        
+        if (input instanceof FormData) {
+            // Ya es FormData - usar directamente
+            return input;
+        }
+        else if (input && typeof input === 'object') {
+            // Es un objeto - convertir a FormData
+            if (typeof input.forEach === 'function') {
+                // Si es Map o similar
+                input.forEach((value, key) => {
+                    formData.append(key, value);
+                });
+            }
+            else if (typeof input.entries === 'function') {
+                // Si tiene entries pero no es iterable
+                try {
+                    const entries = input.entries();
+                    let entry = entries.next();
+                    while (!entry.done) {
+                        formData.append(entry.value[0], entry.value[1]);
+                        entry = entries.next();
+                    }
+                } catch (e) {
+                    console.warn('❌ entries() falló, usando Object.entries:', e);
+                    Object.entries(input).forEach(([key, value]) => {
+                        if (value !== undefined && value !== null) {
+                            formData.append(key, value);
+                        }
+                    });
+                }
+            }
+            else {
+                // Objeto plano
+                Object.entries(input).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null) {
+                        formData.append(key, value);
+                    }
+                });
+            }
+            
+            console.log(`✅ Convertido a FormData con ${Array.from(formData.entries()).length} campos`);
+            return formData;
+        }
+        else {
+            console.error('❌ No se puede convertir a FormData:', input);
+            throw new Error('Datos del proyecto no válidos');
+        }
+    }
+    
+    // PATCH PARA handleProjectSubmit
+    const originalHandleProjectSubmit = window.handleProjectSubmit;
+    
+    if (originalHandleProjectSubmit) {
+        window.handleProjectSubmit = async function(formData, projectId = null) {
+            console.log('🎯 Patch handleProjectSubmit - Iniciando...');
+            
+            try {
+                // CONVERTIR SEGURAMENTE A FORMDATA
+                const safeFormData = safeToFormData(formData);
+                
+                // DEBUG del FormData resultante
+                console.log('📦 FormData final para envío:');
+                const entries = [];
+                for (const [key, value] of safeFormData.entries()) {
+                    entries.push({ key, value: value instanceof File ? `File(${value.name})` : value });
+                    console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
+                }
+                
+                // ENVIAR usando la función original
+                console.log('🚀 Enviando proyecto al servidor...');
+                const result = await originalHandleProjectSubmit.call(this, safeFormData, projectId);
+                
+                console.log('✅ Proyecto guardado exitosamente');
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Error en handleProjectSubmit:', error);
+                
+                // Mostrar error específico al usuario
+                let errorMessage = 'Error al guardar el proyecto';
+                if (error.message.includes('formData.entries')) {
+                    errorMessage = 'Error: Los datos del formulario están corruptos. Por favor, recarga la página e intenta nuevamente.';
+                } else if (error.message) {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                alert(errorMessage);
+                throw error;
+            }
+        };
+    }
+    
+    console.log('✅ Patch mejorado aplicado');
+})();
+
+// ==================================================
+// 🚨 PATCH DE EMERGENCIA - INTERCEPTAR FORMULARIO DIRECTAMENTE
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch de emergencia...');
+    
+    // Interceptar TODOS los formularios de proyecto
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        
+        // Solo interceptar formularios de proyecto
+        if (form && (
+            form.id.includes('project') || 
+            form.className.includes('project') ||
+            form.action.includes('project') ||
+            form.querySelector('input[name="title"]')
+        )) {
+            console.log('🚨 INTERCEPTANDO SUBMIT DE FORMULARIO DE PROYECTO');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Crear FormData directamente desde el formulario HTML
+            const formData = new FormData(form);
+            
+            console.log('📦 FormData creado desde formulario HTML:');
+            for (const [key, value] of formData.entries()) {
+                console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
+            }
+            
+            // Llamar a handleProjectSubmit con el FormData correcto
+            if (window.handleProjectSubmit) {
+                console.log('🎯 Ejecutando handleProjectSubmit con FormData válido...');
+                window.handleProjectSubmit(formData)
+                    .then(result => {
+                        console.log('✅ Proyecto creado exitosamente:', result);
+                        // Aquí podrías redirigir o mostrar mensaje de éxito
+                        alert('¡Proyecto creado exitosamente!');
+                    })
+                    .catch(error => {
+                        console.error('❌ Error creando proyecto:', error);
+                        alert(`Error: ${error.message}`);
+                    });
+            } else {
+                console.error('❌ handleProjectSubmit no encontrado');
+                alert('Error: No se pudo procesar el formulario');
+            }
+            
+            return false;
+        }
+    });
+    
+    console.log('✅ Patch de emergencia aplicado');
+})();
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
