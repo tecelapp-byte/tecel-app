@@ -210,6 +210,63 @@ window.fetch = function(resource, options = {}) {
 
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
+// ==================================================
+// 🚨 PATCH CRÍTICO PARA FORMDATA - SOLUCIONA CAMPOS UNDEFINED
+// ==================================================
+
+// Guardar FormData original
+const OriginalFormData = window.FormData;
+
+// Override FormData para asegurar que los campos se envíen correctamente
+window.FormData = function(form) {
+    const formData = new OriginalFormData(form);
+    
+    // Override el método append para validar valores
+    const originalAppend = formData.append;
+    formData.append = function(name, value, filename) {
+        // Filtrar valores undefined, null o vacíos
+        if (value === undefined || value === null) {
+            console.warn(`⚠️ FormData: Omitiendo campo '${name}' con valor undefined/null`);
+            return;
+        }
+        
+        // Si es string, asegurar que no sea 'undefined'
+        if (typeof value === 'string' && value === 'undefined') {
+            console.warn(`⚠️ FormData: Omitiendo campo '${name}' con valor string 'undefined'`);
+            return;
+        }
+        
+        // Si está vacío, omitir
+        if (typeof value === 'string' && value.trim() === '') {
+            console.warn(`⚠️ FormData: Omitiendo campo '${name}' vacío`);
+            return;
+        }
+        
+        console.log(`✅ FormData.append: ${name} = ${value} ${value instanceof File ? `(File: ${value.name})` : ''}`);
+        return originalAppend.call(this, name, value, filename);
+    };
+    
+    // Override constructor para validar formularios existentes
+    if (form) {
+        console.log('🔍 FormData creado desde formulario:', form.id || form.className);
+        
+        // Validar todos los campos del formulario
+        const formElements = form.elements;
+        for (let element of formElements) {
+            if (element.name && (element.value === undefined || element.value === null || element.value === 'undefined')) {
+                console.warn(`⚠️ Campo problemático en formulario: ${element.name} = ${element.value}`);
+            }
+        }
+    }
+    
+    return formData;
+};
+
+// Mantener compatibilidad con el prototype original
+window.FormData.prototype = OriginalFormData.prototype;
+
+console.log('✅ Patch crítico de FormData aplicado');
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
