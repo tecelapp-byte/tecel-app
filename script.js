@@ -267,6 +267,212 @@ window.FormData.prototype = OriginalFormData.prototype;
 
 console.log('✅ Patch crítico de FormData aplicado');
 
+// ==================================================
+// 🗂️ PATCH CRÍTICO PARA SISTEMA DE ARCHIVOS
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch para sistema de archivos...');
+    
+    // Interceptar la función problemática (basado en tu línea 4159)
+    const originalFormDataAppend = FormData.prototype.append;
+    
+    FormData.prototype.append = function(name, value, filename) {
+        // CORREGIR: Si es un archivo pero no es un Blob válido
+        if (name === 'files' || name === 'file' || name.includes('archivo')) {
+            console.log(`📁 Procesando archivo: ${name}`, value);
+            
+            if (value && typeof value === 'object') {
+                // Si es un File object, usar directamente
+                if (value instanceof File) {
+                    console.log(`✅ Archivo válido: ${value.name} (${value.size} bytes)`);
+                    return originalFormDataAppend.call(this, name, value, filename || value.name);
+                }
+                
+                // Si es un objeto con información de archivo pero no es File
+                if (value.name && value.size !== undefined) {
+                    console.warn(`⚠️ Objeto archivo no es File:`, value);
+                    // Intentar convertir a File si es posible
+                    if (value.content && value.type) {
+                        try {
+                            const blob = new Blob([value.content], { type: value.type });
+                            const file = new File([blob], value.name, { type: value.type });
+                            console.log(`🔧 Convertido a File: ${file.name}`);
+                            return originalFormDataAppend.call(this, name, file, filename || value.name);
+                        } catch (e) {
+                            console.error('❌ Error convirtiendo archivo:', e);
+                        }
+                    }
+                }
+            }
+            
+            // Si llegamos aquí, el valor no es un archivo válido
+            console.error(`❌ Valor no es un archivo válido para ${name}:`, value);
+            return; // No agregar al FormData
+        }
+        
+        // Para otros campos, validar como antes
+        if (value === undefined || value === null || value === 'undefined' || value === 'null') {
+            console.warn(`⚠️ Omitiendo campo '${name}' con valor inválido`);
+            return;
+        }
+        
+        if (typeof value === 'string' && value.trim() === '') {
+            console.warn(`⚠️ Omitiendo campo '${name}' vacío`);
+            return;
+        }
+        
+        console.log(`✅ FormData.append: ${name} = ${typeof value === 'string' ? value : typeof value}`);
+        return originalFormDataAppend.call(this, name, value, filename);
+    };
+    
+    console.log('✅ Patch sistema de archivos aplicado');
+})();
+
+// ==================================================
+// 🔧 PATCH PARA handleProjectSubmit - LÍNEA 4159
+// ==================================================
+
+// Encontrar y parchear la función específica
+const originalHandleProjectSubmit = window.handleProjectSubmit;
+
+window.handleProjectSubmit = async function(formData, projectId = null) {
+    console.log('🎯 Patch handleProjectSubmit activado (línea 4159)');
+    
+    // Crear un nuevo FormData validado
+    const validatedFormData = new FormData();
+    
+    // 1. Primero agregar todos los campos normales
+    for (const [key, value] of formData.entries()) {
+        if (key !== 'files' && key !== 'file' && !key.includes('archivo')) {
+            // Validar campos normales
+            if (value && value !== 'undefined' && value !== 'null' && value.toString().trim() !== '') {
+                validatedFormData.append(key, value);
+                console.log(`✅ Campo normal: ${key} = ${value}`);
+            }
+        }
+    }
+    
+    // 2. Luego procesar archivos SEPARADAMENTE
+    const files = [];
+    for (const [key, value] of formData.entries()) {
+        if (key === 'files' || key === 'file' || key.includes('archivo')) {
+            console.log(`📁 Procesando archivo en campo: ${key}`, value);
+            
+            if (value instanceof File) {
+                files.push(value);
+                console.log(`✅ Archivo válido agregado: ${value.name}`);
+            } else if (value && typeof value === 'object' && value.name) {
+                console.warn(`⚠️ Archivo no es instancia File:`, value);
+                // Intentar manejar como objeto de archivo
+                if (value.content) {
+                    try {
+                        const blob = new Blob([value.content], { type: value.type || 'application/octet-stream' });
+                        const file = new File([blob], value.name, { type: value.type || 'application/octet-stream' });
+                        files.push(file);
+                        console.log(`🔧 Archivo convertido: ${file.name}`);
+                    } catch (e) {
+                        console.error('❌ Error procesando archivo:', e);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 3. Agregar archivos al FormData validado
+    if (files.length > 0) {
+        files.forEach(file => {
+            validatedFormData.append('files', file);
+            console.log(`📤 Archivo listo para upload: ${file.name} (${file.size} bytes)`);
+        });
+    } else {
+        console.log('ℹ️ No hay archivos para subir');
+    }
+    
+    console.log(`📦 FormData final: ${Array.from(validatedFormData.entries()).length} campos totales`);
+    
+    // Llamar a la función original con el FormData corregido
+    if (originalHandleProjectSubmit) {
+        return await originalHandleProjectSubmit.call(this, validatedFormData, projectId);
+    } else {
+        console.error('❌ No se encontró handleProjectSubmit original');
+    }
+};
+
+console.log('✅ Patch línea 4159 aplicado');
+
+// ==================================================
+// 🚀 PATCH UNIFICADO - SISTEMA DE ARCHIVOS COMPLETO
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch unificado para sistema de archivos...');
+    
+    // 1. PATCH FORMDATA.APPEND
+    const originalAppend = FormData.prototype.append;
+    FormData.prototype.append = function(name, value, filename) {
+        // Manejo especial para archivos
+        if (name === 'files' || name === 'file') {
+            if (value instanceof File) {
+                console.log(`✅ Append archivo: ${value.name}`);
+                return originalAppend.call(this, name, value, filename || value.name);
+            } else if (value && typeof value === 'object') {
+                console.warn(`⚠️ Archivo no es File:`, value);
+                // Convertir a File si es posible
+                if (value.name && (value.content || value.data)) {
+                    try {
+                        const content = value.content || value.data || '';
+                        const type = value.type || 'application/octet-stream';
+                        const blob = new Blob([content], { type });
+                        const file = new File([blob], value.name, { type });
+                        console.log(`🔧 Convertido a File: ${file.name}`);
+                        return originalAppend.call(this, name, file, filename || value.name);
+                    } catch (e) {
+                        console.error('❌ Error convirtiendo archivo:', e);
+                        return; // No agregar archivo inválido
+                    }
+                }
+            }
+            console.error(`❌ Archivo inválido omitido: ${name}`, value);
+            return;
+        }
+        
+        // Para campos normales
+        if (value !== undefined && value !== null && value !== 'undefined' && value !== 'null') {
+            if (typeof value === 'string' && value.trim() !== '') {
+                console.log(`✅ Append campo: ${name} = ${value}`);
+                return originalAppend.call(this, name, value, filename);
+            } else if (typeof value !== 'string') {
+                console.log(`✅ Append campo: ${name} = [${typeof value}]`);
+                return originalAppend.call(this, name, value, filename);
+            }
+        }
+        
+        console.warn(`⚠️ Campo omitido: ${name} = ${value}`);
+    };
+    
+    // 2. PATCH FILE CONSTRUCTOR (por si acaso)
+    const OriginalFile = window.File;
+    window.File = function(fileBits, fileName, options) {
+        console.log(`📁 Creando File: ${fileName}`);
+        
+        // Validar fileBits
+        if (!fileBits || !Array.isArray(fileBits) || fileBits.length === 0) {
+            console.warn(`⚠️ FileBits vacío para ${fileName}, usando Blob vacío`);
+            fileBits = [new Blob([''], { type: options?.type || 'application/octet-stream' })];
+        }
+        
+        return new OriginalFile(fileBits, fileName, options);
+    };
+    window.File.prototype = OriginalFile.prototype;
+    
+    console.log('✅ Patch unificado aplicado');
+})();
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
