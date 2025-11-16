@@ -211,681 +211,97 @@ window.fetch = function(resource, options = {}) {
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
 // ==================================================
-// 🚨 PATCH CRÍTICO PARA FORMDATA - SOLUCIONA CAMPOS UNDEFINED
-// ==================================================
-
-// Guardar FormData original
-const OriginalFormData = window.FormData;
-
-// Override FormData para asegurar que los campos se envíen correctamente
-window.FormData = function(form) {
-    const formData = new OriginalFormData(form);
-    
-    // Override el método append para validar valores
-    const originalAppend = formData.append;
-    formData.append = function(name, value, filename) {
-        // Filtrar valores undefined, null o vacíos
-        if (value === undefined || value === null) {
-            console.warn(`⚠️ FormData: Omitiendo campo '${name}' con valor undefined/null`);
-            return;
-        }
-        
-        // Si es string, asegurar que no sea 'undefined'
-        if (typeof value === 'string' && value === 'undefined') {
-            console.warn(`⚠️ FormData: Omitiendo campo '${name}' con valor string 'undefined'`);
-            return;
-        }
-        
-        // Si está vacío, omitir
-        if (typeof value === 'string' && value.trim() === '') {
-            console.warn(`⚠️ FormData: Omitiendo campo '${name}' vacío`);
-            return;
-        }
-        
-        console.log(`✅ FormData.append: ${name} = ${value} ${value instanceof File ? `(File: ${value.name})` : ''}`);
-        return originalAppend.call(this, name, value, filename);
-    };
-    
-    // Override constructor para validar formularios existentes
-    if (form) {
-        console.log('🔍 FormData creado desde formulario:', form.id || form.className);
-        
-        // Validar todos los campos del formulario
-        const formElements = form.elements;
-        for (let element of formElements) {
-            if (element.name && (element.value === undefined || element.value === null || element.value === 'undefined')) {
-                console.warn(`⚠️ Campo problemático en formulario: ${element.name} = ${element.value}`);
-            }
-        }
-    }
-    
-    return formData;
-};
-
-// Mantener compatibilidad con el prototype original
-window.FormData.prototype = OriginalFormData.prototype;
-
-console.log('✅ Patch crítico de FormData aplicado');
-
-// ==================================================
-// 🗂️ PATCH CRÍTICO PARA SISTEMA DE ARCHIVOS
+// 🚀 PATCH ÚNICO Y DEFINITIVO - SIN CONFLICTOS
 // ==================================================
 
 (function() {
     'use strict';
     
-    console.log('🔧 Aplicando patch para sistema de archivos...');
+    console.log('🔧 Aplicando PATCH ÚNICO definitivo...');
     
-    // Interceptar la función problemática (basado en tu línea 4159)
-    const originalFormDataAppend = FormData.prototype.append;
+    // 1. GUARDAR ORIGINALES
+    const originalFetch = window.fetch;
+    const originalFormData = window.FormData;
+    const originalAppend = FormData.prototype.append;
     
+    // 2. PATCH FORMDATA.APPEND - SEGURO Y SIMPLE
     FormData.prototype.append = function(name, value, filename) {
-        // CORREGIR: Si es un archivo pero no es un Blob válido
-        if (name === 'files' || name === 'file' || name.includes('archivo')) {
-            console.log(`📁 Procesando archivo: ${name}`, value);
-            
-            if (value && typeof value === 'object') {
-                // Si es un File object, usar directamente
-                if (value instanceof File) {
-                    console.log(`✅ Archivo válido: ${value.name} (${value.size} bytes)`);
-                    return originalFormDataAppend.call(this, name, value, filename || value.name);
-                }
-                
-                // Si es un objeto con información de archivo pero no es File
-                if (value.name && value.size !== undefined) {
-                    console.warn(`⚠️ Objeto archivo no es File:`, value);
-                    // Intentar convertir a File si es posible
-                    if (value.content && value.type) {
-                        try {
-                            const blob = new Blob([value.content], { type: value.type });
-                            const file = new File([blob], value.name, { type: value.type });
-                            console.log(`🔧 Convertido a File: ${file.name}`);
-                            return originalFormDataAppend.call(this, name, file, filename || value.name);
-                        } catch (e) {
-                            console.error('❌ Error convirtiendo archivo:', e);
-                        }
-                    }
-                }
-            }
-            
-            // Si llegamos aquí, el valor no es un archivo válido
-            console.error(`❌ Valor no es un archivo válido para ${name}:`, value);
+        // SOLUCIONAR ERROR BLOB - Si es campo de archivo y no es Blob, OMITIR
+        if ((name === 'files' || name === 'file') && 
+            !(value instanceof File) && 
+            !(value instanceof Blob)) {
+            console.warn(`⚠️ OMITIENDO archivo inválido en campo "${name}":`, value);
             return; // No agregar al FormData
         }
         
-        // Para otros campos, validar como antes
-        if (value === undefined || value === null || value === 'undefined' || value === 'null') {
-            console.warn(`⚠️ Omitiendo campo '${name}' con valor inválido`);
-            return;
-        }
-        
-        if (typeof value === 'string' && value.trim() === '') {
-            console.warn(`⚠️ Omitiendo campo '${name}' vacío`);
-            return;
-        }
-        
-        console.log(`✅ FormData.append: ${name} = ${typeof value === 'string' ? value : typeof value}`);
-        return originalFormDataAppend.call(this, name, value, filename);
+        // Para todos los otros casos, comportamiento NORMAL
+        return originalAppend.call(this, name, value, filename);
     };
     
-    console.log('✅ Patch sistema de archivos aplicado');
-})();
-
-// ==================================================
-// 🔧 PATCH PARA handleProjectSubmit - LÍNEA 4159
-// ==================================================
-
-// Encontrar y parchear la función específica
-const originalHandleProjectSubmit = window.handleProjectSubmit;
-
-window.handleProjectSubmit = async function(formData, projectId = null) {
-    console.log('🎯 Patch handleProjectSubmit activado (línea 4159)');
-    
-    // Crear un nuevo FormData validado
-    const validatedFormData = new FormData();
-    
-    // 1. Primero agregar todos los campos normales
-    for (const [key, value] of formData.entries()) {
-        if (key !== 'files' && key !== 'file' && !key.includes('archivo')) {
-            // Validar campos normales
-            if (value && value !== 'undefined' && value !== 'null' && value.toString().trim() !== '') {
-                validatedFormData.append(key, value);
-                console.log(`✅ Campo normal: ${key} = ${value}`);
-            }
-        }
-    }
-    
-    // 2. Luego procesar archivos SEPARADAMENTE
-    const files = [];
-    for (const [key, value] of formData.entries()) {
-        if (key === 'files' || key === 'file' || key.includes('archivo')) {
-            console.log(`📁 Procesando archivo en campo: ${key}`, value);
-            
-            if (value instanceof File) {
-                files.push(value);
-                console.log(`✅ Archivo válido agregado: ${value.name}`);
-            } else if (value && typeof value === 'object' && value.name) {
-                console.warn(`⚠️ Archivo no es instancia File:`, value);
-                // Intentar manejar como objeto de archivo
-                if (value.content) {
-                    try {
-                        const blob = new Blob([value.content], { type: value.type || 'application/octet-stream' });
-                        const file = new File([blob], value.name, { type: value.type || 'application/octet-stream' });
-                        files.push(file);
-                        console.log(`🔧 Archivo convertido: ${file.name}`);
-                    } catch (e) {
-                        console.error('❌ Error procesando archivo:', e);
-                    }
-                }
-            }
-        }
-    }
-    
-    // 3. Agregar archivos al FormData validado
-    if (files.length > 0) {
-        files.forEach(file => {
-            validatedFormData.append('files', file);
-            console.log(`📤 Archivo listo para upload: ${file.name} (${file.size} bytes)`);
-        });
-    } else {
-        console.log('ℹ️ No hay archivos para subir');
-    }
-    
-    console.log(`📦 FormData final: ${Array.from(validatedFormData.entries()).length} campos totales`);
-    
-    // Llamar a la función original con el FormData corregido
-    if (originalHandleProjectSubmit) {
-        return await originalHandleProjectSubmit.call(this, validatedFormData, projectId);
-    } else {
-        console.error('❌ No se encontró handleProjectSubmit original');
-    }
-};
-
-console.log('✅ Patch línea 4159 aplicado');
-
-// ==================================================
-// 🚀 PATCH UNIFICADO - SISTEMA DE ARCHIVOS COMPLETO
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch unificado para sistema de archivos...');
-    
-    // 1. PATCH FORMDATA.APPEND
-    const originalAppend = FormData.prototype.append;
-    FormData.prototype.append = function(name, value, filename) {
-        // Manejo especial para archivos
-        if (name === 'files' || name === 'file') {
-            if (value instanceof File) {
-                console.log(`✅ Append archivo: ${value.name}`);
-                return originalAppend.call(this, name, value, filename || value.name);
-            } else if (value && typeof value === 'object') {
-                console.warn(`⚠️ Archivo no es File:`, value);
-                // Convertir a File si es posible
-                if (value.name && (value.content || value.data)) {
-                    try {
-                        const content = value.content || value.data || '';
-                        const type = value.type || 'application/octet-stream';
-                        const blob = new Blob([content], { type });
-                        const file = new File([blob], value.name, { type });
-                        console.log(`🔧 Convertido a File: ${file.name}`);
-                        return originalAppend.call(this, name, file, filename || value.name);
-                    } catch (e) {
-                        console.error('❌ Error convirtiendo archivo:', e);
-                        return; // No agregar archivo inválido
-                    }
-                }
-            }
-            console.error(`❌ Archivo inválido omitido: ${name}`, value);
-            return;
-        }
-        
-        // Para campos normales
-        if (value !== undefined && value !== null && value !== 'undefined' && value !== 'null') {
-            if (typeof value === 'string' && value.trim() !== '') {
-                console.log(`✅ Append campo: ${name} = ${value}`);
-                return originalAppend.call(this, name, value, filename);
-            } else if (typeof value !== 'string') {
-                console.log(`✅ Append campo: ${name} = [${typeof value}]`);
-                return originalAppend.call(this, name, value, filename);
-            }
-        }
-        
-        console.warn(`⚠️ Campo omitido: ${name} = ${value}`);
-    };
-    
-    // 2. PATCH FILE CONSTRUCTOR (por si acaso)
-    const OriginalFile = window.File;
-    window.File = function(fileBits, fileName, options) {
-        console.log(`📁 Creando File: ${fileName}`);
-        
-        // Validar fileBits
-        if (!fileBits || !Array.isArray(fileBits) || fileBits.length === 0) {
-            console.warn(`⚠️ FileBits vacío para ${fileName}, usando Blob vacío`);
-            fileBits = [new Blob([''], { type: options?.type || 'application/octet-stream' })];
-        }
-        
-        return new OriginalFile(fileBits, fileName, options);
-    };
-    window.File.prototype = OriginalFile.prototype;
-    
-    console.log('✅ Patch unificado aplicado');
-})();
-
-// ==================================================
-// 🚨 PATCH PARA DETECTAR ERRORES Y PREVENIR REFRESH
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch anti-refresh...');
-    
-    // 1. PREVENIR COMPORTAMIENTO POR DEFECTO DE FORMULARIOS
-    document.addEventListener('submit', function(e) {
-        if (e.target && e.target.method === 'post') {
-            console.log('🚨 Submit detectado - Previniendo comportamiento por defecto');
-            e.preventDefault();
-            
-            // Ejecutar el submit manualmente después de un pequeño delay
-            setTimeout(() => {
-                console.log('🔁 Re-ejecutando submit de forma controlada...');
-                // El código existente se encargará del submit
-            }, 100);
-        }
-    });
-    
-    // 2. INTERCEPTAR ERRORES GLOBALES
-    window.addEventListener('error', function(e) {
-        console.error('🚨 ERROR GLOBAL DETECTADO:', e.error);
-        console.error('📝 Mensaje:', e.message);
-        console.error('📍 Archivo:', e.filename);
-        console.error('🔢 Línea:', e.lineno);
-        
-        // Prevenir que el error cause un refresh
-        e.preventDefault();
-        return true;
-    });
-    
-    // 3. INTERCEPTAR PROMESAS RECHAZADAS NO MANEJADAS
-    window.addEventListener('unhandledrejection', function(e) {
-        console.error('🚨 PROMESA RECHAZADA NO MANEJADA:', e.reason);
-        e.preventDefault();
-    });
-    
-    // 4. PATCH PARA handleProjectSubmit - CON MEJOR MANEJO DE ERRORES
-    const originalHandleProjectSubmit = window.handleProjectSubmit;
-    
-    if (originalHandleProjectSubmit) {
-        window.handleProjectSubmit = async function(formData, projectId = null) {
-            console.log('🎯 Patch handleProjectSubmit con manejo mejorado de errores');
-            
-            try {
-                // Validar FormData antes de enviar
-                console.log('📋 Validando FormData antes del envío...');
-                for (const [key, value] of formData.entries()) {
-                    console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
-                }
-                
-                // Llamar a la función original
-                const result = await originalHandleProjectSubmit.call(this, formData, projectId);
-                console.log('✅ handleProjectSubmit completado exitosamente');
-                return result;
-                
-            } catch (error) {
-                console.error('❌ ERROR en handleProjectSubmit:', error);
-                
-                // Mostrar error al usuario sin recargar la página
-                alert(`Error al guardar el proyecto: ${error.message}`);
-                
-                // NO recargar la página
-                return null;
-            }
-        };
-    }
-    
-    console.log('✅ Patch anti-refresh aplicado');
-})();
-
-// ==================================================
-// 🔍 PATCH DEBUG DETALLADO - PROCESO DE CREACIÓN
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch debug detallado...');
-    
-    // 1. DEBUG DE TODAS LAS LLAMADAS FETCH
-    const originalFetch = window.fetch;
+    // 3. PATCH FETCH - SOLO PARA DEBUG
     window.fetch = function(resource, options = {}) {
         const url = typeof resource === 'string' ? resource : resource.url;
         
-        // Solo debuggear llamadas a /api/projects
+        // Debug solo para proyectos
         if (url && url.includes('/api/projects') && options.method === 'POST') {
-            console.log('🚨 🚨 🚨 LLAMADA POST A /api/projects DETECTADA 🚨 🚨 🚨');
-            console.log('📤 URL:', url);
-            console.log('⚙️ Options:', options);
-            
+            console.log('🚀 FETCH /api/projects - FormData contenido:');
             if (options.body instanceof FormData) {
-                console.log('📦 FormData contenido:');
                 for (const [key, value] of options.body.entries()) {
                     console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
                 }
             }
-            
-            // Interceptar la respuesta
-            return originalFetch.call(this, resource, options)
-                .then(response => {
-                    console.log(`📥 RESPUESTA RECIBIDA: ${response.status} ${response.statusText}`);
-                    
-                    // Clonar la respuesta para poder leerla y mantenerla
-                    return response.clone().json().then(data => {
-                        console.log('📄 DATOS DE RESPUESTA:', data);
-                        return response;
-                    }).catch(e => {
-                        console.log('📄 RESPUESTA NO JSON:', e);
-                        return response;
-                    });
-                })
-                .catch(error => {
-                    console.error('❌ ERROR EN FETCH:', error);
-                    throw error;
-                });
         }
         
         return originalFetch.call(this, resource, options);
     };
     
-    // 2. DEBUG DE EVENT LISTENERS
-    const originalAddEventListener = EventTarget.prototype.addEventListener;
-    EventTarget.prototype.addEventListener = function(type, listener, options) {
-        // Debuggear event listeners de submit
-        if (type === 'submit' && this.tagName === 'FORM') {
-            console.log('📝 Event listener de SUBMIT agregado a formulario:', this.id || this.className);
-        }
-        
-        return originalAddEventListener.call(this, type, listener, options);
-    };
-    
-    // 3. DEBUG DE REDIRECCIONES
-    const originalPushState = history.pushState;
-    history.pushState = function(state, title, url) {
-        console.log('🧭 History.pushState llamado:', { state, title, url });
-        return originalPushState.call(this, state, title, url);
-    };
-    
-    const originalReplaceState = history.replaceState;
-    history.replaceState = function(state, title, url) {
-        console.log('🧭 History.replaceState llamado:', { state, title, url });
-        return originalReplaceState.call(this, state, title, url);
-    };
-    
-    // 4. DEBUG DE LOCATION CHANGES
-    let currentHref = location.href;
-    setInterval(() => {
-        if (location.href !== currentHref) {
-            console.log('🔄 URL cambió:', currentHref, '→', location.href);
-            currentHref = location.href;
-        }
-    }, 100);
-    
-    console.log('✅ Patch debug detallado aplicado');
-})();
-
-// ==================================================
-// 🚨 PATCH CRÍTICO - formData.entries is not a function
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch para formData.entries...');
-    
-    // 1. PATCH PARA handleProjectSubmit - CONVERSIÓN SEGURA DE FORMDATA
+    // 4. PATCH handleProjectSubmit - ÚNICO Y SIMPLE
     const originalHandleProjectSubmit = window.handleProjectSubmit;
     
     if (originalHandleProjectSubmit) {
         window.handleProjectSubmit = async function(formData, projectId = null) {
-            console.log('🎯 Patch handleProjectSubmit - Conversión segura de formData');
+            console.log('🎯 handleProjectSubmit PATCH - Iniciando...');
             
-            // VALIDAR Y CONVERTIR formData
-            let validatedFormData;
+            // CREAR NUEVO FORMDATA LIMPIO
+            const cleanFormData = new FormData();
+            let validFiles = 0;
+            let validFields = 0;
             
-            if (formData instanceof FormData) {
-                console.log('✅ formData es instancia válida de FormData');
-                validatedFormData = formData;
-            } else if (formData && typeof formData === 'object') {
-                console.log('🔄 formData NO es FormData, convirtiendo...', formData);
-                
-                // Crear nuevo FormData
-                validatedFormData = new FormData();
-                
-                // Intentar diferentes métodos para extraer datos
-                try {
-                    // Método 1: Si tiene entries() pero no es iterable
-                    if (formData.entries && typeof formData.entries === 'function') {
-                        console.log('🔧 Usando formData.entries()');
-                        const entries = formData.entries();
-                        for (const [key, value] of entries) {
-                            validatedFormData.append(key, value);
-                        }
-                    }
-                    // Método 2: Si es un objeto plano
-                    else {
-                        console.log('🔧 Convirtiendo objeto a FormData');
-                        for (const key in formData) {
-                            if (formData.hasOwnProperty(key) && formData[key] !== undefined) {
-                                validatedFormData.append(key, formData[key]);
-                                console.log(`✅ Campo convertido: ${key} = ${formData[key]}`);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('❌ Error convirtiendo formData:', error);
-                    
-                    // Método 3: Recolectar datos del formulario directamente
-                    console.log('🔧 Recolectando datos del formulario directamente');
-                    const form = document.querySelector('form[id*="project"], form[action*="project"]');
-                    if (form) {
-                        validatedFormData = new FormData(form);
-                        console.log('✅ FormData recreado desde formulario HTML');
+            // COPIAR SOLO CAMPOS VÁLIDOS
+            for (const [key, value] of formData.entries()) {
+                if (key === 'files' || key === 'file') {
+                    // Solo archivos que sean Blob/File válidos
+                    if (value instanceof File || value instanceof Blob) {
+                        cleanFormData.append(key, value);
+                        validFiles++;
+                        console.log(`✅ Archivo válido: ${value.name}`);
                     } else {
-                        console.error('❌ No se pudo encontrar el formulario');
-                        throw new Error('No se pudieron obtener los datos del proyecto');
+                        console.warn(`⚠️ Archivo omitido: no es Blob válido`);
                     }
+                } else {
+                    // Campos normales - siempre agregar
+                    cleanFormData.append(key, value);
+                    validFields++;
+                    console.log(`✅ Campo: ${key} = ${value}`);
                 }
-            } else {
-                console.error('❌ formData es inválido:', formData);
-                throw new Error('Datos del proyecto inválidos');
             }
             
-            // DEBUG: Mostrar contenido final del FormData
-            console.log('📦 FormData validado - Contenido:');
-            for (const [key, value] of validatedFormData.entries()) {
-                console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
-            }
+            console.log(`📦 FormData limpio: ${validFields} campos, ${validFiles} archivos`);
             
-            // Llamar a la función original con el FormData validado
+            // EJECUTAR ORIGINAL CON DATOS LIMPIOS
             try {
-                const result = await originalHandleProjectSubmit.call(this, validatedFormData, projectId);
+                const result = await originalHandleProjectSubmit.call(this, cleanFormData, projectId);
                 console.log('✅ Proyecto guardado exitosamente');
                 return result;
             } catch (error) {
                 console.error('❌ Error guardando proyecto:', error);
+                alert(`Error: ${error.message}`);
                 throw error;
             }
         };
     }
     
-    console.log('✅ Patch formData.entries aplicado');
-})();
-
-// ==================================================
-// 🚀 PATCH MEJORADO - DETECCIÓN AUTOMÁTICA DE FORMDATA
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch mejorado para formData...');
-    
-    // Función segura para convertir cualquier cosa a FormData
-    function safeToFormData(input) {
-        console.log('🔄 Convirtiendo a FormData seguro...', input);
-        
-        const formData = new FormData();
-        
-        if (input instanceof FormData) {
-            // Ya es FormData - usar directamente
-            return input;
-        }
-        else if (input && typeof input === 'object') {
-            // Es un objeto - convertir a FormData
-            if (typeof input.forEach === 'function') {
-                // Si es Map o similar
-                input.forEach((value, key) => {
-                    formData.append(key, value);
-                });
-            }
-            else if (typeof input.entries === 'function') {
-                // Si tiene entries pero no es iterable
-                try {
-                    const entries = input.entries();
-                    let entry = entries.next();
-                    while (!entry.done) {
-                        formData.append(entry.value[0], entry.value[1]);
-                        entry = entries.next();
-                    }
-                } catch (e) {
-                    console.warn('❌ entries() falló, usando Object.entries:', e);
-                    Object.entries(input).forEach(([key, value]) => {
-                        if (value !== undefined && value !== null) {
-                            formData.append(key, value);
-                        }
-                    });
-                }
-            }
-            else {
-                // Objeto plano
-                Object.entries(input).forEach(([key, value]) => {
-                    if (value !== undefined && value !== null) {
-                        formData.append(key, value);
-                    }
-                });
-            }
-            
-            console.log(`✅ Convertido a FormData con ${Array.from(formData.entries()).length} campos`);
-            return formData;
-        }
-        else {
-            console.error('❌ No se puede convertir a FormData:', input);
-            throw new Error('Datos del proyecto no válidos');
-        }
-    }
-    
-    // PATCH PARA handleProjectSubmit
-    const originalHandleProjectSubmit = window.handleProjectSubmit;
-    
-    if (originalHandleProjectSubmit) {
-        window.handleProjectSubmit = async function(formData, projectId = null) {
-            console.log('🎯 Patch handleProjectSubmit - Iniciando...');
-            
-            try {
-                // CONVERTIR SEGURAMENTE A FORMDATA
-                const safeFormData = safeToFormData(formData);
-                
-                // DEBUG del FormData resultante
-                console.log('📦 FormData final para envío:');
-                const entries = [];
-                for (const [key, value] of safeFormData.entries()) {
-                    entries.push({ key, value: value instanceof File ? `File(${value.name})` : value });
-                    console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
-                }
-                
-                // ENVIAR usando la función original
-                console.log('🚀 Enviando proyecto al servidor...');
-                const result = await originalHandleProjectSubmit.call(this, safeFormData, projectId);
-                
-                console.log('✅ Proyecto guardado exitosamente');
-                return result;
-                
-            } catch (error) {
-                console.error('❌ Error en handleProjectSubmit:', error);
-                
-                // Mostrar error específico al usuario
-                let errorMessage = 'Error al guardar el proyecto';
-                if (error.message.includes('formData.entries')) {
-                    errorMessage = 'Error: Los datos del formulario están corruptos. Por favor, recarga la página e intenta nuevamente.';
-                } else if (error.message) {
-                    errorMessage = `Error: ${error.message}`;
-                }
-                
-                alert(errorMessage);
-                throw error;
-            }
-        };
-    }
-    
-    console.log('✅ Patch mejorado aplicado');
-})();
-
-// ==================================================
-// 🚨 PATCH DE EMERGENCIA - INTERCEPTAR FORMULARIO DIRECTAMENTE
-// ==================================================
-
-(function() {
-    'use strict';
-    
-    console.log('🔧 Aplicando patch de emergencia...');
-    
-    // Interceptar TODOS los formularios de proyecto
-    document.addEventListener('submit', function(e) {
-        const form = e.target;
-        
-        // Solo interceptar formularios de proyecto
-        if (form && (
-            form.id.includes('project') || 
-            form.className.includes('project') ||
-            form.action.includes('project') ||
-            form.querySelector('input[name="title"]')
-        )) {
-            console.log('🚨 INTERCEPTANDO SUBMIT DE FORMULARIO DE PROYECTO');
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Crear FormData directamente desde el formulario HTML
-            const formData = new FormData(form);
-            
-            console.log('📦 FormData creado desde formulario HTML:');
-            for (const [key, value] of formData.entries()) {
-                console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
-            }
-            
-            // Llamar a handleProjectSubmit con el FormData correcto
-            if (window.handleProjectSubmit) {
-                console.log('🎯 Ejecutando handleProjectSubmit con FormData válido...');
-                window.handleProjectSubmit(formData)
-                    .then(result => {
-                        console.log('✅ Proyecto creado exitosamente:', result);
-                        // Aquí podrías redirigir o mostrar mensaje de éxito
-                        alert('¡Proyecto creado exitosamente!');
-                    })
-                    .catch(error => {
-                        console.error('❌ Error creando proyecto:', error);
-                        alert(`Error: ${error.message}`);
-                    });
-            } else {
-                console.error('❌ handleProjectSubmit no encontrado');
-                alert('Error: No se pudo procesar el formulario');
-            }
-            
-            return false;
-        }
-    });
-    
-    console.log('✅ Patch de emergencia aplicado');
+    console.log('✅ PATCH ÚNICO aplicado - Sin conflictos');
 })();
 
 // Inicialización cuando el DOM está listo
