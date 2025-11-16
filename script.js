@@ -117,6 +117,98 @@ async function apiFetch(endpoint, options = {}) {
     }
 }
 
+// Guardar el fetch original
+const originalFetch = window.fetch;
+
+// Override global fetch para corregir automáticamente
+window.fetch = function(resource, options = {}) {
+    let url = resource;
+    let modifiedOptions = { ...options };
+    
+    // 1. CORREGIR URLS LOCALES
+    if (typeof resource === 'string') {
+        const localUrls = [
+            'http://192.168.1.34:3000',
+            'http://localhost:3000', 
+            'http://127.0.0.1:3000'
+        ];
+        
+        for (const localUrl of localUrls) {
+            if (resource.startsWith(localUrl)) {
+                url = resource.replace(localUrl, 'https://tecel-app.onrender.com');
+                console.log('🔄 URL corregida:', resource, '→', url);
+                break;
+            }
+        }
+        
+        // Asegurar que las URLs relativas tengan el base correcto
+        if (url.startsWith('/') && !url.startsWith('//')) {
+            url = `https://tecel-app.onrender.com${url}`;
+            console.log('📍 URL relativa convertida a absoluta:', url);
+        }
+    }
+
+    // 2. CORREGIR HEADERS PARA FORMDATA
+    if (modifiedOptions.body instanceof FormData) {
+        console.log('📦 Detectado FormData - Configurando headers automáticamente');
+        
+        // Crear nuevos headers (no modificar directamente)
+        modifiedOptions.headers = modifiedOptions.headers || {};
+        
+        // NO establecer Content-Type (el browser lo hace automáticamente con boundary)
+        // Pero eliminar cualquier Content-Type incorrecto que pueda estar seteado
+        if (modifiedOptions.headers['Content-Type']) {
+            delete modifiedOptions.headers['Content-Type'];
+        }
+        
+        // Agregar Authorization si no está presente
+        const authToken = localStorage.getItem('authToken') || 
+                         localStorage.getItem('token') ||
+                         sessionStorage.getItem('authToken');
+                         
+        if (authToken && !modifiedOptions.headers['Authorization']) {
+            modifiedOptions.headers['Authorization'] = `Bearer ${authToken}`;
+            console.log('🔐 Token de autorización agregado automáticamente');
+        }
+    }
+
+    // 3. CORREGIR HEADERS PARA JSON
+    else if (modifiedOptions.body && typeof modifiedOptions.body === 'string') {
+        try {
+            JSON.parse(modifiedOptions.body);
+            if (!modifiedOptions.headers?.['Content-Type']) {
+                modifiedOptions.headers = {
+                    ...modifiedOptions.headers,
+                    'Content-Type': 'application/json'
+                };
+                console.log('📝 Content-Type JSON agregado automáticamente');
+            }
+        } catch (e) {
+            // No es JSON, no hacer nada
+        }
+    }
+
+    // 4. LOG PARA DEBUG
+    const method = modifiedOptions.method || 'GET';
+    console.log(`🌐 [Fetch Interceptor] ${method} ${url}`);
+    
+    if (modifiedOptions.body instanceof FormData) {
+        console.log('   📦 Body: FormData con', Array.from(modifiedOptions.body.entries()).length, 'elementos');
+    }
+
+    // 5. EJECUTAR FETCH ORIGINAL
+    return originalFetch.call(this, url, modifiedOptions)
+        .then(response => {
+            console.log(`✅ [Fetch Interceptor] ${method} ${url} - Status: ${response.status}`);
+            return response;
+        })
+        .catch(error => {
+            console.error(`❌ [Fetch Interceptor] ${method} ${url} - Error:`, error);
+            throw error;
+        });
+};
+
+console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
