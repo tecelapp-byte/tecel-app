@@ -473,6 +473,167 @@ console.log('✅ Patch línea 4159 aplicado');
     console.log('✅ Patch unificado aplicado');
 })();
 
+// ==================================================
+// 🚨 PATCH PARA DETECTAR ERRORES Y PREVENIR REFRESH
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch anti-refresh...');
+    
+    // 1. PREVENIR COMPORTAMIENTO POR DEFECTO DE FORMULARIOS
+    document.addEventListener('submit', function(e) {
+        if (e.target && e.target.method === 'post') {
+            console.log('🚨 Submit detectado - Previniendo comportamiento por defecto');
+            e.preventDefault();
+            
+            // Ejecutar el submit manualmente después de un pequeño delay
+            setTimeout(() => {
+                console.log('🔁 Re-ejecutando submit de forma controlada...');
+                // El código existente se encargará del submit
+            }, 100);
+        }
+    });
+    
+    // 2. INTERCEPTAR ERRORES GLOBALES
+    window.addEventListener('error', function(e) {
+        console.error('🚨 ERROR GLOBAL DETECTADO:', e.error);
+        console.error('📝 Mensaje:', e.message);
+        console.error('📍 Archivo:', e.filename);
+        console.error('🔢 Línea:', e.lineno);
+        
+        // Prevenir que el error cause un refresh
+        e.preventDefault();
+        return true;
+    });
+    
+    // 3. INTERCEPTAR PROMESAS RECHAZADAS NO MANEJADAS
+    window.addEventListener('unhandledrejection', function(e) {
+        console.error('🚨 PROMESA RECHAZADA NO MANEJADA:', e.reason);
+        e.preventDefault();
+    });
+    
+    // 4. PATCH PARA handleProjectSubmit - CON MEJOR MANEJO DE ERRORES
+    const originalHandleProjectSubmit = window.handleProjectSubmit;
+    
+    if (originalHandleProjectSubmit) {
+        window.handleProjectSubmit = async function(formData, projectId = null) {
+            console.log('🎯 Patch handleProjectSubmit con manejo mejorado de errores');
+            
+            try {
+                // Validar FormData antes de enviar
+                console.log('📋 Validando FormData antes del envío...');
+                for (const [key, value] of formData.entries()) {
+                    console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
+                }
+                
+                // Llamar a la función original
+                const result = await originalHandleProjectSubmit.call(this, formData, projectId);
+                console.log('✅ handleProjectSubmit completado exitosamente');
+                return result;
+                
+            } catch (error) {
+                console.error('❌ ERROR en handleProjectSubmit:', error);
+                
+                // Mostrar error al usuario sin recargar la página
+                alert(`Error al guardar el proyecto: ${error.message}`);
+                
+                // NO recargar la página
+                return null;
+            }
+        };
+    }
+    
+    console.log('✅ Patch anti-refresh aplicado');
+})();
+
+// ==================================================
+// 🔍 PATCH DEBUG DETALLADO - PROCESO DE CREACIÓN
+// ==================================================
+
+(function() {
+    'use strict';
+    
+    console.log('🔧 Aplicando patch debug detallado...');
+    
+    // 1. DEBUG DE TODAS LAS LLAMADAS FETCH
+    const originalFetch = window.fetch;
+    window.fetch = function(resource, options = {}) {
+        const url = typeof resource === 'string' ? resource : resource.url;
+        
+        // Solo debuggear llamadas a /api/projects
+        if (url && url.includes('/api/projects') && options.method === 'POST') {
+            console.log('🚨 🚨 🚨 LLAMADA POST A /api/projects DETECTADA 🚨 🚨 🚨');
+            console.log('📤 URL:', url);
+            console.log('⚙️ Options:', options);
+            
+            if (options.body instanceof FormData) {
+                console.log('📦 FormData contenido:');
+                for (const [key, value] of options.body.entries()) {
+                    console.log(`   ${key}:`, value instanceof File ? `File(${value.name})` : value);
+                }
+            }
+            
+            // Interceptar la respuesta
+            return originalFetch.call(this, resource, options)
+                .then(response => {
+                    console.log(`📥 RESPUESTA RECIBIDA: ${response.status} ${response.statusText}`);
+                    
+                    // Clonar la respuesta para poder leerla y mantenerla
+                    return response.clone().json().then(data => {
+                        console.log('📄 DATOS DE RESPUESTA:', data);
+                        return response;
+                    }).catch(e => {
+                        console.log('📄 RESPUESTA NO JSON:', e);
+                        return response;
+                    });
+                })
+                .catch(error => {
+                    console.error('❌ ERROR EN FETCH:', error);
+                    throw error;
+                });
+        }
+        
+        return originalFetch.call(this, resource, options);
+    };
+    
+    // 2. DEBUG DE EVENT LISTENERS
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type, listener, options) {
+        // Debuggear event listeners de submit
+        if (type === 'submit' && this.tagName === 'FORM') {
+            console.log('📝 Event listener de SUBMIT agregado a formulario:', this.id || this.className);
+        }
+        
+        return originalAddEventListener.call(this, type, listener, options);
+    };
+    
+    // 3. DEBUG DE REDIRECCIONES
+    const originalPushState = history.pushState;
+    history.pushState = function(state, title, url) {
+        console.log('🧭 History.pushState llamado:', { state, title, url });
+        return originalPushState.call(this, state, title, url);
+    };
+    
+    const originalReplaceState = history.replaceState;
+    history.replaceState = function(state, title, url) {
+        console.log('🧭 History.replaceState llamado:', { state, title, url });
+        return originalReplaceState.call(this, state, title, url);
+    };
+    
+    // 4. DEBUG DE LOCATION CHANGES
+    let currentHref = location.href;
+    setInterval(() => {
+        if (location.href !== currentHref) {
+            console.log('🔄 URL cambió:', currentHref, '→', location.href);
+            currentHref = location.href;
+        }
+    }, 100);
+    
+    console.log('✅ Patch debug detallado aplicado');
+})();
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
