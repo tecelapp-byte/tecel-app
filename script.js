@@ -210,6 +210,79 @@ window.fetch = function(resource, options = {}) {
 
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
+// ==================== PATCH PARA FORM DATA ====================
+
+// Override para manejar FormData correctamente
+const originalFormDataAppend = FormData.prototype.append;
+FormData.prototype.append = function(name, value, filename) {
+    // Si es un archivo y no tiene nombre, asignarle uno
+    if (value instanceof File && !filename) {
+        filename = value.name;
+    }
+    return originalFormDataAppend.call(this, name, value, filename);
+};
+
+// Función para verificar y corregir FormData antes de enviar
+function prepareFormData(formData) {
+    console.log('🔍 Verificando FormData antes de enviar:');
+    let hasFiles = false;
+    let hasRequiredFields = false;
+    
+    for (let pair of formData.entries()) {
+        console.log(`   ${pair[0]}:`, typeof pair[1] === 'string' ? 
+            pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : 
+            `[File] ${pair[1].name} (${pair[1].size} bytes)`);
+        
+        if (pair[0] === 'files') hasFiles = true;
+        if (pair[0] === 'title' && pair[1].trim()) hasRequiredFields = true;
+    }
+    
+    console.log('✅ FormData verificado:', { hasFiles, hasRequiredFields });
+    return { hasFiles, hasRequiredFields };
+}
+
+// Función para crear FormData robusto para proyectos
+function createProjectFormData(projectData, files = []) {
+    const formData = new FormData();
+    
+    console.log('📦 Creando FormData para proyecto:', {
+        title: projectData.title,
+        year: projectData.year,
+        filesCount: files.length
+    });
+    
+    // Agregar campos básicos del proyecto
+    formData.append('title', projectData.title || '');
+    formData.append('year', projectData.year || '');
+    formData.append('description', projectData.description || '');
+    formData.append('detailed_description', projectData.detailed_description || '');
+    formData.append('objectives', projectData.objectives || '');
+    formData.append('requirements', projectData.requirements || '');
+    formData.append('problem', projectData.problem || '');
+    formData.append('status', projectData.status || 'iniciado');
+    formData.append('students', projectData.students || '[]');
+    
+    // Agregar archivos original_idea_id si existe
+    if (projectData.original_idea_id) {
+        formData.append('original_idea_id', projectData.original_idea_id);
+    }
+    
+    // Agregar archivos a eliminar si existen
+    if (projectData.files_to_remove && projectData.files_to_remove.length > 0) {
+        formData.append('files_to_remove', JSON.stringify(projectData.files_to_remove));
+    }
+    
+    // Agregar archivos
+    if (files && files.length > 0) {
+        files.forEach((file, index) => {
+            console.log(`📎 Agregando archivo ${index + 1}:`, file.name);
+            formData.append('files', file, file.name);
+        });
+    }
+    
+    return formData;
+}
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -4061,8 +4134,8 @@ async function handleProjectSubmit(e) {
     
     if (!checkAuth()) return;
     
-    ('=== INICIANDO GUARDADO DE PROYECTO ===');
-    ('Modo:', currentProject ? 'EDITAR' : 'CREAR');
+    console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
+    console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
     
     // Validar permisos específicos para crear proyecto
     if (!currentProject && !validateProjectPermissions()) {
@@ -4095,18 +4168,18 @@ async function handleProjectSubmit(e) {
             
         const method = currentProject ? 'PUT' : 'POST';
 
-        // PREPARAR FORM DATA para edición o creación
-        const formData = new FormData();
-        
-        // Agregar campos del proyecto
-        formData.append('title', title);
-        formData.append('year', parseInt(year));
-        formData.append('description', description);
-        formData.append('detailed_description', document.getElementById('project-detailed-description').value.trim());
-        formData.append('objectives', document.getElementById('project-objectives').value.trim());
-        formData.append('requirements', document.getElementById('project-requirements').value.trim());
-        formData.append('problem', problem);
-        formData.append('status', document.getElementById('project-status').value);
+        // Preparar datos del proyecto
+        const projectData = {
+            title: title,
+            year: parseInt(year),
+            description: description,
+            detailed_description: document.getElementById('project-detailed-description').value.trim(),
+            objectives: document.getElementById('project-objectives').value.trim(),
+            requirements: document.getElementById('project-requirements').value.trim(),
+            problem: problem,
+            status: document.getElementById('project-status').value,
+            students: '[]'
+        };
 
         // Agregar participantes como JSON string
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
@@ -4119,48 +4192,41 @@ async function handleProjectSubmit(e) {
             }
         }).filter(participant => participant !== null);
         
-        formData.append('students', JSON.stringify(participants));
+        if (participants.length > 0) {
+            projectData.students = JSON.stringify(participants);
+        }
 
         // Agregar archivos a eliminar (solo en edición)
         if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
-            formData.append('files_to_remove', JSON.stringify(window.filesToRemove));
-            (`🗑️ Archivos marcados para eliminar: ${window.filesToRemove.length}`);
+            projectData.files_to_remove = window.filesToRemove;
+            console.log('🗑️ Archivos marcados para eliminar:', window.filesToRemove.length);
         }
 
-        // Agregar nuevos archivos DESDE EL ARRAY (no desde el input)
-        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
-            (`📤 Agregando ${window.uploadedFiles.length} archivos desde el array`);
-            window.uploadedFiles.forEach((file) => {
-                formData.append('files', file);
-            });
-        } else {
-            ('📁 No hay archivos nuevos para agregar');
+        // Agregar original_idea_id si estamos en conversión
+        if (window.currentConversionIdeaId) {
+            projectData.original_idea_id = window.currentConversionIdeaId;
         }
 
-        // LIMPIAR EL ARRAY DESPUÉS DE ENVIAR
-        window.uploadedFiles = [];
+        // Crear FormData usando la función robusta
+        const formData = createProjectFormData(projectData, window.uploadedFiles || []);
+        
+        // Verificar FormData antes de enviar
+        prepareFormData(formData);
 
-        // DEBUG: Mostrar contenido del FormData
-        ('📤 Contenido del FormData:');
-        for (let pair of formData.entries()) {
-            if (pair[0] === 'files') {
-                (`   ${pair[0]}: [File] ${pair[1].name} (${pair[1].size} bytes)`);
-            } else {
-                (`   ${pair[0]}: ${typeof pair[1] === 'string' ? pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : pair[1]}`);
-            }
-        }
-
-        // ENVIAR CON FORM DATA
-        (`🚀 Enviando ${method} request a: ${url}`);
+        // ENVIAR CON FORM DATA - CON HEADERS CORRECTOS
+        console.log('🚀 Enviando request a:', url);
+        console.log('📤 Método:', method);
+        
         response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                // NO establecer Content-Type - el navegador lo hará automáticamente con el boundary
             },
             body: formData
         });
 
-        ('📥 Respuesta del servidor:', {
+        console.log('📥 Respuesta del servidor:', {
             status: response.status,
             statusText: response.statusText,
             ok: response.ok
@@ -4168,7 +4234,7 @@ async function handleProjectSubmit(e) {
 
         if (response.ok) {
             const project = await response.json();
-            ('✅ Proyecto guardado exitosamente:', {
+            console.log('✅ Proyecto guardado exitosamente:', {
                 id: project.id,
                 title: project.title,
                 archivos: project.files?.length || 0,
@@ -4192,6 +4258,7 @@ async function handleProjectSubmit(e) {
             // Limpiar arrays globales
             window.uploadedFiles = [];
             window.filesToRemove = [];
+            window.currentConversionIdeaId = null;
             
             // Recargar proyectos
             if (currentProject) {
@@ -4220,6 +4287,12 @@ async function handleProjectSubmit(e) {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+}
+
+// Función para setear la idea original en conversión
+function setConversionIdeaId(ideaId) {
+    window.currentConversionIdeaId = ideaId;
+    console.log('🎯 Idea original seteada para conversión:', ideaId);
 }
 
 function showProjectDetails(project) {
@@ -5334,6 +5407,8 @@ function canConvertIdeaToProject(idea) {
 // Función para convertir idea a proyecto - CON CONFIGURACIÓN DE EVENT LISTENER
 async function convertIdeaToProject(idea) {
     ('💡 Iniciando conversión de idea:', idea);
+    // SETEAR LA IDEA ORIGINAL
+    setConversionIdeaId(idea.id);
     
     // LIMPIAR ARCHIVOS PREVIOS
     cleanupConversionFiles();
