@@ -222,26 +222,26 @@ FormData.prototype.append = function(name, value, filename) {
     return originalFormDataAppend.call(this, name, value, filename);
 };
 
-// Función para verificar y corregir FormData antes de enviar
-function prepareFormData(formData) {
-    console.log('🔍 Verificando FormData antes de enviar:');
-    let hasFiles = false;
-    let hasRequiredFields = false;
-    
-    for (let pair of formData.entries()) {
-        console.log(`   ${pair[0]}:`, typeof pair[1] === 'string' ? 
-            pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : 
-            `[File] ${pair[1].name} (${pair[1].size} bytes)`);
-        
-        if (pair[0] === 'files') hasFiles = true;
-        if (pair[0] === 'title' && pair[1].trim()) hasRequiredFields = true;
+// ==================== PATCH PARA FORM DATA ====================
+
+// Función para sanitizar valores antes de agregar al FormData
+function sanitizeFormDataValue(value) {
+    if (value === null || value === undefined) {
+        return '';
     }
-    
-    console.log('✅ FormData verificado:', { hasFiles, hasRequiredFields });
-    return { hasFiles, hasRequiredFields };
+    if (typeof value === 'number') {
+        return value.toString();
+    }
+    if (typeof value === 'boolean') {
+        return value.toString();
+    }
+    if (typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+    return String(value);
 }
 
-// Función para crear FormData robusto para proyectos
+// Función para crear FormData robusto para proyectos - VERSIÓN CORREGIDA
 function createProjectFormData(projectData, files = []) {
     const formData = new FormData();
     
@@ -251,20 +251,20 @@ function createProjectFormData(projectData, files = []) {
         filesCount: files.length
     });
     
-    // Agregar campos básicos del proyecto
-    formData.append('title', projectData.title || '');
-    formData.append('year', projectData.year || '');
-    formData.append('description', projectData.description || '');
-    formData.append('detailed_description', projectData.detailed_description || '');
-    formData.append('objectives', projectData.objectives || '');
-    formData.append('requirements', projectData.requirements || '');
-    formData.append('problem', projectData.problem || '');
-    formData.append('status', projectData.status || 'iniciado');
-    formData.append('students', projectData.students || '[]');
+    // Agregar campos básicos del proyecto - SANITIZADOS
+    formData.append('title', sanitizeFormDataValue(projectData.title));
+    formData.append('year', sanitizeFormDataValue(projectData.year));
+    formData.append('description', sanitizeFormDataValue(projectData.description));
+    formData.append('detailed_description', sanitizeFormDataValue(projectData.detailed_description));
+    formData.append('objectives', sanitizeFormDataValue(projectData.objectives));
+    formData.append('requirements', sanitizeFormDataValue(projectData.requirements));
+    formData.append('problem', sanitizeFormDataValue(projectData.problem));
+    formData.append('status', sanitizeFormDataValue(projectData.status));
+    formData.append('students', sanitizeFormDataValue(projectData.students));
     
     // Agregar archivos original_idea_id si existe
     if (projectData.original_idea_id) {
-        formData.append('original_idea_id', projectData.original_idea_id);
+        formData.append('original_idea_id', sanitizeFormDataValue(projectData.original_idea_id));
     }
     
     // Agregar archivos a eliminar si existen
@@ -272,16 +272,56 @@ function createProjectFormData(projectData, files = []) {
         formData.append('files_to_remove', JSON.stringify(projectData.files_to_remove));
     }
     
-    // Agregar archivos
+    // Agregar archivos - VERIFICAR QUE SEAN ARCHIVOS VÁLIDOS
     if (files && files.length > 0) {
         files.forEach((file, index) => {
-            console.log(`📎 Agregando archivo ${index + 1}:`, file.name);
-            formData.append('files', file, file.name);
+            if (file instanceof File || file instanceof Blob) {
+                console.log(`📎 Agregando archivo ${index + 1}:`, file.name);
+                formData.append('files', file, file.name);
+            } else {
+                console.warn(`⚠️ Archivo inválido en posición ${index}:`, file);
+            }
         });
     }
     
     return formData;
 }
+
+// Función para verificar y corregir FormData antes de enviar - MEJORADA
+function prepareFormData(formData) {
+    console.log('🔍 Verificando FormData antes de enviar:');
+    let hasFiles = false;
+    let hasRequiredFields = false;
+    
+    for (let pair of formData.entries()) {
+        const valueType = typeof pair[1];
+        let valuePreview = '';
+        
+        if (pair[1] instanceof File || pair[1] instanceof Blob) {
+            valuePreview = `[File] ${pair[1].name} (${pair[1].size} bytes)`;
+            hasFiles = true;
+        } else if (valueType === 'string') {
+            valuePreview = pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '');
+        } else {
+            valuePreview = `[${valueType}] ${String(pair[1]).substring(0, 50)}`;
+        }
+        
+        console.log(`   ${pair[0]}: ${valuePreview}`);
+        
+        if (pair[0] === 'title' && pair[1] && String(pair[1]).trim()) {
+            hasRequiredFields = true;
+        }
+    }
+    
+    console.log('✅ FormData verificado:', { hasFiles, hasRequiredFields });
+    
+    if (!hasRequiredFields) {
+        console.error('❌ FormData no tiene campos requeridos');
+    }
+    
+    return { hasFiles, hasRequiredFields };
+}
+
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
@@ -4168,16 +4208,16 @@ async function handleProjectSubmit(e) {
             
         const method = currentProject ? 'PUT' : 'POST';
 
-        // Preparar datos del proyecto
+        // Preparar datos del proyecto - CON VALORES POR DEFECTO
         const projectData = {
-            title: title,
-            year: parseInt(year),
-            description: description,
-            detailed_description: document.getElementById('project-detailed-description').value.trim(),
-            objectives: document.getElementById('project-objectives').value.trim(),
-            requirements: document.getElementById('project-requirements').value.trim(),
-            problem: problem,
-            status: document.getElementById('project-status').value,
+            title: title || '',
+            year: year ? parseInt(year) : new Date().getFullYear(),
+            description: description || '',
+            detailed_description: document.getElementById('project-detailed-description')?.value.trim() || '',
+            objectives: document.getElementById('project-objectives')?.value.trim() || '',
+            requirements: document.getElementById('project-requirements')?.value.trim() || '',
+            problem: problem || '',
+            status: document.getElementById('project-status')?.value || 'iniciado',
             students: '[]'
         };
 
@@ -4207,24 +4247,41 @@ async function handleProjectSubmit(e) {
             projectData.original_idea_id = window.currentConversionIdeaId;
         }
 
+        // VERIFICAR ARCHIVOS ANTES DE CREAR FORM DATA
+        const filesToUpload = (window.uploadedFiles || []).filter(file => 
+            file instanceof File || file instanceof Blob
+        );
+        
+        console.log('📁 Archivos válidos para upload:', filesToUpload.length);
+        
         // Crear FormData usando la función robusta
-        const formData = createProjectFormData(projectData, window.uploadedFiles || []);
+        const formData = createProjectFormData(projectData, filesToUpload);
         
         // Verificar FormData antes de enviar
-        prepareFormData(formData);
+        const formDataCheck = prepareFormData(formData);
+        
+        if (!formDataCheck.hasRequiredFields) {
+            throw new Error('Faltan campos requeridos en el formulario');
+        }
 
-        // ENVIAR CON FORM DATA - CON HEADERS CORRECTOS
+        // ENVIAR CON FORM DATA - CON MANEJO DE ERRORES MEJORADO
         console.log('🚀 Enviando request a:', url);
         console.log('📤 Método:', method);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
         
         response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                // NO establecer Content-Type - el navegador lo hará automáticamente con el boundary
+                // NO establecer Content-Type - el navegador lo hará automáticamente
             },
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         console.log('📥 Respuesta del servidor:', {
             status: response.status,
@@ -4245,20 +4302,7 @@ async function handleProjectSubmit(e) {
             closeModal(document.getElementById('project-modal'));
             
             // Limpiar todo
-            document.getElementById('project-form').reset();
-            const participantsContainer = document.getElementById('project-participants');
-            if (participantsContainer) {
-                participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
-            }
-            
-            // Limpiar preview de archivos
-            const filePreview = document.getElementById('file-preview');
-            if (filePreview) filePreview.innerHTML = '';
-            
-            // Limpiar arrays globales
-            window.uploadedFiles = [];
-            window.filesToRemove = [];
-            window.currentConversionIdeaId = null;
+            cleanupProjectForm();
             
             // Recargar proyectos
             if (currentProject) {
@@ -4277,16 +4321,57 @@ async function handleProjectSubmit(e) {
                 errorData = { error: `Error ${response.status}: ${response.statusText}` };
             }
             
-            showNotification(errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`, 'error');
+            // Mensajes de error más específicos
+            let errorMessage = errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`;
+            
+            if (response.status === 400) {
+                errorMessage = 'Datos del proyecto inválidos: ' + (errorData.error || 'Verifica todos los campos');
+            } else if (response.status === 413) {
+                errorMessage = 'Archivos demasiado grandes. El tamaño total no debe superar 50MB';
+            } else if (response.status === 415) {
+                errorMessage = 'Tipo de archivo no permitido';
+            }
+            
+            showNotification(errorMessage, 'error');
         }
     } catch (error) {
         console.error('❌ Error de conexión guardando proyecto:', error);
-        showNotification('Error de conexión al guardar el proyecto: ' + error.message, 'error');
+        
+        let errorMessage = 'Error de conexión al guardar el proyecto';
+        if (error.name === 'AbortError') {
+            errorMessage = 'Tiempo de espera agotado. El servidor está tardando demasiado en responder.';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'No se puede conectar con el servidor. Verifica tu conexión a internet.';
+        } else {
+            errorMessage = error.message || errorMessage;
+        }
+        
+        showNotification(errorMessage, 'error');
     } finally {
         // Restaurar botón
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+}
+
+// Función para limpiar el formulario de proyecto
+function cleanupProjectForm() {
+    document.getElementById('project-form').reset();
+    const participantsContainer = document.getElementById('project-participants');
+    if (participantsContainer) {
+        participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
+    }
+    
+    // Limpiar preview de archivos
+    const filePreview = document.getElementById('file-preview');
+    if (filePreview) filePreview.innerHTML = '';
+    
+    // Limpiar arrays globales
+    window.uploadedFiles = [];
+    window.filesToRemove = [];
+    window.currentConversionIdeaId = null;
+    
+    console.log('🧹 Formulario de proyecto limpiado');
 }
 
 // Función para setear la idea original en conversión
@@ -5409,7 +5494,7 @@ async function convertIdeaToProject(idea) {
     ('💡 Iniciando conversión de idea:', idea);
     // SETEAR LA IDEA ORIGINAL
     setConversionIdeaId(idea.id);
-    
+
     // LIMPIAR ARCHIVOS PREVIOS
     cleanupConversionFiles();
     
