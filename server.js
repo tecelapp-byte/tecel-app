@@ -1716,6 +1716,48 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
     }
 });
 
+// Agrega esta ruta temporal de diagnóstico
+app.get('/api/debug/storage-policies', authenticateToken, async (req, res) => {
+    try {
+        console.log('🔍 Diagnóstico de políticas de Storage...');
+        
+        // 1. Verificar buckets
+        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+        if (bucketsError) {
+            console.error('❌ Error listando buckets:', bucketsError);
+        } else {
+            console.log('📦 Buckets disponibles:', buckets.map(b => ({ name: b.name, id: b.id })));
+        }
+
+        // 2. Verificar políticas (esto requiere consulta directa a la BD)
+        const policiesResult = await pool.query(`
+            SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check 
+            FROM pg_policies 
+            WHERE tablename = 'objects' AND schemaname = 'storage'
+        `);
+        
+        console.log('🔐 Políticas de RLS encontradas:');
+        policiesResult.rows.forEach(policy => {
+            console.log('   📋', {
+                name: policy.policyname,
+                command: policy.cmd,
+                roles: policy.roles,
+                condition: policy.qual || policy.with_check
+            });
+        });
+
+        res.json({
+            buckets: buckets || [],
+            policies: policiesResult.rows,
+            user: req.user
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en diagnóstico:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Ruta para re-habilitar una idea (cuando se elimina su proyecto)
 app.put('/api/ideas/:id/reenable', authenticateToken, async (req, res) => {
     try {
