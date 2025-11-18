@@ -52,6 +52,18 @@ pool.query('SELECT NOW()')
 
 const { createClient } = require('@supabase/supabase-js');
 
+// Configurar Supabase con Service Role para operaciones administrativas
+const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwdHdybWZmeGpvbHdnanZhc2hjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzE1NjI4OCwiZXhwIjoyMDc4NzMyMjg4fQ.hxv_9aOHD-_LtdeC8zf5E4HGmkO9D09Ddeq6nqDGbV0, // Usar service role key
+    {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    }
+);
+
 // Configurar Supabase (agregar después de pool)
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -1974,12 +1986,12 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Función para asegurar que el bucket existe
+// Función para asegurar que el bucket existe (usando service role)
 async function ensureBucketExists() {
     try {
         console.log('🔍 Verificando bucket tecel-files...');
         
-        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+        const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
         if (listError) {
             console.error('❌ Error listando buckets:', listError);
             return false;
@@ -1988,8 +2000,8 @@ async function ensureBucketExists() {
         const bucketExists = buckets.some(bucket => bucket.name === 'tecel-files');
         
         if (!bucketExists) {
-            console.log('➕ Creando bucket tecel-files...');
-            const { data: newBucket, error: createError } = await supabase.storage
+            console.log('➕ Creando bucket tecel-files con service role...');
+            const { data: newBucket, error: createError } = await supabaseAdmin.storage
                 .createBucket('tecel-files', {
                     public: false,
                     fileSizeLimit: 52428800, // 50MB
