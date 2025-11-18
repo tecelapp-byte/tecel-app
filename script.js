@@ -4138,7 +4138,12 @@ async function handleProjectSubmit(e) {
     const description = document.getElementById('project-description')?.value.trim() || '';
     const problem = document.getElementById('project-problem')?.value.trim() || '';
     
-    console.log('✅ Campos validados:', { title: title.substring(0, 20), year, description: description.substring(0, 20), problem: problem.substring(0, 20) });
+    console.log('✅ Campos validados:', { 
+        title: title.substring(0, 20), 
+        year, 
+        description: description.substring(0, 20), 
+        problem: problem.substring(0, 20) 
+    });
     
     if (!title || !year || !description || !problem) {
         showNotification('Por favor completa todos los campos obligatorios: Título, Año, Descripción y Problema', 'error');
@@ -4201,46 +4206,18 @@ async function handleProjectSubmit(e) {
             console.log(`💡 Conversión de idea: ${window.currentConversionIdeaId}`);
         }
 
-        // Preparar archivos para upload
-        const filesToUpload = (window.uploadedFiles || [])
-            .filter(file => file && typeof file === 'object' && (file instanceof File || file instanceof Blob));
-        
-        console.log(`📁 ${filesToUpload.length} archivos listos para upload`);
-
-        // CREAR FORM DATA DE MANERA SEGURA
-        console.log('🛡️ Creando FormData seguro...');
-        const formData = createSafeFormData(projectData, filesToUpload);
-        
-        console.log('🔍 Verificando FormData...');
-        const formDataCheck = debugFormData(formData);
-
-        if (!formDataCheck || !formDataCheck.hasTitle) {
-            console.error('❌ FormData inválido:', formDataCheck);
-            throw new Error('El formulario no contiene los datos necesarios. Por favor, verifica los campos.');
-        }
-
-        console.log('✅ FormData verificado correctamente');
-
-        // ENVIAR AL SERVIDOR
-        console.log(`📤 Enviando ${method} a: ${url}`);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort();
-            console.warn('⏰ Timeout excedido');
-        }, 45000); // 45 segundos
+        // ENVIAR COMO JSON - SIN ARCHIVOS POR AHORA
+        console.log('📤 Enviando como JSON (sin archivos)...');
+        console.log('📄 Datos a enviar:', projectData);
 
         const response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                // NO agregar Content-Type - lo hace automáticamente el browser
+                'Content-Type': 'application/json'
             },
-            body: formData,
-            signal: controller.signal
+            body: JSON.stringify(projectData)
         });
-
-        clearTimeout(timeoutId);
 
         console.log('📥 Respuesta recibida:', {
             status: response.status,
@@ -4249,16 +4226,20 @@ async function handleProjectSubmit(e) {
         });
 
         if (response.ok) {
-            const project = await response.json();
-            console.log('🎉 Proyecto guardado exitosamente:', {
-                id: project.id,
-                title: project.title,
-                archivos: project.files?.length || 0,
-                participantes: project.participants?.length || 0
-            });
-            
-            showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente!`, 'success');
-            
+        const project = await response.json();
+        console.log('🎉 Proyecto guardado exitosamente:', {
+            id: project.id,
+            title: project.title,
+            participantes: project.participants?.length || 0
+        });
+        
+        // Subir archivos después de crear el proyecto
+        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+            await uploadProjectFiles(project.id, window.uploadedFiles);
+        }
+        
+        showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente!`, 'success');
+        
             // Limpiar y cerrar
             cleanupProjectForm();
             closeModal(document.getElementById('project-modal'));
@@ -4283,8 +4264,6 @@ async function handleProjectSubmit(e) {
             
             let userMessage = errorData.error || 'Error al guardar el proyecto';
             if (response.status === 400) userMessage = 'Datos inválidos: ' + userMessage;
-            if (response.status === 413) userMessage = 'Archivos demasiado grandes';
-            if (response.status === 415) userMessage = 'Tipo de archivo no permitido';
             
             showNotification(userMessage, 'error');
         }
@@ -4307,6 +4286,55 @@ async function handleProjectSubmit(e) {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+}
+
+// Función para subir archivos después de crear el proyecto
+async function uploadProjectFiles(projectId, files) {
+    if (!files || files.length === 0) return;
+    
+    console.log(`📤 Subiendo ${files.length} archivos para proyecto ${projectId}`);
+    
+    for (const file of files) {
+        try {
+            // Convertir archivo a base64
+            const base64File = await fileToBase64(file);
+            
+            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    file: base64File,
+                    fileName: file.name,
+                    fileType: file.type
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Archivo subido: ${file.name}`);
+            } else {
+                console.error(`❌ Error subiendo archivo ${file.name}`);
+            }
+        } catch (error) {
+            console.error(`❌ Error procesando archivo ${file.name}:`, error);
+        }
+    }
+}
+
+// Función auxiliar para convertir File a base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            // Remover el prefijo data:application/octet-stream;base64,
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
 }
 
 // Función auxiliar para limpiar el formulario
