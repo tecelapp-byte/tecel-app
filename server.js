@@ -52,10 +52,9 @@ pool.query('SELECT NOW()')
 
 const { createClient } = require('@supabase/supabase-js');
 
-// Configurar Supabase con Service Role para operaciones administrativas
 const supabaseAdmin = createClient(
     process.env.SUPABASE_URL,
-    process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwdHdybWZmeGpvbHdnanZhc2hjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzE1NjI4OCwiZXhwIjoyMDc4NzMyMjg4fQ.hxv_9aOHD-_LtdeC8zf5E4HGmkO9D09Ddeq6nqDGbV0, // Usar service role key
+    process.env.SUPABASE_SERVICE_ROLE_KEY, // ← Esto sí funciona
     {
         auth: {
             autoRefreshToken: false,
