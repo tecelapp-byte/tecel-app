@@ -1974,66 +1974,121 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Agregar archivos a proyecto existente
-app.post('/api/projects/:id/files', authenticateToken, checkProjectPermissions,async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { file, fileName, fileType } = req.body;
+// Función para asegurar que el bucket existe
+async function ensureBucketExists() {
+    try {
+        console.log('🔍 Verificando bucket tecel-files...');
+        
+        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+        if (listError) {
+            console.error('❌ Error listando buckets:', listError);
+            return false;
+        }
 
-    console.log('📤 Subiendo archivo a Supabase Storage...');
-
-    if (!file || !fileName) {
-      return res.status(400).json({ error: 'Datos de archivo incompletos' });
+        const bucketExists = buckets.some(bucket => bucket.name === 'tecel-files');
+        
+        if (!bucketExists) {
+            console.log('➕ Creando bucket tecel-files...');
+            const { data: newBucket, error: createError } = await supabase.storage
+                .createBucket('tecel-files', {
+                    public: false,
+                    fileSizeLimit: 52428800, // 50MB
+                    allowedMimeTypes: ['image/*', 'application/pdf', 'application/zip', 'text/*', 'application/*']
+                });
+            
+            if (createError) {
+                console.error('❌ Error creando bucket:', createError);
+                return false;
+            }
+            
+            console.log('✅ Bucket tecel-files creado exitosamente');
+            return true;
+        } else {
+            console.log('✅ Bucket tecel-files ya existe');
+            return true;
+        }
+    } catch (error) {
+        console.error('❌ Error en ensureBucketExists:', error);
+        return false;
     }
+}
 
-    // Convertir base64 a buffer
-    const fileBuffer = Buffer.from(file, 'base64');
-    
-    // Generar nombre único
-    const uniqueFileName = `project-${id}-${Date.now()}-${fileName}`;
-    const filePath = `projects/${id}/${uniqueFileName}`;
+// Modifica la ruta de subida de archivos para usar esta función
+app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
+    try {
+        console.log('📤 Iniciando subida de archivo...');
+        
+        // Asegurar que el bucket existe antes de subir
+        const bucketReady = await ensureBucketExists();
+        if (!bucketReady) {
+            return res.status(500).json({ error: 'No se pudo preparar el almacenamiento de archivos' });
+        }
 
-    // Subir a Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('tecel-files')
-      .upload(filePath, fileBuffer, {
-        contentType: fileType || 'application/octet-stream',
-        upsert: false
-      });
+        const { id } = req.params;
+        const { file, fileName, fileType } = req.body;
 
-    if (error) {
-      console.error('❌ Error subiendo a Supabase:', error);
-      return res.status(500).json({ error: 'Error subiendo archivo: ' + error.message });
+        if (!file || !fileName) {
+            return res.status(400).json({ error: 'Datos de archivo incompletos' });
+        }
+
+        // Convertir base64 a buffer
+        const fileBuffer = Buffer.from(file, 'base64');
+        console.log('📊 Tamaño del archivo:', fileBuffer.length, 'bytes');
+
+        // Generar nombre único
+        const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const uniqueFileName = `project-${id}-${Date.now()}-${safeFileName}`;
+        const filePath = `projects/${id}/${uniqueFileName}`;
+
+        console.log('📍 Subiendo a:', filePath);
+
+        // Subir a Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('tecel-files')
+            .upload(filePath, fileBuffer, {
+                contentType: fileType || 'application/octet-stream',
+                upsert: false
+            });
+
+        if (error) {
+            console.error('❌ Error subiendo archivo:', error);
+            return res.status(500).json({ 
+                error: 'Error subiendo archivo: ' + error.message 
+            });
+        }
+
+        // Obtener URL pública
+        const { data: urlData } = supabase.storage
+            .from('tecel-files')
+            .getPublicUrl(filePath);
+
+        console.log('✅ Archivo subido. URL:', urlData.publicUrl);
+
+        // Guardar en base de datos
+        const result = await pool.query(
+            `INSERT INTO project_files (project_id, filename, original_name, file_path, file_type, file_size, uploaded_by) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [
+                id,
+                uniqueFileName,
+                fileName,
+                urlData.publicUrl,
+                fileType || 'application/octet-stream',
+                fileBuffer.length,
+                req.user.id
+            ]
+        );
+
+        console.log('✅ Archivo guardado en BD con ID:', result.rows[0].id);
+        res.status(201).json(result.rows[0]);
+
+    } catch (error) {
+        console.error('❌ Error en upload:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor',
+            details: error.message 
+        });
     }
-
-    // Obtener URL pública
-    const { data: urlData } = supabase.storage
-      .from('tecel-files')
-      .getPublicUrl(filePath);
-
-    // Guardar en base de datos
-    const result = await pool.query(
-      `INSERT INTO project_files 
-       (project_id, filename, original_name, file_path, file_type, file_size, uploaded_by) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        id,
-        uniqueFileName,
-        fileName,
-        urlData.publicUrl, // Guardamos la URL pública
-        fileType || 'application/octet-stream',
-        fileBuffer.length,
-        req.user.id
-      ]
-    );
-
-    console.log('✅ Archivo subido exitosamente:', fileName);
-    res.status(201).json(result.rows[0]);
-
-  } catch (error) {
-    console.error('❌ Error en upload:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
 });
 
 // Agregar enlace a proyecto
