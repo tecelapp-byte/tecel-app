@@ -1607,11 +1607,11 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         transactionClient = await pool.connect();
         await transactionClient.query('BEGIN');
 
-        const { title, year, description, detailed_description, objectives, requirements, problem, status, students, original_idea_id } = req.body;
+        const { title, year, description, detailed_description, objectives, requirements, problem, status, students } = req.body;
 
         console.log('=== CREANDO NUEVO PROYECTO ===');
         console.log('Datos recibidos:', { 
-            title, year, description, problem, status, original_idea_id,
+            title, year, description, problem, status,
             students_type: typeof students,
             students_value: students
         });
@@ -1640,11 +1640,11 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Solo alumnos de 7mo pueden crear proyectos' });
         }
 
-        // INSERTAR PROYECTO
+        // INSERTAR PROYECTO (SIN original_idea_id)
         console.log('📝 Insertando proyecto en la base de datos...');
         const projectResult = await transactionClient.query(
-            `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by, original_idea_id) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [
                 title.trim(),
                 parseInt(year),
@@ -1654,8 +1654,7 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
                 (requirements || '').trim(),
                 problem.trim(),
                 status || 'iniciado',
-                req.user.id,
-                original_idea_id || null
+                req.user.id
             ]
         );
 
@@ -1688,20 +1687,6 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
             }
         }
 
-        // ACTUALIZAR ESTADO DE LA IDEA SI EXISTE
-        if (original_idea_id) {
-            try {
-                console.log(`🔄 Actualizando estado de idea ${original_idea_id} a "en_progreso"`);
-                await transactionClient.query(
-                    'UPDATE ideas SET project_status = $1 WHERE id = $2',
-                    ['en_progreso', original_idea_id]
-                );
-                console.log(`✅ Idea ${original_idea_id} actualizada`);
-            } catch (ideaError) {
-                console.error('❌ Error actualizando idea:', ideaError.message);
-            }
-        }
-
         // CONFIRMAR TRANSACCIÓN
         await transactionClient.query('COMMIT');
         console.log('🎉 Proyecto guardado completamente');
@@ -1721,8 +1706,7 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         console.error('❌ Error creando proyecto:', error);
         res.status(500).json({ 
             error: 'Error interno del servidor al crear el proyecto',
-            details: error.message,
-            stack: error.stack // Para debug detallado
+            details: error.message
         });
     } finally {
         // LIBERAR CLIENTE DE TRANSACCIÓN
