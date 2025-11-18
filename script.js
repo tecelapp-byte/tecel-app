@@ -242,29 +242,34 @@ function createSafeFormData(data, files = []) {
     return formData;
 }
 
-// Función para debug del FormData
+// Función para debug del FormData - VERSIÓN CORREGIDA
 function debugFormData(formData) {
     console.log('🔍 DEBUG FormData:');
     let hasFiles = false;
     let hasTitle = false;
     
-    for (let pair of formData.entries()) {
-        const key = pair[0];
-        const value = pair[1];
-        
-        if (value instanceof File || value instanceof Blob) {
-            console.log(`   📁 ${key}: [File] ${value.name} (${value.size} bytes)`);
-            hasFiles = true;
-        } else {
-            console.log(`   📄 ${key}: "${String(value).substring(0, 50)}"`);
-            if (key === 'title' && String(value).trim()) {
-                hasTitle = true;
+    try {
+        for (let pair of formData.entries()) {
+            const key = pair[0];
+            const value = pair[1];
+            
+            if (value instanceof File || value instanceof Blob) {
+                console.log(`   📁 ${key}: [File] ${value.name} (${value.size} bytes)`);
+                hasFiles = true;
+            } else {
+                console.log(`   📄 ${key}: "${String(value).substring(0, 50)}"`);
+                if (key === 'title' && String(value).trim()) {
+                    hasTitle = true;
+                }
             }
         }
+        
+        console.log('✅ Estado FormData:', { hasFiles, hasTitle });
+        return { hasFiles, hasTitle };
+    } catch (error) {
+        console.error('❌ Error en debugFormData:', error);
+        return { hasFiles: false, hasTitle: false };
     }
-    
-    console.log('✅ Estado FormData:', { hasFiles, hasTitle });
-    return { hasFiles, hasTitle };
 }
 
 // Inicialización cuando el DOM está listo
@@ -4206,12 +4211,15 @@ async function handleProjectSubmit(e) {
         console.log('🛡️ Creando FormData seguro...');
         const formData = createSafeFormData(projectData, filesToUpload);
         
-        // Debug del FormData
+        console.log('🔍 Verificando FormData...');
         const formDataCheck = debugFormData(formData);
-        
-        if (!formDataCheck.hasTitle) {
-            throw new Error('El campo título está vacío en el FormData');
+
+        if (!formDataCheck || !formDataCheck.hasTitle) {
+            console.error('❌ FormData inválido:', formDataCheck);
+            throw new Error('El formulario no contiene los datos necesarios. Por favor, verifica los campos.');
         }
+
+        console.log('✅ FormData verificado correctamente');
 
         // ENVIAR AL SERVIDOR
         console.log(`📤 Enviando ${method} a: ${url}`);
@@ -4883,15 +4891,6 @@ function initIdeasSection() {
     updateIdeaCounters();
     
     ('✅ Sección de ideas inicializada correctamente');
-}
-
-// Función temporal para debug de FormData
-function debugFormData(formData) {
-    ('=== DEBUG FORM DATA ===');
-    for (let pair of formData.entries()) {
-        (pair[0] + ': ', pair[1]);
-    }
-    ('========================');
 }
 
 async function deleteFile(projectId, fileId) {
