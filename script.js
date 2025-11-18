@@ -210,76 +210,31 @@ window.fetch = function(resource, options = {}) {
 
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
-// ==================== PATCH PARA FORM DATA ====================
-
-// Override para manejar FormData correctamente
-const originalFormDataAppend = FormData.prototype.append;
-FormData.prototype.append = function(name, value, filename) {
-    // Si es un archivo y no tiene nombre, asignarle uno
-    if (value instanceof File && !filename) {
-        filename = value.name;
-    }
-    return originalFormDataAppend.call(this, name, value, filename);
-};
-
-// ==================== PATCH PARA FORM DATA ====================
-
-// Función para sanitizar valores antes de agregar al FormData
-function sanitizeFormDataValue(value) {
-    if (value === null || value === undefined) {
-        return '';
-    }
-    if (typeof value === 'number') {
-        return value.toString();
-    }
-    if (typeof value === 'boolean') {
-        return value.toString();
-    }
-    if (typeof value === 'object') {
-        return JSON.stringify(value);
-    }
-    return String(value);
-}
-
-// Función para crear FormData robusto para proyectos - VERSIÓN CORREGIDA
-function createProjectFormData(projectData, files = []) {
+// Función para crear FormData de manera segura sin modificar prototypes
+function createSafeFormData(data, files = []) {
     const formData = new FormData();
     
-    console.log('📦 Creando FormData para proyecto:', {
-        title: projectData.title,
-        year: projectData.year,
-        filesCount: files.length
+    console.log('🛡️ Creando FormData seguro...');
+    
+    // Agregar campos de texto de manera segura
+    Object.keys(data).forEach(key => {
+        const value = data[key];
+        if (value !== null && value !== undefined) {
+            // Convertir a string de manera segura
+            const stringValue = String(value);
+            console.log(`📝 Agregando campo: ${key} = ${stringValue.substring(0, 30)}...`);
+            formData.append(key, stringValue);
+        }
     });
     
-    // Agregar campos básicos del proyecto - SANITIZADOS
-    formData.append('title', sanitizeFormDataValue(projectData.title));
-    formData.append('year', sanitizeFormDataValue(projectData.year));
-    formData.append('description', sanitizeFormDataValue(projectData.description));
-    formData.append('detailed_description', sanitizeFormDataValue(projectData.detailed_description));
-    formData.append('objectives', sanitizeFormDataValue(projectData.objectives));
-    formData.append('requirements', sanitizeFormDataValue(projectData.requirements));
-    formData.append('problem', sanitizeFormDataValue(projectData.problem));
-    formData.append('status', sanitizeFormDataValue(projectData.status));
-    formData.append('students', sanitizeFormDataValue(projectData.students));
-    
-    // Agregar archivos original_idea_id si existe
-    if (projectData.original_idea_id) {
-        formData.append('original_idea_id', sanitizeFormDataValue(projectData.original_idea_id));
-    }
-    
-    // Agregar archivos a eliminar si existen
-    if (projectData.files_to_remove && projectData.files_to_remove.length > 0) {
-        formData.append('files_to_remove', JSON.stringify(projectData.files_to_remove));
-    }
-    
-    // Agregar archivos - VERIFICAR QUE SEAN ARCHIVOS VÁLIDOS
+    // Agregar archivos de manera segura
     if (files && files.length > 0) {
         files.forEach((file, index) => {
-            if (file instanceof File || file instanceof Blob) {
-                console.log(`📎 Agregando archivo ${index + 1}:`, file.name);
+            if (file && typeof file === 'object' && (file instanceof File || file instanceof Blob)) {
+                console.log(`📎 Agregando archivo ${index + 1}: ${file.name}`);
                 formData.append('files', file, file.name);
             } else {
-                console.warn(`⚠️ Archivo inválido en posición ${index}:`, file);
+                console.warn(`⚠️ Archivo inválido omitido:`, file);
             }
         });
     }
@@ -287,41 +242,30 @@ function createProjectFormData(projectData, files = []) {
     return formData;
 }
 
-// Función para verificar y corregir FormData antes de enviar - MEJORADA
-function prepareFormData(formData) {
-    console.log('🔍 Verificando FormData antes de enviar:');
+// Función para debug del FormData
+function debugFormData(formData) {
+    console.log('🔍 DEBUG FormData:');
     let hasFiles = false;
-    let hasRequiredFields = false;
+    let hasTitle = false;
     
     for (let pair of formData.entries()) {
-        const valueType = typeof pair[1];
-        let valuePreview = '';
+        const key = pair[0];
+        const value = pair[1];
         
-        if (pair[1] instanceof File || pair[1] instanceof Blob) {
-            valuePreview = `[File] ${pair[1].name} (${pair[1].size} bytes)`;
+        if (value instanceof File || value instanceof Blob) {
+            console.log(`   📁 ${key}: [File] ${value.name} (${value.size} bytes)`);
             hasFiles = true;
-        } else if (valueType === 'string') {
-            valuePreview = pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '');
         } else {
-            valuePreview = `[${valueType}] ${String(pair[1]).substring(0, 50)}`;
-        }
-        
-        console.log(`   ${pair[0]}: ${valuePreview}`);
-        
-        if (pair[0] === 'title' && pair[1] && String(pair[1]).trim()) {
-            hasRequiredFields = true;
+            console.log(`   📄 ${key}: "${String(value).substring(0, 50)}"`);
+            if (key === 'title' && String(value).trim()) {
+                hasTitle = true;
+            }
         }
     }
     
-    console.log('✅ FormData verificado:', { hasFiles, hasRequiredFields });
-    
-    if (!hasRequiredFields) {
-        console.error('❌ FormData no tiene campos requeridos');
-    }
-    
-    return { hasFiles, hasRequiredFields };
+    console.log('✅ Estado FormData:', { hasFiles, hasTitle });
+    return { hasFiles, hasTitle };
 }
-
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
@@ -4174,108 +4118,115 @@ async function handleProjectSubmit(e) {
     
     if (!checkAuth()) return;
     
-    console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
-    console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
+    console.log('🚀 INICIANDO GUARDADO DE PROYECTO');
+    console.log('📋 Modo:', currentProject ? 'EDITAR' : 'CREAR');
     
-    // Validar permisos específicos para crear proyecto
+    // Validar permisos
     if (!currentProject && !validateProjectPermissions()) {
         showNotification('No tienes permisos para crear proyectos. Solo profesores, administradores y alumnos de 7mo pueden crear proyectos.', 'error');
         return;
     }
 
-    // Validar campos requeridos antes de enviar
-    const title = document.getElementById('project-title').value.trim();
-    const year = document.getElementById('project-year').value;
-    const description = document.getElementById('project-description').value.trim();
-    const problem = document.getElementById('project-problem').value.trim();
+    // Obtener y validar campos requeridos
+    const title = document.getElementById('project-title')?.value.trim() || '';
+    const year = document.getElementById('project-year')?.value || '';
+    const description = document.getElementById('project-description')?.value.trim() || '';
+    const problem = document.getElementById('project-problem')?.value.trim() || '';
+    
+    console.log('✅ Campos validados:', { title: title.substring(0, 20), year, description: description.substring(0, 20), problem: problem.substring(0, 20) });
     
     if (!title || !year || !description || !problem) {
         showNotification('Por favor completa todos los campos obligatorios: Título, Año, Descripción y Problema', 'error');
         return;
     }
 
-    // Mostrar loading
+    // Preparar UI de carga
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (currentProject ? 'Actualizando...' : 'Guardando...');
     submitBtn.disabled = true;
 
     try {
-        let response;
+        // Configurar URL y método
         const url = currentProject ? 
             `${API_BASE}/projects/${currentProject.id}` : 
             `${API_BASE}/projects`;
-            
         const method = currentProject ? 'PUT' : 'POST';
 
-        // Preparar datos del proyecto - CON VALORES POR DEFECTO
+        // Preparar datos básicos del proyecto
         const projectData = {
-            title: title || '',
-            year: year ? parseInt(year) : new Date().getFullYear(),
-            description: description || '',
+            title: title,
+            year: parseInt(year),
+            description: description,
             detailed_description: document.getElementById('project-detailed-description')?.value.trim() || '',
             objectives: document.getElementById('project-objectives')?.value.trim() || '',
             requirements: document.getElementById('project-requirements')?.value.trim() || '',
-            problem: problem || '',
+            problem: problem,
             status: document.getElementById('project-status')?.value || 'iniciado',
             students: '[]'
         };
 
-        // Agregar participantes como JSON string
+        // Procesar participantes
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
-        const participants = Array.from(participantInputs).map(input => {
-            try {
-                return JSON.parse(input.value);
-            } catch (error) {
-                console.error('Error parseando participante:', input.value);
-                return null;
-            }
-        }).filter(participant => participant !== null);
+        const participants = Array.from(participantInputs)
+            .map(input => {
+                try {
+                    return input.value ? JSON.parse(input.value) : null;
+                } catch (error) {
+                    console.error('❌ Error parseando participante:', input.value);
+                    return null;
+                }
+            })
+            .filter(participant => participant !== null);
         
         if (participants.length > 0) {
             projectData.students = JSON.stringify(participants);
+            console.log(`👥 ${participants.length} participantes procesados`);
         }
 
-        // Agregar archivos a eliminar (solo en edición)
+        // Procesar archivos a eliminar (solo edición)
         if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
-            projectData.files_to_remove = window.filesToRemove;
-            console.log('🗑️ Archivos marcados para eliminar:', window.filesToRemove.length);
+            projectData.files_to_remove = JSON.stringify(window.filesToRemove);
+            console.log(`🗑️ ${window.filesToRemove.length} archivos marcados para eliminar`);
         }
 
-        // Agregar original_idea_id si estamos en conversión
+        // Procesar conversión de idea (si aplica)
         if (window.currentConversionIdeaId) {
             projectData.original_idea_id = window.currentConversionIdeaId;
+            console.log(`💡 Conversión de idea: ${window.currentConversionIdeaId}`);
         }
 
-        // VERIFICAR ARCHIVOS ANTES DE CREAR FORM DATA
-        const filesToUpload = (window.uploadedFiles || []).filter(file => 
-            file instanceof File || file instanceof Blob
-        );
+        // Preparar archivos para upload
+        const filesToUpload = (window.uploadedFiles || [])
+            .filter(file => file && typeof file === 'object' && (file instanceof File || file instanceof Blob));
         
-        console.log('📁 Archivos válidos para upload:', filesToUpload.length);
+        console.log(`📁 ${filesToUpload.length} archivos listos para upload`);
+
+        // CREAR FORM DATA DE MANERA SEGURA
+        console.log('🛡️ Creando FormData seguro...');
+        const formData = createSafeFormData(projectData, filesToUpload);
         
-        // Crear FormData usando la función robusta
-        const formData = createProjectFormData(projectData, filesToUpload);
+        // Debug del FormData
+        const formDataCheck = debugFormData(formData);
         
-        // Verificar FormData antes de enviar
-        const formDataCheck = prepareFormData(formData);
-        
-        if (!formDataCheck.hasRequiredFields) {
-            throw new Error('Faltan campos requeridos en el formulario');
+        if (!formDataCheck.hasTitle) {
+            throw new Error('El campo título está vacío en el FormData');
         }
 
-        // ENVIAR CON FORM DATA - CON MANEJO DE ERRORES MEJORADO
-        console.log('🚀 Enviando request a:', url);
-        console.log('📤 Método:', method);
+        // ENVIAR AL SERVIDOR
+        console.log(`📤 Enviando ${method} a: ${url}`);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
-        
-        response = await fetch(url, {
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            console.warn('⏰ Timeout excedido');
+        }, 45000); // 45 segundos
+
+        const response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                // NO establecer Content-Type - el navegador lo hará automáticamente
+                // NO agregar Content-Type - lo hace automáticamente el browser
             },
             body: formData,
             signal: controller.signal
@@ -4283,7 +4234,7 @@ async function handleProjectSubmit(e) {
 
         clearTimeout(timeoutId);
 
-        console.log('📥 Respuesta del servidor:', {
+        console.log('📥 Respuesta recibida:', {
             status: response.status,
             statusText: response.statusText,
             ok: response.ok
@@ -4291,20 +4242,20 @@ async function handleProjectSubmit(e) {
 
         if (response.ok) {
             const project = await response.json();
-            console.log('✅ Proyecto guardado exitosamente:', {
+            console.log('🎉 Proyecto guardado exitosamente:', {
                 id: project.id,
                 title: project.title,
                 archivos: project.files?.length || 0,
                 participantes: project.participants?.length || 0
             });
             
-            showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente`, 'success');
+            showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente!`, 'success');
+            
+            // Limpiar y cerrar
+            cleanupProjectForm();
             closeModal(document.getElementById('project-modal'));
             
-            // Limpiar todo
-            cleanupProjectForm();
-            
-            // Recargar proyectos
+            // Recargar datos
             if (currentProject) {
                 await reloadProject(currentProject.id);
             } else {
@@ -4312,66 +4263,66 @@ async function handleProjectSubmit(e) {
             }
             
         } else {
+            // Manejar errores del servidor
             let errorData;
             try {
                 errorData = await response.json();
-                console.error('❌ Error del servidor:', errorData);
-            } catch (parseError) {
-                console.error('❌ Error parseando respuesta de error:', parseError);
+            } catch {
                 errorData = { error: `Error ${response.status}: ${response.statusText}` };
             }
             
-            // Mensajes de error más específicos
-            let errorMessage = errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`;
+            console.error('❌ Error del servidor:', errorData);
             
-            if (response.status === 400) {
-                errorMessage = 'Datos del proyecto inválidos: ' + (errorData.error || 'Verifica todos los campos');
-            } else if (response.status === 413) {
-                errorMessage = 'Archivos demasiado grandes. El tamaño total no debe superar 50MB';
-            } else if (response.status === 415) {
-                errorMessage = 'Tipo de archivo no permitido';
-            }
+            let userMessage = errorData.error || 'Error al guardar el proyecto';
+            if (response.status === 400) userMessage = 'Datos inválidos: ' + userMessage;
+            if (response.status === 413) userMessage = 'Archivos demasiado grandes';
+            if (response.status === 415) userMessage = 'Tipo de archivo no permitido';
             
-            showNotification(errorMessage, 'error');
+            showNotification(userMessage, 'error');
         }
+
     } catch (error) {
-        console.error('❌ Error de conexión guardando proyecto:', error);
+        console.error('💥 Error crítico:', error);
         
-        let errorMessage = 'Error de conexión al guardar el proyecto';
+        let userMessage = 'Error de conexión';
         if (error.name === 'AbortError') {
-            errorMessage = 'Tiempo de espera agotado. El servidor está tardando demasiado en responder.';
+            userMessage = 'El servidor tardó demasiado en responder. Intenta nuevamente.';
         } else if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'No se puede conectar con el servidor. Verifica tu conexión a internet.';
+            userMessage = 'No se puede conectar al servidor. Verifica tu conexión.';
         } else {
-            errorMessage = error.message || errorMessage;
+            userMessage = error.message || userMessage;
         }
         
-        showNotification(errorMessage, 'error');
+        showNotification(userMessage, 'error');
     } finally {
-        // Restaurar botón
+        // Restaurar UI
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
 }
 
-// Función para limpiar el formulario de proyecto
+// Función auxiliar para limpiar el formulario
 function cleanupProjectForm() {
-    document.getElementById('project-form').reset();
-    const participantsContainer = document.getElementById('project-participants');
-    if (participantsContainer) {
-        participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
+    try {
+        document.getElementById('project-form')?.reset();
+        
+        const participantsContainer = document.getElementById('project-participants');
+        if (participantsContainer) {
+            participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
+        }
+        
+        const filePreview = document.getElementById('file-preview');
+        if (filePreview) filePreview.innerHTML = '';
+        
+        // Limpiar variables globales
+        window.uploadedFiles = [];
+        window.filesToRemove = [];
+        window.currentConversionIdeaId = null;
+        
+        console.log('🧹 Formulario limpiado');
+    } catch (error) {
+        console.error('Error limpiando formulario:', error);
     }
-    
-    // Limpiar preview de archivos
-    const filePreview = document.getElementById('file-preview');
-    if (filePreview) filePreview.innerHTML = '';
-    
-    // Limpiar arrays globales
-    window.uploadedFiles = [];
-    window.filesToRemove = [];
-    window.currentConversionIdeaId = null;
-    
-    console.log('🧹 Formulario de proyecto limpiado');
 }
 
 // Función para setear la idea original en conversión
