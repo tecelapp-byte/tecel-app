@@ -4198,10 +4198,10 @@ async function handleProjectSubmit(e) {
     submitBtn.disabled = true;
 
     try {
-        // TEMPORAL: Cambia esta línea para probar el debug
+        // VOLVER A LA RUTA ORIGINAL
         const url = currentProject ? 
             `${API_BASE}/projects/${currentProject.id}` : 
-            `${API_BASE}/debug/projects`;  // Cambiar a debug temporal
+            `${API_BASE}/projects`;  // ← Esta es la ruta correcta
             
         const method = currentProject ? 'PUT' : 'POST';
 
@@ -4264,6 +4264,12 @@ async function handleProjectSubmit(e) {
                 title: project.title
             });
             
+            // SUBIR ARCHIVOS DESPUÉS DE CREAR EL PROYECTO
+            if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+                console.log(`📤 Iniciando subida de ${window.uploadedFiles.length} archivos...`);
+                await uploadProjectFiles(project.id);
+            }
+            
             showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente`, 'success');
             closeModal(document.getElementById('project-modal'));
             
@@ -4318,25 +4324,30 @@ function validateProjectPermissions() {
     return false;
 }
 
-// Función para subir archivos después de crear el proyecto
-async function uploadProjectFiles(projectId, files) {
-    if (!files || files.length === 0) return;
+// Agrega esta función después de guardar el proyecto exitosamente
+async function uploadProjectFiles(projectId) {
+    if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
+        console.log('📁 No hay archivos para subir');
+        return;
+    }
+
+    console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos para proyecto ${projectId}`);
     
-    console.log(`📤 Subiendo ${files.length} archivos para proyecto ${projectId}`);
-    
-    for (const file of files) {
+    for (const file of window.uploadedFiles) {
         try {
+            console.log(`⬆️ Subiendo archivo: ${file.name}`);
+            
             // Convertir archivo a base64
             const base64File = await fileToBase64(file);
             
             const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify({
-                    file: base64File,
+                    file: base64File.split(',')[1], // Remover el prefijo data:application/octet-stream;base64,
                     fileName: file.name,
                     fileType: file.type
                 })
@@ -4358,11 +4369,7 @@ function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => {
-            // Remover el prefijo data:application/octet-stream;base64,
-            const base64 = reader.result.split(',')[1];
-            resolve(base64);
-        };
+        reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
     });
 }
