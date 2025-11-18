@@ -117,9 +117,6 @@ async function apiFetch(endpoint, options = {}) {
     }
 }
 
-// Guardar el fetch original
-const originalFetch = window.fetch;
-
 // Override global fetch para corregir automáticamente
 window.fetch = function(resource, options = {}) {
     let url = resource;
@@ -210,6 +207,72 @@ window.fetch = function(resource, options = {}) {
 
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
+// ==================== PATCH PARA FORM DATA ====================
+// Override global para manejar FormData correctamente
+const originalFetch = window.fetch;
+window.fetch = async function(resource, options = {}) {
+    let url = resource;
+    
+    // Corregir URLs para producción
+    if (typeof resource === 'string') {
+        if (resource.includes('localhost:3000') || resource.includes('192.168.1.34:3000')) {
+            url = resource.replace(/http:\/\/[^/]+/, 'https://tecel-app.onrender.com');
+        }
+    }
+    
+    // Si es FormData, manejar especialmente
+    if (options.body instanceof FormData) {
+        console.log('📦 Detectado FormData - Convirtiendo a JSON...');
+        
+        // Convertir FormData a objeto JSON
+        const formDataObj = {};
+        for (let [key, value] of options.body.entries()) {
+            if (key === 'files') {
+                // Manejar archivos por separado
+                if (!formDataObj.files) formDataObj.files = [];
+                formDataObj.files.push(value);
+            } else {
+                formDataObj[key] = value;
+            }
+        }
+        
+        // Para proyectos, enviar como JSON normal
+        if (url.includes('/projects') && (options.method === 'POST' || options.method === 'PUT')) {
+            console.log('🔄 Convirtiendo FormData de proyecto a JSON...');
+            
+            // Preparar datos para el servidor
+            const projectData = {
+                title: formDataObj.title,
+                year: formDataObj.year,
+                description: formDataObj.description,
+                detailed_description: formDataObj.detailed_description,
+                objectives: formDataObj.objectives,
+                requirements: formDataObj.requirements,
+                problem: formDataObj.problem,
+                status: formDataObj.status,
+                students: formDataObj.students
+            };
+            
+            // Agregar archivos si existen
+            if (formDataObj.files && formDataObj.files.length > 0) {
+                console.log(`📁 Enviando ${formDataObj.files.length} archivos como base64`);
+                // Aquí podrías convertir archivos a base64 si el servidor lo requiere
+            }
+            
+            return originalFetch.call(this, url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': options.headers?.Authorization || `Bearer ${authToken}`
+                },
+                body: JSON.stringify(projectData)
+            });
+        }
+    }
+    
+    return originalFetch.call(this, url, options);
+};
+
 // Función para crear FormData de manera segura sin modificar prototypes
 function createSafeFormData(data, files = []) {
     const formData = new FormData();
@@ -242,33 +305,15 @@ function createSafeFormData(data, files = []) {
     return formData;
 }
 
-// Función para debug del FormData - VERSIÓN CORREGIDA
+// Función auxiliar para debug
 function debugFormData(formData) {
     console.log('🔍 DEBUG FormData:');
-    let hasFiles = false;
-    let hasTitle = false;
-    
-    try {
-        for (let pair of formData.entries()) {
-            const key = pair[0];
-            const value = pair[1];
-            
-            if (value instanceof File || value instanceof Blob) {
-                console.log(`   📁 ${key}: [File] ${value.name} (${value.size} bytes)`);
-                hasFiles = true;
-            } else {
-                console.log(`   📄 ${key}: "${String(value).substring(0, 50)}"`);
-                if (key === 'title' && String(value).trim()) {
-                    hasTitle = true;
-                }
-            }
+    for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+            console.log(`   ${key}: [File] ${value.name} (${value.size} bytes)`);
+        } else {
+            console.log(`   ${key}: ${value}`);
         }
-        
-        console.log('✅ Estado FormData:', { hasFiles, hasTitle });
-        return { hasFiles, hasTitle };
-    } catch (error) {
-        console.error('❌ Error en debugFormData:', error);
-        return { hasFiles: false, hasTitle: false };
     }
 }
 
@@ -4123,8 +4168,8 @@ async function handleProjectSubmit(e) {
     
     if (!checkAuth()) return;
     
-    console.log('🚀 INICIANDO GUARDADO DE PROYECTO');
-    console.log('📋 Modo:', currentProject ? 'EDITAR' : 'CREAR');
+    console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
+    console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
     
     // Validar permisos
     if (!currentProject && !validateProjectPermissions()) {
@@ -4132,119 +4177,91 @@ async function handleProjectSubmit(e) {
         return;
     }
 
-    // Obtener y validar campos requeridos
-    const title = document.getElementById('project-title')?.value.trim() || '';
-    const year = document.getElementById('project-year')?.value || '';
-    const description = document.getElementById('project-description')?.value.trim() || '';
-    const problem = document.getElementById('project-problem')?.value.trim() || '';
-    
-    console.log('✅ Campos validados:', { 
-        title: title.substring(0, 20), 
-        year, 
-        description: description.substring(0, 20), 
-        problem: problem.substring(0, 20) 
-    });
+    // Validar campos requeridos
+    const title = document.getElementById('project-title').value.trim();
+    const year = document.getElementById('project-year').value;
+    const description = document.getElementById('project-description').value.trim();
+    const problem = document.getElementById('project-problem').value.trim();
     
     if (!title || !year || !description || !problem) {
         showNotification('Por favor completa todos los campos obligatorios: Título, Año, Descripción y Problema', 'error');
         return;
     }
 
-    // Preparar UI de carga
+    // Mostrar loading
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (currentProject ? 'Actualizando...' : 'Guardando...');
     submitBtn.disabled = true;
 
     try {
-        // Configurar URL y método
         const url = currentProject ? 
             `${API_BASE}/projects/${currentProject.id}` : 
             `${API_BASE}/projects`;
+            
         const method = currentProject ? 'PUT' : 'POST';
 
-        // Preparar datos básicos del proyecto
+        // Preparar datos como JSON (NO FormData)
         const projectData = {
             title: title,
             year: parseInt(year),
             description: description,
-            detailed_description: document.getElementById('project-detailed-description')?.value.trim() || '',
-            objectives: document.getElementById('project-objectives')?.value.trim() || '',
-            requirements: document.getElementById('project-requirements')?.value.trim() || '',
+            detailed_description: document.getElementById('project-detailed-description').value.trim(),
+            objectives: document.getElementById('project-objectives').value.trim(),
+            requirements: document.getElementById('project-requirements').value.trim(),
             problem: problem,
-            status: document.getElementById('project-status')?.value || 'iniciado',
-            students: '[]'
+            status: document.getElementById('project-status').value
         };
 
-        // Procesar participantes
+        // Agregar participantes
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
-        const participants = Array.from(participantInputs)
-            .map(input => {
-                try {
-                    return input.value ? JSON.parse(input.value) : null;
-                } catch (error) {
-                    console.error('❌ Error parseando participante:', input.value);
-                    return null;
-                }
-            })
-            .filter(participant => participant !== null);
+        const participants = Array.from(participantInputs).map(input => {
+            try {
+                return JSON.parse(input.value);
+            } catch (error) {
+                console.error('Error parseando participante:', input.value);
+                return null;
+            }
+        }).filter(participant => participant !== null);
         
-        if (participants.length > 0) {
-            projectData.students = JSON.stringify(participants);
-            console.log(`👥 ${participants.length} participantes procesados`);
-        }
+        projectData.students = JSON.stringify(participants);
 
-        // Procesar archivos a eliminar (solo edición)
-        if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
-            projectData.files_to_remove = JSON.stringify(window.filesToRemove);
-            console.log(`🗑️ ${window.filesToRemove.length} archivos marcados para eliminar`);
-        }
-
-        // Procesar conversión de idea (si aplica)
+        // Agregar idea original si existe (para conversión)
         if (window.currentConversionIdeaId) {
             projectData.original_idea_id = window.currentConversionIdeaId;
-            console.log(`💡 Conversión de idea: ${window.currentConversionIdeaId}`);
         }
 
-        // ENVIAR COMO JSON - SIN ARCHIVOS POR AHORA
-        console.log('📤 Enviando como JSON (sin archivos)...');
-        console.log('📄 Datos a enviar:', projectData);
+        console.log('📤 Enviando datos del proyecto:', projectData);
 
         const response = await fetch(url, {
             method: method,
             headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify(projectData)
         });
 
-        console.log('📥 Respuesta recibida:', {
+        console.log('📥 Respuesta del servidor:', {
             status: response.status,
             statusText: response.statusText,
             ok: response.ok
         });
 
         if (response.ok) {
-        const project = await response.json();
-        console.log('🎉 Proyecto guardado exitosamente:', {
-            id: project.id,
-            title: project.title,
-            participantes: project.participants?.length || 0
-        });
-        
-        // Subir archivos después de crear el proyecto
-        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
-            await uploadProjectFiles(project.id, window.uploadedFiles);
-        }
-        
-        showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente!`, 'success');
-        
-            // Limpiar y cerrar
-            cleanupProjectForm();
+            const project = await response.json();
+            console.log('✅ Proyecto guardado exitosamente:', {
+                id: project.id,
+                title: project.title
+            });
+            
+            showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente`, 'success');
             closeModal(document.getElementById('project-modal'));
             
-            // Recargar datos
+            // Limpiar formulario
+            cleanupProjectForm();
+            
+            // Recargar proyectos
             if (currentProject) {
                 await reloadProject(currentProject.id);
             } else {
@@ -4252,40 +4269,33 @@ async function handleProjectSubmit(e) {
             }
             
         } else {
-            // Manejar errores del servidor
-            let errorData;
-            try {
-                errorData = await response.json();
-            } catch {
-                errorData = { error: `Error ${response.status}: ${response.statusText}` };
-            }
-            
-            console.error('❌ Error del servidor:', errorData);
-            
-            let userMessage = errorData.error || 'Error al guardar el proyecto';
-            if (response.status === 400) userMessage = 'Datos inválidos: ' + userMessage;
-            
-            showNotification(userMessage, 'error');
+            const errorData = await response.json();
+            showNotification(errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`, 'error');
         }
-
     } catch (error) {
-        console.error('💥 Error crítico:', error);
-        
-        let userMessage = 'Error de conexión';
-        if (error.name === 'AbortError') {
-            userMessage = 'El servidor tardó demasiado en responder. Intenta nuevamente.';
-        } else if (error.message.includes('Failed to fetch')) {
-            userMessage = 'No se puede conectar al servidor. Verifica tu conexión.';
-        } else {
-            userMessage = error.message || userMessage;
-        }
-        
-        showNotification(userMessage, 'error');
+        console.error('❌ Error de conexión guardando proyecto:', error);
+        showNotification('Error de conexión al guardar el proyecto: ' + error.message, 'error');
     } finally {
-        // Restaurar UI
+        // Restaurar botón
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+}
+
+function validateProjectPermissions() {
+    if (!currentUser) return false;
+    
+    // Admin y profesores pueden crear proyectos
+    if (currentUser.user_type === 'admin' || currentUser.user_type === 'teacher') {
+        return true;
+    }
+    
+    // Alumnos de 7mo pueden crear proyectos
+    if (currentUser.user_type === 'student' && currentUser.grade === '7mo') {
+        return true;
+    }
+    
+    return false;
 }
 
 // Función para subir archivos después de crear el proyecto
