@@ -52,16 +52,11 @@ pool.query('SELECT NOW()')
 
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseAdmin = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY, // ← Esto sí funciona
-    {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false
-        }
-    }
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
 );
+
 /* Configuración de PostgreSQL
 const pool = new Pool({
     user: 'postgres',
@@ -1984,22 +1979,25 @@ async function ensureBucketExists() {
     try {
         console.log('🔍 Verificando bucket tecel-files...');
         
-        const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
-        if (listError) {
-            console.error('❌ Error listando buckets:', listError);
-            return false;
-        }
+        // ✅ Cámbialo por:
+        const { data, error } = await supabase.storage
+            .from('tecel-files')
+            .upload(filePath, fileBuffer, {
+                contentType: fileType || 'application/octet-stream',
+                upsert: false
+            });
 
         const bucketExists = buckets.some(bucket => bucket.name === 'tecel-files');
         
         if (!bucketExists) {
             console.log('➕ Creando bucket tecel-files con service role...');
-            const { data: newBucket, error: createError } = await supabaseAdmin.storage
-                .createBucket('tecel-files', {
-                    public: false,
-                    fileSizeLimit: 52428800, // 50MB
-                    allowedMimeTypes: ['image/*', 'application/pdf', 'application/zip', 'text/*', 'application/*']
-                });
+        // ✅ Cámbialo por:
+        const { data, error } = await supabase.storage
+            .from('tecel-files')
+            .upload(filePath, fileBuffer, {
+                contentType: fileType || 'application/octet-stream',
+                upsert: false
+            });
             
             if (createError) {
                 console.error('❌ Error creando bucket:', createError);
