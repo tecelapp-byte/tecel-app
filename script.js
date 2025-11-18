@@ -88,6 +88,9 @@ const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:3000' 
     : 'https://tecel-app.onrender/api.com';
 
+// Override global para manejar FormData correctamente
+const originalFetch = window.fetch;
+
 // Función corregida para fetch
 async function apiFetch(endpoint, options = {}) {
     // Asegurar que el endpoint empiece con /
@@ -208,8 +211,7 @@ window.fetch = function(resource, options = {}) {
 console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
 
 // ==================== PATCH PARA FORM DATA ====================
-// Override global para manejar FormData correctamente
-const originalFetch = window.fetch;
+
 window.fetch = async function(resource, options = {}) {
     let url = resource;
     
