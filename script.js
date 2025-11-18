@@ -4172,6 +4172,7 @@ async function handleProjectSubmit(e) {
     
     console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
     console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
+    console.log('Usuario actual:', currentUser);
     
     // Validar permisos
     if (!currentProject && !validateProjectPermissions()) {
@@ -4197,9 +4198,10 @@ async function handleProjectSubmit(e) {
     submitBtn.disabled = true;
 
     try {
+        // TEMPORAL: Cambia esta línea para probar el debug
         const url = currentProject ? 
             `${API_BASE}/projects/${currentProject.id}` : 
-            `${API_BASE}/projects`;
+            `${API_BASE}/debug/projects`;  // Cambiar a debug temporal
             
         const method = currentProject ? 'PUT' : 'POST';
 
@@ -4226,14 +4228,19 @@ async function handleProjectSubmit(e) {
             }
         }).filter(participant => participant !== null);
         
-        projectData.students = JSON.stringify(participants);
+        if (participants.length > 0) {
+            projectData.students = JSON.stringify(participants);
+            console.log(`👥 Participantes a enviar: ${participants.length}`);
+        }
 
         // Agregar idea original si existe (para conversión)
         if (window.currentConversionIdeaId) {
             projectData.original_idea_id = window.currentConversionIdeaId;
+            console.log(`💡 Idea original para conversión: ${window.currentConversionIdeaId}`);
         }
 
         console.log('📤 Enviando datos del proyecto:', projectData);
+        console.log('🔑 Token de autenticación:', authToken ? 'PRESENTE' : 'AUSENTE');
 
         const response = await fetch(url, {
             method: method,
@@ -4271,8 +4278,19 @@ async function handleProjectSubmit(e) {
             }
             
         } else {
-            const errorData = await response.json();
-            showNotification(errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`, 'error');
+            // Intentar obtener más información del error
+            let errorMessage = `Error ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+                console.error('❌ Error detallado del servidor:', errorData);
+            } catch (parseError) {
+                const errorText = await response.text();
+                console.error('❌ Error texto del servidor:', errorText);
+                errorMessage = errorText || errorMessage;
+            }
+            
+            showNotification(errorMessage, 'error');
         }
     } catch (error) {
         console.error('❌ Error de conexión guardando proyecto:', error);
