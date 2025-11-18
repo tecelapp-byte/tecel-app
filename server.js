@@ -62,12 +62,6 @@ const supabaseAdmin = createClient(
         }
     }
 );
-
-// Configurar Supabase (agregar después de pool)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
 /* Configuración de PostgreSQL
 const pool = new Pool({
     user: 'postgres',
