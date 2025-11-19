@@ -2511,9 +2511,6 @@ function generateSafeShortName(originalName) {
   return shortName + '_' + uniqueId + ext;
 }
 
-// En la función uploadProjectFiles, usa esto:
-const safeFileName = generateSafeShortName(file.name);
-
 async function loadSuggestions() {
   try {
     ('🔄 Cargando sugerencias...');
