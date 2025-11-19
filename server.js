@@ -1314,7 +1314,7 @@ app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
     console.log('📥 Descargando de Supabase:', filePath);
 
     const { data, error } = await supabase.storage
-      .from('tecel-files')
+      .from('tecel-files-public')
       .download(filePath);
 
     if (error) {
@@ -1393,7 +1393,7 @@ app.get('/api/library/download/:resourceId', authenticateToken, async (req, res)
 
     // Descargar de Supabase
     const { data, error } = await supabase.storage
-      .from('tecel-files')
+      .from('tecel-files-public')
       .download(filePath);
 
     if (error) {
@@ -1438,7 +1438,7 @@ app.post('/api/library', authenticateToken, async (req, res) => {
 
       // Subir a Supabase
       const { data, error } = await supabase.storage
-        .from('tecel-files')
+        .from('tecel-files-public')
         .upload(filePath, fileBuffer, {
           contentType: fileType || 'application/octet-stream'
         });
@@ -1450,7 +1450,7 @@ app.post('/api/library', authenticateToken, async (req, res) => {
 
       // Obtener URL pública
       const { data: urlData } = supabase.storage
-        .from('tecel-files')
+        .from('tecel-files-public')
         .getPublicUrl(filePath);
 
       file_url = urlData.publicUrl;
@@ -1999,7 +1999,7 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
 
         // INTENTAR SUBIR DIRECTAMENTE
         const { data, error } = await supabase.storage
-            .from('tecel-files')
+            .from('tecel-files-public')
             .upload(filePath, fileBuffer, {
                 contentType: fileType || 'application/octet-stream',
                 upsert: false
@@ -2009,13 +2009,13 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
             console.error('❌ Error subiendo archivo:', error);
             return res.status(500).json({ 
                 error: 'Error subiendo archivo: ' + error.message,
-                solution: 'Verifica que el bucket "tecel-files" existe en Supabase Storage'
+                solution: 'Verifica que el bucket "tecel-files-public" existe en Supabase Storage'
             });
         }
 
         // Obtener URL pública
         const { data: urlData } = supabase.storage
-            .from('tecel-files')
+            .from('tecel-files-public')
             .getPublicUrl(filePath);
 
         console.log('✅ Archivo subido exitosamente. URL:', urlData.publicUrl);
@@ -2085,7 +2085,7 @@ app.delete('/api/projects/:id/files/:fileId', authenticateToken, checkProjectPer
     // 2. Eliminar de Supabase Storage
     const filePath = `projects/${file.project_id}/${file.filename}`;
     const { error: storageError } = await supabase.storage
-      .from('tecel-files')
+      .from('tecel-files-public')
       .remove([filePath]);
 
     if (storageError) {
