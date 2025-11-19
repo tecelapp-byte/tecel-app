@@ -4345,6 +4345,9 @@ function validateProjectPermissions() {
 }
 
 async function uploadProjectFiles(projectId) {
+    // En la función uploadProjectFiles, usa esto:
+const safeFileName = generateSafeShortName(file.name);
+
   if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
     console.log('📁 No hay archivos para subir');
     return;
