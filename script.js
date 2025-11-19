@@ -1327,52 +1327,84 @@ highlightStyle.textContent = `
 `;
 document.head.appendChild(highlightStyle);
 
-// Configurar event listener para el formulario de conversión - VERSIÓN MEJORADA
+// SOLUCIÓN ESPECÍFICA PARA EL BOTÓN "CREAR PROYECTO" - SIN AFECTAR EL RESTO
 function setupConversionFormListener() {
-    ('🔧 Configurando event listener para formulario de conversión...');
+  console.log('🔧 Configurando solo el botón Crear Proyecto...');
+  
+  // Buscar específicamente el botón por ID
+  const submitBtn = document.getElementById('convert-idea-submit-btn');
+  
+  if (!submitBtn) {
+    console.error('❌ Botón "convert-idea-submit-btn" no encontrado');
     
-    const convertForm = document.getElementById('convert-idea-form');
-    const submitBtn = document.getElementById('convert-idea-submit-btn');
-    
-    // Limpiar solo los event listeners de submit, no reemplazar el formulario completo
-    if (convertForm) {
-        // Remover event listeners existentes
-        convertForm.removeEventListener('submit', handleConvertIdeaToProject);
-        
-        // Agregar nuevo event listener
-        convertForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!conversionInProgress) {
-                ('🎯 Formulario de conversión enviado');
-                handleConvertIdeaToProject(e);
-            }
-        });
-        
-        ('✅ Event listener del formulario configurado');
-    }
-    
-    if (submitBtn) {
-        // Remover event listeners existentes
-        submitBtn.removeEventListener('click', handleConvertIdeaToProject);
-        
-        // Agregar nuevo event listener
-        submitBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (!conversionInProgress) {
-                ('🎯 Botón de conversión clickeado');
-                handleConvertIdeaToProject(e);
-            }
-        });
-        
-        ('✅ Event listener del botón configurado');
-    }
-    
-    // RE-INICIALIZAR los sistemas de búsqueda y archivos
+    // Buscar alternativas sin afectar otros elementos
     setTimeout(() => {
-        initConversionStudentSearch();
-        initConversionFileUpload();
-        ('✅ Sistemas de búsqueda y archivos reinicializados');
-    }, 100);
+      findAndFixConversionButton();
+    }, 500);
+    return;
+  }
+  
+  console.log('✅ Botón encontrado, configurando listeners...');
+  
+  // MÉTODO 1: Reemplazar solo el botón manteniendo sus propiedades
+  const originalClasses = submitBtn.className;
+  const originalHTML = submitBtn.innerHTML;
+  const originalType = submitBtn.type;
+  
+  const newBtn = document.createElement('button');
+  newBtn.id = 'convert-idea-submit-btn';
+  newBtn.className = originalClasses;
+  newBtn.innerHTML = originalHTML;
+  newBtn.type = originalType;
+  
+  // Reemplazar el botón
+  submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+  
+  // CONFIGURAR LISTENER DIRECTO (método principal)
+  newBtn.onclick = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🎯 Botón "Crear Proyecto" clickeado');
+    handleConvertIdeaToProject(e);
+    return false;
+  };
+  
+  console.log('✅ Botón configurado correctamente');
+}
+
+// Función alternativa para buscar el botón
+function findAndFixConversionButton() {
+  console.log('🔍 Buscando botón de conversión alternativamente...');
+  
+  const modal = document.getElementById('convert-idea-modal');
+  if (!modal) return;
+  
+  // Buscar botones por texto sin afectar otros elementos
+  const buttons = modal.querySelectorAll('button');
+  let targetButton = null;
+  
+  buttons.forEach(btn => {
+    const btnText = btn.textContent.trim().toLowerCase();
+    if ((btnText.includes('crear') && btnText.includes('proyecto')) || 
+        btnText.includes('convertir')) {
+      targetButton = btn;
+      console.log('✅ Botón encontrado por texto:', btnText);
+    }
+  });
+  
+  if (targetButton && !targetButton.id) {
+    // Solo agregar listener si no tiene ID específico (para no duplicar)
+    targetButton.addEventListener('click', function(e) {
+      if (!e.target.closest('.student-result-item') && 
+          !e.target.closest('.file-remove') &&
+          !e.target.closest('.btn-outline')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Botón alternativo clickeado');
+        handleConvertIdeaToProject(e);
+      }
+    });
+  }
 }
 
 // Función para debug del sistema de conversión
@@ -4353,13 +4385,14 @@ async function uploadProjectFiles(projectId) {
   let failedUploads = 0;
   
   for (let i = 0; i < window.uploadedFiles.length; i++) {
-    const file = window.uploadedFiles[i]; // ✅ ESTA LÍNEA FALTABA O ESTÁ MAL
+    const file = window.uploadedFiles[i];
     
     try {
       console.log(`⬆️ Procesando archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name} (${file.type})`);
       
       let processedFile = file;
       let base64File;
+      let response; // ✅ DECLARAR response AQUÍ para que esté en scope
       
       // MANEJO DIFERENTE SEGÚN EL TIPO DE ARCHIVO
       if (file.type.startsWith('image/') && file.size > 500 * 1024) {
@@ -4367,15 +4400,28 @@ async function uploadProjectFiles(projectId) {
         console.log('🖼️ Comprimiendo imagen...');
         processedFile = await compressImage(file);
         base64File = await fileToOptimizedBase64(processedFile);
+        
+        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            file: base64File,
+            fileName: file.name,
+            fileType: processedFile.type || file.type
+          })
+        });
       } 
       else if (isDocumentFile(file)) {
         // Documentos (Word, PDF, etc.) - subir sin compresión pero con validación de tamaño
         console.log('📄 Procesando documento...');
         if (file.size > 3 * 1024 * 1024) {
-            console.warn(`⚠️ Documento demasiado grande: ${file.name}`);
-            showNotification(`"${file.name}" es muy grande (máx. 3MB)`, 'warning');
-            failedUploads++;
-            continue;
+          console.warn(`⚠️ Documento demasiado grande: ${file.name}`);
+          showNotification(`"${file.name}" es muy grande (máx. 3MB)`, 'warning');
+          failedUploads++;
+          continue;
         }
         
         // ✅ USAR NOMBRE SEGURO Y CORTO
@@ -4385,23 +4431,35 @@ async function uploadProjectFiles(projectId) {
         console.log('🔧 Nombre original:', file.name, '-> Seguro:', safeFileName);
         
         // Enviar con nombre seguro
-        const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-            method: 'POST',
-            headers: {
+        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+          method: 'POST',
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
+          },
+          body: JSON.stringify({
             file: base64File,
             fileName: safeFileName, // ✅ ENVIAR NOMBRE SEGURO
             fileType: file.type
-            })
+          })
         });
-        base64File = await fileToBase64(file); // Sin optimización para documentos
       }
       else {
         // Otros archivos
         base64File = await fileToOptimizedBase64(file);
+        
+        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            file: base64File,
+            fileName: file.name,
+            fileType: file.type
+          })
+        });
       }
       
       if (!base64File) {
@@ -4461,8 +4519,6 @@ async function uploadProjectFiles(projectId) {
   // Limpiar archivos
   window.uploadedFiles = [];
 }
-
-
 
 // Función para detectar documentos
 function isDocumentFile(file) {
@@ -6562,167 +6618,190 @@ function loadConversionParticipants(idea) {
     }
 }
 
-// Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
+// Función mejorada handleConvertIdeaToProject (solo para referencia)
 async function handleConvertIdeaToProject(e) {
-  e.preventDefault();
-  conversionInProgress = true;
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
   
-  console.log('🚀 Iniciando conversión de idea a proyecto...');
-
-    // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
-    if (conversionInProgress) {
-        ('⏳ Conversión ya en progreso, ignorando click adicional');
-        return;
-    }
-    
+  if (conversionInProgress) {
+    console.log('⏳ Conversión ya en progreso...');
+    return;
+  }
+  
+  conversionInProgress = true;
+  console.log('🚀 INICIANDO CONVERSIÓN DE IDEA A PROYECTO...');
+  
+  try {
+    // Validar que tenemos la idea actual
     if (!currentIdea) {
-        showNotification('No hay idea seleccionada para convertir', 'error');
-        return;
+      throw new Error('No hay idea seleccionada para convertir');
     }
     
-    ('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
+    // Recoger datos del formulario SIN AFECTAR otros elementos
+    const title = document.getElementById('project-title-from-idea')?.value.trim() || '';
+    const year = document.getElementById('project-year-from-idea')?.value || '';
+    const description = document.getElementById('project-description-from-idea')?.value.trim() || '';
+    const status = document.getElementById('project-status-from-idea')?.value || 'iniciado';
     
-    const title = document.getElementById('project-title-from-idea').value.trim();
-    const year = document.getElementById('project-year-from-idea').value;
-    const description = document.getElementById('project-description-from-idea').value.trim();
-    const status = document.getElementById('project-status-from-idea').value;
-    
+    // Validaciones básicas
     if (!title || !year || !description) {
-        showNotification('Por favor completa todos los campos obligatorios', 'error');
-        return;
+      showNotification('Por favor completa todos los campos obligatorios', 'error');
+      conversionInProgress = false;
+      return;
     }
     
-    // ENCONTRAR el botón de submit
-    let submitBtn = document.querySelector('#convert-idea-form button[type="submit"]');
-    if (!submitBtn) {
-        submitBtn = document.getElementById('convert-idea-submit-btn');
-    }
-    if (!submitBtn) {
-        submitBtn = document.querySelector('.conversion-actions .btn-primary');
+    // Recoger participantes (sin afectar el sistema de búsqueda)
+    const participantInputs = document.querySelectorAll('#conversion-project-participants input[name="conversion-participants[]"]');
+    const participants = Array.from(participantInputs).map(input => {
+      try {
+        return JSON.parse(input.value);
+      } catch (error) {
+        console.error('Error parseando participante:', input.value);
+        return null;
+      }
+    }).filter(participant => participant !== null);
+    
+    // Preparar datos del proyecto
+    const projectData = {
+      title: title,
+      year: parseInt(year),
+      description: description,
+      status: status,
+      original_idea_id: currentIdea.id
+    };
+    
+    // Agregar participantes si existen
+    if (participants.length > 0) {
+      projectData.students = JSON.stringify(participants);
+      console.log(`👥 Enviando ${participants.length} participantes`);
     }
     
-    if (!submitBtn) {
-        console.error('❌ No se encontró el botón de submit');
-        showNotification('Error interno del formulario', 'error');
-        return;
+    console.log('📤 Enviando datos del proyecto para conversión');
+    
+    // Mostrar loading en el botón específico
+    const submitBtn = document.getElementById('convert-idea-submit-btn');
+    const originalText = submitBtn?.innerHTML;
+    if (submitBtn) {
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+      submitBtn.disabled = true;
     }
     
-    const originalText = submitBtn.innerHTML;
+    // Crear el proyecto
+    const response = await fetch(`${API_BASE}/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(projectData)
+    });
     
-    try {
-        // BLOQUEAR CONVERSIÓN MÚLTIPLE
-        conversionInProgress = true;
-        
-        // Mostrar loading
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando Proyecto...';
-        submitBtn.disabled = true;
-        
-        // Preparar datos del proyecto
-        const projectData = {
-            title: title,
-            year: parseInt(year),
-            description: description,
-            detailed_description: currentIdea.description,
-            objectives: `Proyecto basado en la idea: "${currentIdea.name}"\n\nProblema original: ${currentIdea.problem}`,
-            requirements: 'Por definir en base a los recursos disponibles',
-            problem: currentIdea.problem,
-            status: status,
-            original_idea_id: currentIdea.id,
-            original_idea_name: currentIdea.name
-        };
-        
-        // Recoger participantes del formulario de conversión
-        const participantInputs = document.querySelectorAll('input[name="conversion-participants[]"]');
-        const participants = Array.from(participantInputs).map(input => {
-            try {
-                return JSON.parse(input.value);
-            } catch (error) {
-                console.error('Error parseando participante:', input.value);
-                return null;
-            }
-        }).filter(participant => participant !== null);
-        
-        projectData.students = JSON.stringify(participants);
-        
-        ('📤 Enviando datos del proyecto:', projectData);
-        
-        // Crear FormData para enviar archivos
-        const formData = new FormData();
-        for (const key in projectData) {
-            formData.append(key, projectData[key]);
-        }
-        
-        // Después de guardar el proyecto, subir archivos
-        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
+    if (response.ok) {
+      const newProject = await response.json();
+      console.log('✅ Proyecto creado exitosamente desde idea');
+      
+      // SUBIR ARCHIVOS si hay (usando el sistema existente)
+      if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
         console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
-        
-        // Usar la MISMA función de subida
+        window.uploadedFiles = [...window.conversionUploadedFiles];
         await uploadProjectFiles(newProject.id);
-        }
-        
-        const response = await fetch(`${API_BASE}/projects`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: formData
+      }
+      
+      // Actualizar estado de la idea
+      try {
+        await fetch(`${API_BASE}/ideas/${currentIdea.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            project_status: 'converted'
+          })
         });
-        
-        if (response.ok) {
-        const newProject = await response.json();
-        ('✅ Proyecto creado exitosamente:', newProject);
-        
-        // FORZAR RECARGA DE IDEAS DESDE EL SERVIDOR
-        ('🔄 Recargando ideas desde el servidor...');
-        await loadIdeas(); // Esto recargará todas las ideas con el estado actualizado
-        
-        // Buscar la idea actualizada en la lista
-        const updatedIdea = ideas.find(i => i.id === currentIdea.id);
-        
-        if (updatedIdea) {
-            ('✅ Idea actualizada encontrada:', {
-                id: updatedIdea.id,
-                name: updatedIdea.name,
-                project_status: updatedIdea.project_status
-            });
-        } else {
-            console.error('❌ No se pudo encontrar la idea actualizada');
-        }
-        
-        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como "Proyecto en curso".`, 'success');
-        
-        // Cerrar modales
-        closeModal(document.getElementById('convert-idea-modal'));
-        closeModal(document.getElementById('idea-detail-modal'));
-        
-        // Limpiar datos temporales
-        window.conversionUploadedFiles = [];
-        currentIdea = null;
-        
-        // Recargar proyectos
-        await loadProjects();
-        
-        // Navegar a la sección de proyectos
-        showSection('semillero');
-        
+      } catch (error) {
+        console.warn('⚠️ No se pudo actualizar estado de la idea:', error);
+      }
+      
+      showNotification('¡Proyecto creado exitosamente desde la idea!', 'success');
+      
+      // Cerrar modales
+      closeModal(document.getElementById('convert-idea-modal'));
+      closeModal(document.getElementById('idea-detail-modal'));
+      
+      // Recargar datos
+      setTimeout(() => {
+        loadProjects();
+        loadIdeas();
+      }, 1000);
+      
     } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear el proyecto');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al crear el proyecto');
     }
-        
-    } catch (error) {
-        console.error('❌ Error convirtiendo idea a proyecto:', error);
-        showNotification(`Error al crear el proyecto: ${error.message}`, 'error');
-    } finally {
-        // RESTAURAR ESTADO sin importar el resultado
-        conversionInProgress = false;
-        
-        if (submitBtn) {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
+    
+  } catch (error) {
+    console.error('❌ Error en conversión:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  } finally {
+    conversionInProgress = false;
+    
+    // Restaurar botón
+    const submitBtn = document.getElementById('convert-idea-submit-btn');
+    if (submitBtn) {
+      submitBtn.innerHTML = '<i class="fas fa-rocket"></i> Crear Proyecto';
+      submitBtn.disabled = false;
     }
+  }
 }
+
+// Inicialización específica para el modal de conversión
+function initConversionModal() {
+  console.log('🔧 Inicializando modal de conversión...');
+  
+  // Configurar el botón cuando se abra el modal
+  const modal = document.getElementById('convert-idea-modal');
+  if (modal) {
+    // Observer para detectar cuando el modal se abre
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && 
+            mutation.attributeName === 'style' && 
+            modal.style.display === 'flex') {
+          
+          console.log('🎯 Modal de conversión abierto, configurando botón...');
+          
+          // Pequeño delay para que el DOM se estabilice
+          setTimeout(() => {
+            setupConversionFormListener();
+          }, 300);
+        }
+      });
+    });
+    
+    observer.observe(modal, { 
+      attributes: true, 
+      attributeFilter: ['style'] 
+    });
+  }
+  
+  // También configurar cuando se hace click en el botón de conversión desde la idea
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.btn-success') && 
+        e.target.closest('.btn-success').textContent.includes('Convertir a Proyecto')) {
+      
+      // Pequeño delay para que el modal se abra completamente
+      setTimeout(() => {
+        setupConversionFormListener();
+      }, 1000);
+    }
+  });
+}
+
+// Ejecutar inicialización
+setTimeout(initConversionModal, 2000);
 
 // Función para cargar participantes en el modal de conversión
 function loadConversionParticipants(idea) {
