@@ -369,21 +369,7 @@ app.get('/api/ideas', async (req, res) => {
     }
 });
 
-// Función para generar nombres de archivo seguros
-function generateSafeFileName(originalName) {
-  const ext = path.extname(originalName);
-  const nameWithoutExt = path.basename(originalName, ext);
-  
-  // Limitar longitud y reemplazar caracteres problemáticos
-  const safeName = nameWithoutExt
-    .substring(0, 100) // Limitar a 100 caracteres
-    .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]/g, '_') // Mantener caracteres españoles
-    .replace(/\s+/g, '_'); // Reemplazar espacios con guiones bajos
-  
-  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-  
-  return safeName + '-' + uniqueSuffix + ext;
-}
+
 
 // Ruta para crear ideas con participantes - ACTUALIZADA
 app.post('/api/ideas', authenticateToken, async (req, res) => {
