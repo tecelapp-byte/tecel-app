@@ -4324,71 +4324,121 @@ function validateProjectPermissions() {
     return false;
 }
 
-// Agrega esta función después de guardar el proyecto exitosamente
 async function uploadProjectFiles(projectId) {
-    if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
-        console.log('📁 No hay archivos para subir');
-        return;
-    }
+  if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
+    console.log('📁 No hay archivos para subir');
+    return;
+  }
 
-    console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos a la BD...`);
+  console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos a la BD...`);
+  
+  // Subir archivos en SERIE (no en paralelo) para evitar sobrecarga
+  let successfulUploads = 0;
+  
+  for (let i = 0; i < window.uploadedFiles.length; i++) {
+    const file = window.uploadedFiles[i];
     
-    // Subir archivos en paralelo
-    const uploadPromises = window.uploadedFiles.map(async (file) => {
+    try {
+      console.log(`⬆️ Convirtiendo archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name}`);
+      
+      // Convertir archivo a base64
+      const base64File = await fileToBase64(file);
+      
+      // Validar tamaño antes de enviar
+      if (base64File.length > 4 * 1024 * 1024) { // ~4MB
+        console.warn(`⚠️ Archivo muy grande, omitiendo: ${file.name}`);
+        continue;
+      }
+      
+      console.log(`📤 Enviando ${file.name} (${Math.round(base64File.length / 1024)}KB)`);
+      
+      const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          file: base64File,
+          fileName: file.name,
+          fileType: file.type
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Archivo guardado: ${file.name}`);
+        successfulUploads++;
+      } else {
+        // Intentar obtener mensaje de error
         try {
-            console.log(`⬆️ Convirtiendo archivo: ${file.name}`);
-            
-            // Convertir archivo a base64 COMPLETO
-            const base64File = await fileToBase64(file);
-            
-            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({
-                    file: base64File, // Enviar base64 COMPLETO (con prefijo data:)
-                    fileName: file.name,
-                    fileType: file.type
-                })
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log(`✅ Archivo guardado en BD: ${file.name} (ID: ${result.id})`);
-                return { success: true, file: file.name };
-            } else {
-                const errorData = await response.json();
-                console.error(`❌ Error subiendo ${file.name}:`, errorData);
-                return { success: false, file: file.name, error: errorData.error };
-            }
-        } catch (error) {
-            console.error(`💥 Error procesando ${file.name}:`, error);
-            return { success: false, file: file.name, error: error.message };
+          const errorData = await response.json();
+          console.error(`❌ Error subiendo ${file.name}:`, errorData.error);
+        } catch {
+          console.error(`❌ Error ${response.status} subiendo ${file.name}`);
         }
-    });
-
-    const results = await Promise.allSettled(uploadPromises);
-    const successfulUploads = results.filter(r => r.value?.success).length;
-    
-    console.log(`📊 Resultado: ${successfulUploads}/${window.uploadedFiles.length} archivos guardados en BD`);
-    
-    if (successfulUploads > 0) {
-        showNotification(`${successfulUploads} archivo(s) guardados correctamente`, 'success');
+      }
+      
+      // Pequeña pausa entre archivos
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+    } catch (error) {
+      console.error(`💥 Error procesando ${file.name}:`, error);
     }
-    
-    // Limpiar archivos
-    window.uploadedFiles = [];
+  }
+
+  console.log(`📊 Resultado: ${successfulUploads}/${window.uploadedFiles.length} archivos guardados`);
+  
+  if (successfulUploads > 0) {
+    showNotification(`${successfulUploads} archivo(s) guardados correctamente`, 'success');
+  } else if (window.uploadedFiles.length > 0) {
+    showNotification('No se pudieron guardar los archivos', 'error');
+  }
+  
+  // Limpiar archivos
+  window.uploadedFiles = [];
 }
 
 function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file); // Esto genera base64 con prefijo data:image/...
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
+  return new Promise((resolve, reject) => {
+    // Validar tamaño antes de convertir
+    if (file.size > 5 * 1024 * 1024) {
+      reject(new Error('Archivo demasiado grande (máximo 5MB)'));
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Extraer solo la parte base64 (sin el prefijo data:...)
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
+
+function filterLargeFiles(files) {
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  const validFiles = [];
+  const largeFiles = [];
+  
+  Array.from(files).forEach(file => {
+    if (file.size <= maxSize) {
+      validFiles.push(file);
+    } else {
+      largeFiles.push(file.name);
+    }
+  });
+  
+  if (largeFiles.length > 0) {
+    showNotification(
+      `Los siguientes archivos son muy grandes (máx. 5MB): ${largeFiles.join(', ')}`,
+      'warning'
+    );
+  }
+  
+  return validFiles;
 }
 
 // Función auxiliar para limpiar el formulario
@@ -5712,40 +5762,36 @@ function initFileUpload() {
 
     // *** FUNCIÓN handleFiles ***
     function handleFiles(files) {
-        if (!files || files.length === 0) return;
-        
-        console.log(`📁 Procesando ${files.length} archivos`);
-        
-        let filesAdded = 0;
-        const filesArray = Array.from(files);
-        
-        filesArray.forEach(file => {
-            // Validar duplicados
-            const isDuplicate = window.uploadedFiles.some(
-                existingFile => existingFile.name === file.name && existingFile.size === file.size
-            );
-            
-            if (isDuplicate) {
-                showNotification(`"${file.name}" ya está agregado`, 'warning');
-                return;
-            }
-            
-            // Validar tamaño
-            if (file.size > 50 * 1024 * 1024) {
-                showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
-                return;
-            }
-            
-            // Agregar archivo
-            window.uploadedFiles.push(file);
-            filesAdded++;
-            addFileToPreview(file);
-        });
-        
-        if (filesAdded > 0) {
-            showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
-        }
+  if (!files || files.length === 0) return;
+  
+  console.log(`📁 Procesando ${files.length} archivos`);
+  
+  // Filtrar archivos grandes
+  const validFiles = filterLargeFiles(files);
+  
+  let filesAdded = 0;
+  
+  validFiles.forEach(file => {
+    // Validar duplicados
+    const isDuplicate = window.uploadedFiles.some(
+      existingFile => existingFile.name === file.name && existingFile.size === file.size
+    );
+    
+    if (isDuplicate) {
+      showNotification(`"${file.name}" ya está agregado`, 'warning');
+      return;
     }
+    
+    // Agregar archivo
+    window.uploadedFiles.push(file);
+    filesAdded++;
+    addFileToPreview(file);
+  });
+  
+  if (filesAdded > 0) {
+    showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
+  }
+}
     
     // *** FUNCIÓN addFileToPreview ***
     function addFileToPreview(file) {

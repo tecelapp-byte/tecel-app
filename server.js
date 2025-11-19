@@ -1953,50 +1953,61 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Modifica la ruta de subida de archivos para usar esta función
+// Ruta CORREGIDA para subir archivos a proyectos - VERSIÓN SIMPLIFICADA
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
-    try {
-        console.log('🚀 SUBIDA NUCLEAR - Guardando archivo en BD directamente');
-        
-        const { id } = req.params;
-        const { file, fileName, fileType } = req.body;
+  try {
+    console.log('🚀 SUBIDA CORREGIDA - Guardando archivo en BD');
+    const { id } = req.params;
+    const { file, fileName, fileType } = req.body;
 
-        if (!file || !fileName) {
-            return res.status(400).json({ error: 'Datos de archivo incompletos' });
-        }
-
-        console.log('📁 Procesando archivo:', fileName);
-        console.log('📊 Tamaño base64:', file.length, 'caracteres');
-
-        // Guardar el archivo COMPLETO en la base de datos
-        const result = await pool.query(
-            `INSERT INTO project_files (project_id, filename, original_name, file_data, file_type, file_size, uploaded_by) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-            [
-                id,
-                `db-file-${Date.now()}-${fileName}`,
-                fileName,
-                file, // Guardar el base64 completo
-                fileType || 'application/octet-stream',
-                file.length, // Tamaño del base64
-                req.user.id
-            ]
-        );
-
-        console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
-        
-        res.status(201).json({
-            ...result.rows[0],
-            message: 'Archivo guardado en base de datos'
-        });
-
-    } catch (error) {
-        console.error('💥 ERROR en subida nuclear:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error guardando archivo: ' + error.message
-        });
+    if (!file || !fileName) {
+      return res.status(400).json({ error: 'Datos de archivo incompletos' });
     }
+
+    console.log('📁 Procesando archivo:', fileName);
+    console.log('📊 Tamaño base64:', file.length, 'caracteres');
+
+    // Validar tamaño del archivo (máximo 5MB en base64)
+    if (file.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Archivo demasiado grande (máximo 5MB)' });
+    }
+
+    // Generar nombres seguros
+    const safeFileName = fileName.substring(0, 100); // Limitar a 100 caracteres
+    const dbFileName = `db-file-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+
+    // Guardar el archivo en la base de datos CON TODOS LOS CAMPOS REQUERIDOS
+    const result = await pool.query(
+      `INSERT INTO project_files (
+        project_id, filename, original_name, file_data, file_type, file_size, 
+        file_path, uploaded_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        id,
+        dbFileName, // filename - nombre interno seguro
+        safeFileName, // original_name - limitado a 100 chars
+        file, // file_data - base64 completo
+        fileType || 'application/octet-stream',
+        file.length, // file_size - tamaño del base64
+        'database_storage', // file_path - valor por defecto
+        req.user.id
+      ]
+    );
+
+    console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
+    res.status(201).json({ 
+      success: true, 
+      fileId: result.rows[0].id,
+      message: 'Archivo guardado correctamente' 
+    });
+
+  } catch (error) {
+    console.error('💥 ERROR en subida:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error guardando archivo: ' + error.message 
+    });
+  }
 });
 
 // Agregar enlace a proyecto
