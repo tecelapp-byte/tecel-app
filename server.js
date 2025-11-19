@@ -1974,17 +1974,6 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Función para asegurar que el bucket existe (usando service role)
-async function ensureBucketExists() {
-    try {
-        console.log('✅ Asumiendo que bucket tecel-files existe (creado manualmente)');
-        return true; // Siempre retornar true si creaste el bucket manualmente
-    } catch (error) {
-        console.error('❌ Error en ensureBucketExists:', error);
-        return true; // Aún así intentar la subida
-    }
-}
-
 // Modifica la ruta de subida de archivos para usar esta función
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
