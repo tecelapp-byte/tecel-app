@@ -11,6 +11,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'tecel_secret_key_2023';
 
+// Agregar esto al inicio del middleware (después de const app = express())
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 // TEMPORAL - Eliminar después de fix
 const upload = {
   array: () => (req, res, next) => next()
@@ -81,8 +85,9 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'Servidor TECEL funcionando' });
 });
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Y también modifica body-parser
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Agregar esto para mejor manejo de FormData
 app.use(express.json({ limit: '50mb' }));

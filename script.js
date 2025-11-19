@@ -4332,21 +4332,30 @@ async function uploadProjectFiles(projectId) {
 
   console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos a la BD...`);
   
-  // Subir archivos en SERIE (no en paralelo) para evitar sobrecarga
   let successfulUploads = 0;
+  let failedUploads = 0;
   
   for (let i = 0; i < window.uploadedFiles.length; i++) {
     const file = window.uploadedFiles[i];
     
     try {
-      console.log(`⬆️ Convirtiendo archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name}`);
+      console.log(`⬆️ Procesando archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name}`);
       
-      // Convertir archivo a base64
-      const base64File = await fileToBase64(file);
+      // OPTIMIZACIÓN: Comprimir imágenes antes de convertirlas
+      let processedFile = file;
       
-      // Validar tamaño antes de enviar
-      if (base64File.length > 4 * 1024 * 1024) { // ~4MB
-        console.warn(`⚠️ Archivo muy grande, omitiendo: ${file.name}`);
+      // Si es imagen, comprimirla
+      if (file.type.startsWith('image/') && file.size > 500 * 1024) { // > 500KB
+        console.log('🖼️ Comprimiendo imagen...');
+        processedFile = await compressImage(file);
+      }
+      
+      // Convertir archivo a base64 optimizado
+      const base64File = await fileToOptimizedBase64(processedFile);
+      
+      if (!base64File) {
+        console.warn(`⚠️ No se pudo procesar: ${file.name}`);
+        failedUploads++;
         continue;
       }
       
@@ -4361,42 +4370,163 @@ async function uploadProjectFiles(projectId) {
         body: JSON.stringify({
           file: base64File,
           fileName: file.name,
-          fileType: file.type
+          fileType: processedFile.type || file.type
         })
       });
       
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Archivo guardado: ${file.name}`);
+        console.log(`✅ Archivo guardado: ${file.name} (ID: ${result.fileId})`);
         successfulUploads++;
-      } else {
-        // Intentar obtener mensaje de error
-        try {
-          const errorData = await response.json();
-          console.error(`❌ Error subiendo ${file.name}:`, errorData.error);
-        } catch {
-          console.error(`❌ Error ${response.status} subiendo ${file.name}`);
+      } else if (response.status === 413) {
+        console.error(`❌ Archivo demasiado grande: ${file.name}`);
+        failedUploads++;
+        
+        // Intentar con archivo más pequeño
+        if (file.type.startsWith('image/')) {
+          console.log('🔄 Intentando con versión más comprimida...');
+          await uploadCompressedVersion(projectId, file, i);
         }
+      } else {
+        console.error(`❌ Error ${response.status} subiendo ${file.name}`);
+        failedUploads++;
       }
       
-      // Pequeña pausa entre archivos
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Pausa más larga entre archivos grandes
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error) {
       console.error(`💥 Error procesando ${file.name}:`, error);
+      failedUploads++;
     }
   }
 
-  console.log(`📊 Resultado: ${successfulUploads}/${window.uploadedFiles.length} archivos guardados`);
+  console.log(`📊 Resultado: ${successfulUploads} exitosos, ${failedUploads} fallidos`);
   
   if (successfulUploads > 0) {
     showNotification(`${successfulUploads} archivo(s) guardados correctamente`, 'success');
-  } else if (window.uploadedFiles.length > 0) {
-    showNotification('No se pudieron guardar los archivos', 'error');
+  }
+  
+  if (failedUploads > 0) {
+    showNotification(`${failedUploads} archivo(s) no se pudieron subir`, 'warning');
   }
   
   // Limpiar archivos
   window.uploadedFiles = [];
+}
+
+// Función para comprimir imágenes
+function compressImage(file, quality = 0.7) {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = function(e) {
+      const img = new Image();
+      img.src = e.target.result;
+      
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Redimensionar si es muy grande (máximo 1200px en el lado más largo)
+        const maxSize = 1200;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convertir a formato WebP para mejor compresión (si el navegador lo soporta)
+        const format = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const compressedQuality = format === 'image/png' ? 0.8 : quality;
+        
+        canvas.toBlob(function(blob) {
+          const compressedFile = new File([blob], file.name, {
+            type: format,
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        }, format, compressedQuality);
+      };
+    };
+    
+    reader.onerror = () => resolve(file); // Fallback al archivo original
+  });
+}
+
+// Función optimizada para convertir a base64
+function fileToOptimizedBase64(file) {
+  return new Promise((resolve, reject) => {
+    // Validar tamaño máximo (3MB después de compresión)
+    if (file.size > 3 * 1024 * 1024) {
+      reject(new Error('Archivo demasiado grande después de compresión (máximo 3MB)'));
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Usar el base64 completo (con prefijo) para mayor compatibilidad
+      resolve(reader.result);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
+
+// Función para subir versión comprimida como fallback
+async function uploadCompressedVersion(projectId, originalFile, index) {
+  try {
+    console.log(`🔄 Creando versión ultra-comprimida de: ${originalFile.name}`);
+    
+    // Crear versión muy comprimida
+    const ultraCompressedFile = await compressImage(originalFile, 0.4); // Calidad muy baja
+    
+    const base64File = await fileToOptimizedBase64(ultraCompressedFile);
+    
+    if (!base64File || base64File.length > 2 * 1024 * 1024) { // Máximo 2MB
+      console.warn(`❌ Versión comprimida aún demasiado grande: ${originalFile.name}`);
+      return false;
+    }
+    
+    const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        file: base64File,
+        fileName: `compressed_${originalFile.name}`,
+        fileType: ultraCompressedFile.type
+      })
+    });
+    
+    if (response.ok) {
+      console.log(`✅ Versión comprimida guardada: ${originalFile.name}`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`💥 Error subiendo versión comprimida:`, error);
+    return false;
+  }
 }
 
 function fileToBase64(file) {
@@ -4419,7 +4549,7 @@ function fileToBase64(file) {
 }
 
 function filterLargeFiles(files) {
-  const maxSize = 5 * 1024 * 1024; // 5MB
+  const maxSize = 10 * 1024 * 1024; // 10MB máximo original
   const validFiles = [];
   const largeFiles = [];
   
@@ -4427,13 +4557,17 @@ function filterLargeFiles(files) {
     if (file.size <= maxSize) {
       validFiles.push(file);
     } else {
-      largeFiles.push(file.name);
+      largeFiles.push({
+        name: file.name,
+        size: (file.size / (1024 * 1024)).toFixed(2) + 'MB'
+      });
     }
   });
   
   if (largeFiles.length > 0) {
+    const largeFilesList = largeFiles.map(f => `${f.name} (${f.size})`).join(', ');
     showNotification(
-      `Los siguientes archivos son muy grandes (máx. 5MB): ${largeFiles.join(', ')}`,
+      `Archivos muy grandes (máx. 10MB): ${largeFilesList}`,
       'warning'
     );
   }
@@ -5911,38 +6045,37 @@ function initConversionFileUpload() {
         handleConversionFiles(e.dataTransfer.files);
     });
     
-    function handleConversionFiles(files) {
-        if (!files || files.length === 0) return;
-        
-        (`📁 Procesando ${files.length} archivos en conversión`);
-        
-        for (let file of files) {
-            // Validar que no sea un archivo duplicado
-            const isDuplicate = window.conversionUploadedFiles.some(
-                existingFile => existingFile.name === file.name && existingFile.size === file.size
-            );
-            
-            if (isDuplicate) {
-                (`⚠️ Archivo duplicado ignorado: ${file.name}`);
-                continue;
-            }
-            
-            if (file.size > 50 * 1024 * 1024) {
-                showNotification(`El archivo ${file.name} es demasiado grande (máx. 50MB)`, 'error');
-                continue;
-            }
-            
-            // Agregar archivo único
-            window.conversionUploadedFiles.push(file);
-            addConversionFileToPreview(file);
-            (`✅ Archivo agregado: ${file.name}`);
-        }
-        
-        // LIMPIAR EL INPUT PARA PERMITIR NUEVAS SELECCIONES
-        fileInput.value = '';
-        
-        showNotification(`Se agregaron ${files.length} archivo(s)`, 'success');
+      function handleConversionFiles(files) {
+    if (!files || files.length === 0) return;
+    
+    console.log(`📁 Procesando ${files.length} archivos en conversión`);
+    
+    // Usar el MISMO filtro de archivos grandes
+    const validFiles = filterLargeFiles(files);
+    
+    let filesAdded = 0;
+    
+    validFiles.forEach(file => {
+      // Validar duplicados
+      const isDuplicate = window.conversionUploadedFiles.some(
+        existingFile => existingFile.name === file.name && existingFile.size === file.size
+      );
+      
+      if (isDuplicate) {
+        showNotification(`"${file.name}" ya está agregado`, 'warning');
+        return;
+      }
+      
+      // Agregar archivo
+      window.conversionUploadedFiles.push(file);
+      filesAdded++;
+      addConversionFileToPreview(file);
+    });
+    
+    if (filesAdded > 0) {
+      showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
     }
+  }
     
     function addConversionFileToPreview(file) {
         const fileItem = document.createElement('div');
@@ -6249,8 +6382,11 @@ function loadConversionParticipants(idea) {
 
 // Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
 async function handleConvertIdeaToProject(e) {
-    e.preventDefault();
-    
+  e.preventDefault();
+  conversionInProgress = true;
+  
+  console.log('🚀 Iniciando conversión de idea a proyecto...');
+
     // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
     if (conversionInProgress) {
         ('⏳ Conversión ya en progreso, ignorando click adicional');
@@ -6334,12 +6470,12 @@ async function handleConvertIdeaToProject(e) {
             formData.append(key, projectData[key]);
         }
         
-        // Agregar archivos si existen
+        // Después de guardar el proyecto, subir archivos
         if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
-            (`📁 Agregando ${window.conversionUploadedFiles.length} archivos`);
-            window.conversionUploadedFiles.forEach((file) => {
-                formData.append('files', file);
-            });
+        console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
+        
+        // Usar la MISMA función de subida
+        await uploadProjectFiles(newProject.id);
         }
         
         const response = await fetch(`${API_BASE}/projects`, {
