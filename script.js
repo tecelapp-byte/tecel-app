@@ -1327,78 +1327,52 @@ highlightStyle.textContent = `
 `;
 document.head.appendChild(highlightStyle);
 
+// Configurar event listener para el formulario de conversión - VERSIÓN MEJORADA
 function setupConversionFormListener() {
-  console.log('🔧 CONFIGURANDO FORMULARIO DE CONVERSIÓN...');
-  
-  const convertForm = document.getElementById('convert-idea-form');
-  const submitBtn = document.getElementById('convert-idea-submit-btn');
-  
-  console.log('📍 Elementos encontrados:', {
-    form: !!convertForm,
-    button: !!submitBtn
-  });
-  
-  // LIMPIAR EVENT LISTENERS EXISTENTES
-  if (convertForm) {
-    const newForm = convertForm.cloneNode(true);
-    convertForm.parentNode.replaceChild(newForm, convertForm);
-  }
-  
-  // Obtener referencia fresca
-  const freshForm = document.getElementById('convert-idea-form');
-  const freshButton = document.getElementById('convert-idea-submit-btn');
-  
-  if (freshForm) {
-    console.log('✅ Formulario listo para configurar');
+    ('🔧 Configurando event listener para formulario de conversión...');
     
-    // SOLUCIÓN NUCLEAR - múltiples event listeners
-    freshForm.onsubmit = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🎯 FORMULARIO ENVIADO (onsubmit)');
-      handleConvertIdeaToProject(e);
-      return false;
-    };
+    const convertForm = document.getElementById('convert-idea-form');
+    const submitBtn = document.getElementById('convert-idea-submit-btn');
     
-    freshForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🎯 FORMULARIO ENVIADO (addEventListener)');
-      handleConvertIdeaToProject(e);
-      return false;
-    });
-  }
-  
-  if (freshButton) {
-    console.log('✅ Botón listo para configurar');
-    
-    // SOLUCIÓN NUCLEAR - múltiples event listeners para el botón
-    freshButton.onclick = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🎯 BOTÓN CLICKEADO (onclick)');
-      handleConvertIdeaToProject(e);
-      return false;
-    };
-    
-    freshButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🎯 BOTÓN CLICKEADO (addEventListener)');
-      handleConvertIdeaToProject(e);
-      return false;
-    });
-  }
-  
-  // DEBUG: Agregar listener temporal para verificar clicks
-  document.addEventListener('click', function(e) {
-    if (e.target.closest('#convert-idea-submit-btn') || 
-        e.target.id === 'convert-idea-submit-btn') {
-      console.log('🎯 CLICK GLOBAL CAPTURADO en botón convertir');
+    // Limpiar solo los event listeners de submit, no reemplazar el formulario completo
+    if (convertForm) {
+        // Remover event listeners existentes
+        convertForm.removeEventListener('submit', handleConvertIdeaToProject);
+        
+        // Agregar nuevo event listener
+        convertForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!conversionInProgress) {
+                ('🎯 Formulario de conversión enviado');
+                handleConvertIdeaToProject(e);
+            }
+        });
+        
+        ('✅ Event listener del formulario configurado');
     }
-  });
-  
-  console.log('✅ Formulario de conversión completamente configurado');
+    
+    if (submitBtn) {
+        // Remover event listeners existentes
+        submitBtn.removeEventListener('click', handleConvertIdeaToProject);
+        
+        // Agregar nuevo event listener
+        submitBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!conversionInProgress) {
+                ('🎯 Botón de conversión clickeado');
+                handleConvertIdeaToProject(e);
+            }
+        });
+        
+        ('✅ Event listener del botón configurado');
+    }
+    
+    // RE-INICIALIZAR los sistemas de búsqueda y archivos
+    setTimeout(() => {
+        initConversionStudentSearch();
+        initConversionFileUpload();
+        ('✅ Sistemas de búsqueda y archivos reinicializados');
+    }, 100);
 }
 
 // Función para debug del sistema de conversión
@@ -6588,215 +6562,167 @@ function loadConversionParticipants(idea) {
     }
 }
 
-// También mejora la función handleConvertIdeaToProject:
+// Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
 async function handleConvertIdeaToProject(e) {
-  if (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  
-  if (conversionInProgress) {
-    console.log('⏳ Conversión ya en progreso...');
-    return;
-  }
-  
+  e.preventDefault();
   conversionInProgress = true;
   
-  console.log('🚀 INICIANDO CONVERSIÓN DE IDEA A PROYECTO...');
-  
-  try {
-    // Validar que tenemos la idea actual
-    if (!currentIdea) {
-      throw new Error('No hay idea seleccionada para convertir');
+  console.log('🚀 Iniciando conversión de idea a proyecto...');
+
+    // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
+    if (conversionInProgress) {
+        ('⏳ Conversión ya en progreso, ignorando click adicional');
+        return;
     }
     
-    console.log('💡 Idea a convertir:', currentIdea);
+    if (!currentIdea) {
+        showNotification('No hay idea seleccionada para convertir', 'error');
+        return;
+    }
     
-    // Recoger datos del formulario
+    ('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
+    
     const title = document.getElementById('project-title-from-idea').value.trim();
     const year = document.getElementById('project-year-from-idea').value;
     const description = document.getElementById('project-description-from-idea').value.trim();
     const status = document.getElementById('project-status-from-idea').value;
     
-    // Validaciones básicas
     if (!title || !year || !description) {
-      showNotification('Por favor completa todos los campos obligatorios', 'error');
-      conversionInProgress = false;
-      return;
+        showNotification('Por favor completa todos los campos obligatorios', 'error');
+        return;
     }
     
-    // Recoger participantes
-    const participantInputs = document.querySelectorAll('#conversion-project-participants input[name="conversion-participants[]"]');
-    const participants = Array.from(participantInputs).map(input => {
-      try {
-        return JSON.parse(input.value);
-      } catch (error) {
-        console.error('Error parseando participante:', input.value);
-        return null;
-      }
-    }).filter(participant => participant !== null);
-    
-    // Preparar datos del proyecto
-    const projectData = {
-      title: title,
-      year: parseInt(year),
-      description: description,
-      status: status,
-      original_idea_id: currentIdea.id
-    };
-    
-    // Agregar participantes si existen
-    if (participants.length > 0) {
-      projectData.students = JSON.stringify(participants);
-      console.log(`👥 Enviando ${participants.length} participantes`);
+    // ENCONTRAR el botón de submit
+    let submitBtn = document.querySelector('#convert-idea-form button[type="submit"]');
+    if (!submitBtn) {
+        submitBtn = document.getElementById('convert-idea-submit-btn');
+    }
+    if (!submitBtn) {
+        submitBtn = document.querySelector('.conversion-actions .btn-primary');
     }
     
-    console.log('📤 Enviando datos del proyecto:', projectData);
+    if (!submitBtn) {
+        console.error('❌ No se encontró el botón de submit');
+        showNotification('Error interno del formulario', 'error');
+        return;
+    }
     
-    // Mostrar loading en el botón
-    const submitBtn = document.getElementById('convert-idea-submit-btn');
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
-    submitBtn.disabled = true;
     
-    // Crear el proyecto
-    const response = await fetch(`${API_BASE}/projects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify(projectData)
-    });
-    
-    console.log('📥 Respuesta del servidor:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
-    
-    if (response.ok) {
-      const newProject = await response.json();
-      console.log('✅ Proyecto creado exitosamente:', newProject);
-      
-      // SUBIR ARCHIVOS SI HAY
-      if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
+    try {
+        // BLOQUEAR CONVERSIÓN MÚLTIPLE
+        conversionInProgress = true;
+        
+        // Mostrar loading
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando Proyecto...';
+        submitBtn.disabled = true;
+        
+        // Preparar datos del proyecto
+        const projectData = {
+            title: title,
+            year: parseInt(year),
+            description: description,
+            detailed_description: currentIdea.description,
+            objectives: `Proyecto basado en la idea: "${currentIdea.name}"\n\nProblema original: ${currentIdea.problem}`,
+            requirements: 'Por definir en base a los recursos disponibles',
+            problem: currentIdea.problem,
+            status: status,
+            original_idea_id: currentIdea.id,
+            original_idea_name: currentIdea.name
+        };
+        
+        // Recoger participantes del formulario de conversión
+        const participantInputs = document.querySelectorAll('input[name="conversion-participants[]"]');
+        const participants = Array.from(participantInputs).map(input => {
+            try {
+                return JSON.parse(input.value);
+            } catch (error) {
+                console.error('Error parseando participante:', input.value);
+                return null;
+            }
+        }).filter(participant => participant !== null);
+        
+        projectData.students = JSON.stringify(participants);
+        
+        ('📤 Enviando datos del proyecto:', projectData);
+        
+        // Crear FormData para enviar archivos
+        const formData = new FormData();
+        for (const key in projectData) {
+            formData.append(key, projectData[key]);
+        }
+        
+        // Después de guardar el proyecto, subir archivos
+        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
         console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
         
-        // Usar archivos de conversión
-        window.uploadedFiles = [...window.conversionUploadedFiles];
+        // Usar la MISMA función de subida
         await uploadProjectFiles(newProject.id);
-      }
-      
-      // Actualizar estado de la idea
-      await updateIdeaStatus(currentIdea.id, 'converted');
-      
-      showNotification('¡Proyecto creado exitosamente desde la idea!', 'success');
-      
-      // Cerrar modales
-      closeModal(document.getElementById('convert-idea-modal'));
-      closeModal(document.getElementById('idea-detail-modal'));
-      
-      // Recargar proyectos e ideas
-      await loadProjects();
-      await loadIdeas();
-      
+        }
+        
+        const response = await fetch(`${API_BASE}/projects`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+        const newProject = await response.json();
+        ('✅ Proyecto creado exitosamente:', newProject);
+        
+        // FORZAR RECARGA DE IDEAS DESDE EL SERVIDOR
+        ('🔄 Recargando ideas desde el servidor...');
+        await loadIdeas(); // Esto recargará todas las ideas con el estado actualizado
+        
+        // Buscar la idea actualizada en la lista
+        const updatedIdea = ideas.find(i => i.id === currentIdea.id);
+        
+        if (updatedIdea) {
+            ('✅ Idea actualizada encontrada:', {
+                id: updatedIdea.id,
+                name: updatedIdea.name,
+                project_status: updatedIdea.project_status
+            });
+        } else {
+            console.error('❌ No se pudo encontrar la idea actualizada');
+        }
+        
+        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como "Proyecto en curso".`, 'success');
+        
+        // Cerrar modales
+        closeModal(document.getElementById('convert-idea-modal'));
+        closeModal(document.getElementById('idea-detail-modal'));
+        
+        // Limpiar datos temporales
+        window.conversionUploadedFiles = [];
+        currentIdea = null;
+        
+        // Recargar proyectos
+        await loadProjects();
+        
+        // Navegar a la sección de proyectos
+        showSection('semillero');
+        
     } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al crear el proyecto');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al crear el proyecto');
     }
-    
-  } catch (error) {
-    console.error('❌ Error en conversión:', error);
-    showNotification(`Error: ${error.message}`, 'error');
-  } finally {
-    conversionInProgress = false;
-    
-    // Restaurar botón
-    const submitBtn = document.getElementById('convert-idea-submit-btn');
-    if (submitBtn) {
-      submitBtn.innerHTML = '<i class="fas fa-rocket"></i> Crear Proyecto';
-      submitBtn.disabled = false;
+        
+    } catch (error) {
+        console.error('❌ Error convirtiendo idea a proyecto:', error);
+        showNotification(`Error al crear el proyecto: ${error.message}`, 'error');
+    } finally {
+        // RESTAURAR ESTADO sin importar el resultado
+        conversionInProgress = false;
+        
+        if (submitBtn) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
     }
-  }
 }
-
-// Función para actualizar estado de la idea
-async function updateIdeaStatus(ideaId, status) {
-  try {
-    const response = await fetch(`${API_BASE}/ideas/${ideaId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        project_status: status
-      })
-    });
-    
-    if (response.ok) {
-      console.log(`✅ Estado de idea ${ideaId} actualizado a: ${status}`);
-    }
-  } catch (error) {
-    console.error('❌ Error actualizando estado de idea:', error);
-  }
-}
-
-// Debug específico para el modal de conversión
-function debugConversionModal() {
-  console.log('=== DEBUG MODAL CONVERSIÓN ===');
-  
-  const modal = document.getElementById('convert-idea-modal');
-  const form = document.getElementById('convert-idea-form');
-  const button = document.getElementById('convert-idea-submit-btn');
-  
-  console.log('Elementos del modal:', {
-    modal: !!modal,
-    form: !!form,
-    button: !!button,
-    modalDisplay: modal?.style.display,
-    modalClass: modal?.className
-  });
-  
-  if (button) {
-    console.log('🔍 Botón detalles:', {
-      id: button.id,
-      text: button.textContent,
-      html: button.innerHTML,
-      disabled: button.disabled,
-      onclick: button.onclick
-    });
-    
-    // Agregar listener de debug temporal
-    button.addEventListener('click', function(e) {
-      console.log('🎯 DEBUG: Click en botón crear proyecto', e);
-      console.log('Event target:', e.target);
-    });
-  }
-  
-  // Verificar si el modal está visible
-  if (modal && modal.style.display !== 'none') {
-    console.log('✅ Modal de conversión está visible');
-  } else {
-    console.log('❌ Modal de conversión NO está visible');
-  }
-}
-
-// Ejecutar debug cuando se abra el modal de conversión
-const originalOpenModal = window.openModal;
-window.openModal = function(modal) {
-  originalOpenModal(modal);
-  
-  if (modal === 'convert-idea-modal' || 
-      (typeof modal === 'string' && modal.includes('convert-idea'))) {
-    setTimeout(() => {
-      console.log('🔧 Modal de conversión abierto, ejecutando debug...');
-      debugConversionModal();
-      setupConversionFormListener(); // Re-configurar listeners
-    }, 500);
-  }
-};
 
 // Función para cargar participantes en el modal de conversión
 function loadConversionParticipants(idea) {
