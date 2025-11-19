@@ -1959,9 +1959,10 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 });
 
 // Ruta CORREGIDA para subir archivos a proyectos - VERSIÓN SIMPLIFICADA
+// Ruta TEMPORAL para subir archivos - VERSIÓN SEGURA
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
   try {
-    console.log('🚀 SUBIDA CORREGIDA - Guardando archivo en BD');
+    console.log('🚀 SUBIDA SEGURA - Guardando archivo en BD');
     const { id } = req.params;
     const { file, fileName, fileType } = req.body;
 
@@ -1972,29 +1973,38 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     console.log('📁 Procesando archivo:', fileName);
     console.log('📊 Tamaño base64:', file.length, 'caracteres');
 
-    // Validar tamaño del archivo (máximo 5MB en base64)
-    if (file.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Archivo demasiado grande (máximo 5MB)' });
+    // Validar tamaño del archivo (máximo 3MB en base64)
+    if (file.length > 3 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Archivo demasiado grande (máximo 3MB)' });
     }
 
-    // Generar nombres seguros
-    const safeFileName = fileName.substring(0, 100); // Limitar a 100 caracteres
-    const dbFileName = `db-file-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    // Generar nombres seguros y cortos
+    const safeFileName = fileName.substring(0, 100);
+    const dbFileName = `file-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    // Acortar aún más el filename para la BD
+    const shortFileName = dbFileName.substring(0, 50);
 
-    // Guardar el archivo en la base de datos CON TODOS LOS CAMPOS REQUERIDOS
+    console.log('🔧 Nombres generados:', {
+      original: fileName,
+      safe: safeFileName,
+      db: shortFileName
+    });
+
+    // Guardar el archivo en la base de datos
     const result = await pool.query(
       `INSERT INTO project_files (
         project_id, filename, original_name, file_data, file_type, file_size, 
         file_path, uploaded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, filename, original_name`,
       [
         id,
-        dbFileName, // filename - nombre interno seguro
-        safeFileName, // original_name - limitado a 100 chars
-        file, // file_data - base64 completo
+        shortFileName, // filename - máximo 50 caracteres
+        safeFileName, // original_name
+        file, // file_data
         fileType || 'application/octet-stream',
-        file.length, // file_size - tamaño del base64
-        'database_storage', // file_path - valor por defecto
+        file.length,
+        'database_storage',
         req.user.id
       ]
     );
@@ -2007,7 +2017,16 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('💥 ERROR en subida:', error);
+    console.error('💥 ERROR en subida segura:', error);
+    
+    // Manejar error específico de longitud
+    if (error.code === '22001') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Nombre de archivo demasiado largo. Por favor usa un nombre más corto.' 
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
       error: 'Error guardando archivo: ' + error.message 

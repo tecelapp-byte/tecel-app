@@ -2496,6 +2496,24 @@ async function loadIdeas() {
   renderIdeas();
 }
 
+// Función para generar nombres de archivo seguros y cortos
+function generateSafeShortName(originalName) {
+  const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')) : '';
+  const nameWithoutExt = originalName.replace(ext, '');
+  
+  // Limitar a 20 caracteres para el nombre
+  const shortName = nameWithoutExt
+    .substring(0, 20)
+    .replace(/[^a-zA-Z0-9]/g, '_');
+  
+  const uniqueId = Date.now().toString(36).substring(2, 8);
+  
+  return shortName + '_' + uniqueId + ext;
+}
+
+// En la función uploadProjectFiles, usa esto:
+const safeFileName = generateSafeShortName(file.name);
+
 async function loadSuggestions() {
   try {
     ('🔄 Cargando sugerencias...');
