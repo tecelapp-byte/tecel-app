@@ -126,6 +126,9 @@ ALTER TABLE projects ADD COLUMN requirements TEXT;
 -- Actualizar tabla project_students para incluir rol específico
 ALTER TABLE project_students ADD COLUMN student_role VARCHAR(100);
 
+-- Agregar columna para almacenar archivos en base64
+ALTER TABLE project_files ADD COLUMN IF NOT EXISTS file_data TEXT;
+
 -- Insertar usuario administrador por defecto
 INSERT INTO users (email, password, first_name, last_name, user_type) 
 VALUES ('admin@tecel.edu', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin', 'TECEL', 'admin');

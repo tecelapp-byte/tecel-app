@@ -4331,13 +4331,14 @@ async function uploadProjectFiles(projectId) {
         return;
     }
 
-    console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos para proyecto ${projectId}`);
+    console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos a la BD...`);
     
-    for (const file of window.uploadedFiles) {
+    // Subir archivos en paralelo
+    const uploadPromises = window.uploadedFiles.map(async (file) => {
         try {
-            console.log(`⬆️ Subiendo archivo: ${file.name}`);
+            console.log(`⬆️ Convirtiendo archivo: ${file.name}`);
             
-            // Convertir archivo a base64
+            // Convertir archivo a base64 COMPLETO
             const base64File = await fileToBase64(file);
             
             const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
@@ -4347,28 +4348,44 @@ async function uploadProjectFiles(projectId) {
                     'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify({
-                    file: base64File.split(',')[1], // Remover el prefijo data:application/octet-stream;base64,
+                    file: base64File, // Enviar base64 COMPLETO (con prefijo data:)
                     fileName: file.name,
                     fileType: file.type
                 })
             });
             
             if (response.ok) {
-                console.log(`✅ Archivo subido: ${file.name}`);
+                const result = await response.json();
+                console.log(`✅ Archivo guardado en BD: ${file.name} (ID: ${result.id})`);
+                return { success: true, file: file.name };
             } else {
-                console.error(`❌ Error subiendo archivo ${file.name}`);
+                const errorData = await response.json();
+                console.error(`❌ Error subiendo ${file.name}:`, errorData);
+                return { success: false, file: file.name, error: errorData.error };
             }
         } catch (error) {
-            console.error(`❌ Error procesando archivo ${file.name}:`, error);
+            console.error(`💥 Error procesando ${file.name}:`, error);
+            return { success: false, file: file.name, error: error.message };
         }
+    });
+
+    const results = await Promise.allSettled(uploadPromises);
+    const successfulUploads = results.filter(r => r.value?.success).length;
+    
+    console.log(`📊 Resultado: ${successfulUploads}/${window.uploadedFiles.length} archivos guardados en BD`);
+    
+    if (successfulUploads > 0) {
+        showNotification(`${successfulUploads} archivo(s) guardados correctamente`, 'success');
     }
+    
+    // Limpiar archivos
+    window.uploadedFiles = [];
 }
 
-// Función auxiliar para convertir File a base64
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(file); // Esto genera base64 con prefijo data:image/...
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
     });

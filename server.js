@@ -1288,62 +1288,41 @@ function getActivityDescription(activity) {
 
 // Ruta MEJORADA para descargar archivos - VERSIÓN SUPABASE
 app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
-  try {
-    const { fileId } = req.params;
-    
-    console.log('🎯 Solicitando descarga de archivo ID:', fileId);
+    try {
+        const { fileId } = req.params;
+        
+        console.log('📥 Descargando archivo desde BD:', fileId);
+        
+        const fileResult = await pool.query(
+            'SELECT * FROM project_files WHERE id = $1',
+            [fileId]
+        );
 
-    // 1. Obtener información de la base de datos
-    const fileResult = await pool.query(
-      `SELECT pf.* FROM project_files pf WHERE pf.id = $1`,
-      [fileId]
-    );
-    
-    if (fileResult.rows.length === 0) {
-      console.log('❌ Archivo no encontrado en BD');
-      return res.status(404).json({ error: 'Archivo no encontrado' });
+        if (fileResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+        }
+
+        const file = fileResult.rows[0];
+        
+        if (!file.file_data) {
+            return res.status(404).json({ error: 'Datos de archivo no disponibles' });
+        }
+
+        console.log('✅ Enviando archivo:', file.original_name);
+        
+        // Convertir base64 a buffer
+        const fileBuffer = Buffer.from(file.file_data, 'base64');
+        
+        res.setHeader('Content-Type', file.file_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        
+        res.send(fileBuffer);
+
+    } catch (error) {
+        console.error('❌ Error descargando archivo:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
-    
-    const file = fileResult.rows[0];
-    console.log('✅ Archivo en BD:', file.original_name);
-
-    // 2. Descargar de Supabase Storage
-    const fileName = file.filename;
-    const filePath = `projects/${file.project_id}/${fileName}`;
-
-    console.log('📥 Descargando de Supabase:', filePath);
-
-    const { data, error } = await supabase.storage
-      .from('tecel-files-public')
-      .download(filePath);
-
-    if (error) {
-      console.error('❌ Error descargando de Supabase:', error);
-      return res.status(404).json({ error: 'Archivo no encontrado en storage' });
-    }
-
-    // 3. Convertir blob a buffer
-    const arrayBuffer = await data.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // 4. Configurar headers
-    const safeFileName = file.original_name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    
-    res.setHeader('Content-Type', file.file_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.setHeader('Cache-Control', 'no-cache');
-    
-    console.log('📤 Enviando archivo:', safeFileName);
-    res.send(buffer);
-
-  } catch (error) {
-    console.error('💥 ERROR en descarga:', error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      details: error.message 
-    });
-  }
 });
 
 // Rutas de biblioteca
@@ -1977,7 +1956,7 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 // Modifica la ruta de subida de archivos para usar esta función
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
-        console.log('📤 Intentando subida directa de archivo...');
+        console.log('🚀 SUBIDA NUCLEAR - Guardando archivo en BD directamente');
         
         const { id } = req.params;
         const { file, fileName, fileType } = req.body;
@@ -1986,63 +1965,36 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Datos de archivo incompletos' });
         }
 
-        // Convertir base64 a buffer
-        const fileBuffer = Buffer.from(file, 'base64');
-        console.log('📊 Tamaño del archivo:', fileBuffer.length, 'bytes');
+        console.log('📁 Procesando archivo:', fileName);
+        console.log('📊 Tamaño base64:', file.length, 'caracteres');
 
-        // Generar nombre único
-        const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        const uniqueFileName = `project-${id}-${Date.now()}-${safeFileName}`;
-        const filePath = `projects/${id}/${uniqueFileName}`;
-
-        console.log('📍 Intentando subir a:', filePath);
-
-        // INTENTAR SUBIR DIRECTAMENTE
-        const { data, error } = await supabase.storage
-            .from('tecel-files-public')
-            .upload(filePath, fileBuffer, {
-                contentType: fileType || 'application/octet-stream',
-                upsert: false
-            });
-
-        if (error) {
-            console.error('❌ Error subiendo archivo:', error);
-            return res.status(500).json({ 
-                error: 'Error subiendo archivo: ' + error.message,
-                solution: 'Verifica que el bucket "tecel-files-public" existe en Supabase Storage'
-            });
-        }
-
-        // Obtener URL pública
-        const { data: urlData } = supabase.storage
-            .from('tecel-files-public')
-            .getPublicUrl(filePath);
-
-        console.log('✅ Archivo subido exitosamente. URL:', urlData.publicUrl);
-
-        // Guardar en base de datos
+        // Guardar el archivo COMPLETO en la base de datos
         const result = await pool.query(
-            `INSERT INTO project_files (project_id, filename, original_name, file_path, file_type, file_size, uploaded_by) 
+            `INSERT INTO project_files (project_id, filename, original_name, file_data, file_type, file_size, uploaded_by) 
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [
                 id,
-                uniqueFileName,
+                `db-file-${Date.now()}-${fileName}`,
                 fileName,
-                urlData.publicUrl,
+                file, // Guardar el base64 completo
                 fileType || 'application/octet-stream',
-                fileBuffer.length,
+                file.length, // Tamaño del base64
                 req.user.id
             ]
         );
 
-        console.log('✅ Archivo guardado en BD con ID:', result.rows[0].id);
-        res.status(201).json(result.rows[0]);
+        console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
+        
+        res.status(201).json({
+            ...result.rows[0],
+            message: 'Archivo guardado en base de datos'
+        });
 
     } catch (error) {
-        console.error('❌ Error en upload:', error);
+        console.error('💥 ERROR en subida nuclear:', error);
         res.status(500).json({ 
-            error: 'Error interno del servidor',
-            details: error.message 
+            success: false,
+            error: 'Error guardando archivo: ' + error.message
         });
     }
 });
