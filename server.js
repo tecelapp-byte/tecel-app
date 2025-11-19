@@ -1977,44 +1977,19 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 // Función para asegurar que el bucket existe (usando service role)
 async function ensureBucketExists() {
     try {
-        console.log('🔍 Verificando bucket tecel-files...');
-        
-        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-        if (listError) {
-            console.error('❌ Error listando buckets:', listError);
-            return false;
-        }
-
-        const bucketExists = buckets.some(bucket => bucket.name === 'tecel-files');
-        
-        if (bucketExists) {
-            console.log('✅ Bucket tecel-files existe');
-            return true;
-        } else {
-            console.log('❌ Bucket tecel-files no existe');
-            console.log('💡 Crea el bucket manualmente en Supabase Dashboard → Storage');
-            return false;
-        }
+        console.log('✅ Asumiendo que bucket tecel-files existe (creado manualmente)');
+        return true; // Siempre retornar true si creaste el bucket manualmente
     } catch (error) {
         console.error('❌ Error en ensureBucketExists:', error);
-        return false;
+        return true; // Aún así intentar la subida
     }
 }
 
 // Modifica la ruta de subida de archivos para usar esta función
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
-        console.log('📤 Iniciando subida de archivo...');
+        console.log('📤 Intentando subida directa de archivo...');
         
-        // Verificar si el bucket existe
-        const bucketReady = await ensureBucketExists();
-        if (!bucketReady) {
-            return res.status(400).json({ 
-                error: 'Bucket tecel-files no configurado',
-                details: 'Crea el bucket manualmente en Supabase Dashboard → Storage → New Bucket → tecel-files'
-            });
-        }
-
         const { id } = req.params;
         const { file, fileName, fileType } = req.body;
 
@@ -2029,11 +2004,11 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
         // Generar nombre único
         const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
         const uniqueFileName = `project-${id}-${Date.now()}-${safeFileName}`;
-        const filePath = `projects/${id}/${uniqueFileName}`; // ← filePath definido aquí
+        const filePath = `projects/${id}/${uniqueFileName}`;
 
-        console.log('📍 Subiendo a:', filePath);
+        console.log('📍 Intentando subir a:', filePath);
 
-        // Subir a Supabase Storage
+        // INTENTAR SUBIR DIRECTAMENTE
         const { data, error } = await supabase.storage
             .from('tecel-files')
             .upload(filePath, fileBuffer, {
@@ -2044,7 +2019,8 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
         if (error) {
             console.error('❌ Error subiendo archivo:', error);
             return res.status(500).json({ 
-                error: 'Error subiendo archivo: ' + error.message 
+                error: 'Error subiendo archivo: ' + error.message,
+                solution: 'Verifica que el bucket "tecel-files" existe en Supabase Storage'
             });
         }
 
@@ -2053,7 +2029,7 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
             .from('tecel-files')
             .getPublicUrl(filePath);
 
-        console.log('✅ Archivo subido. URL:', urlData.publicUrl);
+        console.log('✅ Archivo subido exitosamente. URL:', urlData.publicUrl);
 
         // Guardar en base de datos
         const result = await pool.query(
