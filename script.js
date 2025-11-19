@@ -2454,44 +2454,46 @@ async function reloadProject(projectId) {
 }
 
 async function loadIdeas() {
-    const container = document.getElementById('ideas-container');
-    if (!container) return;
+  const container = document.getElementById('ideas-container');
+  if (!container) return;
+  
+  try {
+    // Mostrar estado de carga
+    container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando ideas...</p></div>';
     
-    try {
-        // Mostrar estado de carga
-        container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando ideas...</p></div>';
-        
-        ('🔄 Cargando ideas desde la API...');
-        const response = await fetch(`${API_BASE}/ideas`);
-        
-        if (response.ok) {
-            ideas = await response.json();
-            (`✅ ${ideas.length} ideas cargadas desde la API`);
-            
-            // DEBUG DETALLADO: Mostrar estado de cada idea
-            ('=== ESTADO DE IDEAS CARGADAS ===');
-            ideas.forEach((idea, index) => {
-                (`Idea ${index + 1}:`, {
-                    id: idea.id,
-                    name: idea.name,
-                    project_status: idea.project_status,
-                    hasProject: !!(idea.project_status && idea.project_status !== 'idea')
-                });
-            });
-            ('================================');
-            
-            // Después de cargar las ideas, actualizar contadores
-            updateIdeaCounters();
-        } else {
-            throw new Error('API no disponible');
-        }
-    } catch (error) {
-        console.error('Error cargando ideas desde API:', error);
-        ideas = getSampleIdeas();
-        showNotification('Usando datos de demostración', 'info');
+    console.log('🔄 Cargando ideas desde la API...');
+    const response = await fetch(`${API_BASE}/ideas`);
+    
+    if (response.ok) {
+      ideas = await response.json();
+      console.log(`✅ ${ideas.length} ideas cargadas desde la API`);
+      
+      // DEBUG: Mostrar estructura de las primeras ideas
+      if (ideas.length > 0) {
+        console.log('🔍 Estructura de la primera idea:', {
+          id: ideas[0].id,
+          name: ideas[0].name,
+          category: ideas[0].category,
+          complexity: ideas[0].complexity,
+          budget: ideas[0].budget,
+          hasProjectStatus: !!ideas[0].project_status,
+          participants: ideas[0].participants || 'No participants'
+        });
+      }
+      
+      // Después de cargar las ideas, actualizar contadores
+      updateIdeaCounters();
+    } else {
+      console.error('❌ Error cargando ideas:', response.status, response.statusText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-    
-    renderIdeas();
+  } catch (error) {
+    console.error('❌ Error cargando ideas desde API:', error);
+    ideas = getSampleIdeas();
+    showNotification('Usando datos de demostración', 'info');
+  }
+  
+  renderIdeas();
 }
 
 async function loadSuggestions() {
@@ -4339,19 +4341,33 @@ async function uploadProjectFiles(projectId) {
     const file = window.uploadedFiles[i];
     
     try {
-      console.log(`⬆️ Procesando archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name}`);
+      console.log(`⬆️ Procesando archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name} (${file.type})`);
       
-      // OPTIMIZACIÓN: Comprimir imágenes antes de convertirlas
       let processedFile = file;
+      let base64File;
       
-      // Si es imagen, comprimirla
-      if (file.type.startsWith('image/') && file.size > 500 * 1024) { // > 500KB
+      // MANEJO DIFERENTE SEGÚN EL TIPO DE ARCHIVO
+      if (file.type.startsWith('image/') && file.size > 500 * 1024) {
+        // Comprimir imágenes grandes
         console.log('🖼️ Comprimiendo imagen...');
         processedFile = await compressImage(file);
+        base64File = await fileToOptimizedBase64(processedFile);
+      } 
+      else if (isDocumentFile(file)) {
+        // Documentos (Word, PDF, etc.) - subir sin compresión pero con validación de tamaño
+        console.log('📄 Procesando documento...');
+        if (file.size > 3 * 1024 * 1024) {
+          console.warn(`⚠️ Documento demasiado grande: ${file.name}`);
+          showNotification(`"${file.name}" es muy grande (máx. 3MB)`, 'warning');
+          failedUploads++;
+          continue;
+        }
+        base64File = await fileToBase64(file); // Sin optimización para documentos
       }
-      
-      // Convertir archivo a base64 optimizado
-      const base64File = await fileToOptimizedBase64(processedFile);
+      else {
+        // Otros archivos
+        base64File = await fileToOptimizedBase64(processedFile);
+      }
       
       if (!base64File) {
         console.warn(`⚠️ No se pudo procesar: ${file.name}`);
@@ -4382,7 +4398,7 @@ async function uploadProjectFiles(projectId) {
         console.error(`❌ Archivo demasiado grande: ${file.name}`);
         failedUploads++;
         
-        // Intentar con archivo más pequeño
+        // Solo intentar comprimir si es imagen
         if (file.type.startsWith('image/')) {
           console.log('🔄 Intentando con versión más comprimida...');
           await uploadCompressedVersion(projectId, file, i);
@@ -4392,8 +4408,8 @@ async function uploadProjectFiles(projectId) {
         failedUploads++;
       }
       
-      // Pausa más larga entre archivos grandes
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Pausa entre archivos
+      await new Promise(resolve => setTimeout(resolve, 800));
       
     } catch (error) {
       console.error(`💥 Error procesando ${file.name}:`, error);
@@ -4413,6 +4429,26 @@ async function uploadProjectFiles(projectId) {
   
   // Limpiar archivos
   window.uploadedFiles = [];
+}
+
+// Función para detectar documentos
+function isDocumentFile(file) {
+  const documentTypes = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'application/rtf'
+  ];
+  
+  const documentExtensions = ['.doc', '.docx', '.pdf', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf'];
+  
+  return documentTypes.includes(file.type) || 
+         documentExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 }
 
 // Función para comprimir imágenes
@@ -9569,104 +9605,138 @@ function updateCharCounter(element, counter, maxLength) {
 
 // Función para manejar el envío del formulario de idea - ACTUALIZADA
 async function submitNewIdea(e) {
-    e.preventDefault();
-    
-    if (!checkAuth()) return;
-    
-    ('🚀 Enviando nueva idea...');
-    
-    // Validar campos requeridos
+  e.preventDefault();
+  
+  if (!checkAuth()) return;
+  
+  console.log('💡 Enviando nueva idea...');
+  
+  // Mostrar loading
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+  submitBtn.disabled = true;
+  
+  try {
+    // Recoger datos del formulario con validaciones
     const name = document.getElementById('idea-name').value.trim();
     const category = document.getElementById('idea-category').value;
     const problem = document.getElementById('idea-problem').value.trim();
     const description = document.getElementById('idea-description').value.trim();
     
+    // Validaciones básicas
     if (!name || !category || !problem || !description) {
-        showNotification('Por favor completa todos los campos obligatorios', 'error');
-        return;
+      showNotification('Por favor completa todos los campos obligatorios', 'error');
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+      return;
     }
     
     // Obtener complejidad y presupuesto seleccionados
-    const complexityBtn = document.querySelector('#idea-form .complexity-btn.active');
-    const budgetBtn = document.querySelector('#idea-form .budget-btn.active');
+    const complexityBtn = document.querySelector('.complexity-btn.active');
+    const budgetBtn = document.querySelector('.budget-btn.active');
     const complexity = complexityBtn ? complexityBtn.getAttribute('data-complexity') : 'baja';
     const budget = budgetBtn ? budgetBtn.getAttribute('data-budget') : 'bajo';
     
-    // Recoger participantes si existen
-    let participants = [];
-    const participantInputs = document.querySelectorAll('#idea-participants input[name="idea-participants[]"]');
-    if (participantInputs.length > 0) {
-        participants = Array.from(participantInputs).map(input => {
-            try {
-                return JSON.parse(input.value);
-            } catch (error) {
-                console.error('Error parseando participante:', input.value);
-                return null;
-            }
-        }).filter(participant => participant !== null);
-    }
+    // Recoger participantes
+    const participantInputs = document.querySelectorAll('input[name="idea-participants[]"]');
+    const participants = Array.from(participantInputs).map(input => {
+      try {
+        return JSON.parse(input.value);
+      } catch (error) {
+        console.error('Error parseando participante:', input.value);
+        return null;
+      }
+    }).filter(participant => participant !== null);
     
+    // Preparar datos para enviar
     const formData = {
-        name: name,
-        author: `${currentUser.first_name} ${currentUser.last_name}`,
-        category: category,
-        problem: problem,
-        description: description,
-        complexity: complexity,
-        budget: budget,
-        created_by: currentUser.id
+      name: name,
+      category: category,
+      problem: problem,
+      description: description,
+      complexity: complexity,
+      budget: budget,
+      author: `${currentUser.first_name} ${currentUser.last_name}`,
+      created_by: currentUser.id
     };
     
-    // Agregar participantes si hay
+    // Agregar participantes solo si existen
     if (participants.length > 0) {
-        formData.students = JSON.stringify(participants);
+      formData.students = JSON.stringify(participants);
+      console.log(`👥 Enviando ${participants.length} participantes`);
     }
     
-    ('📤 Enviando datos de idea:', formData);
+    console.log('📤 Datos de idea a enviar:', {
+      name: formData.name,
+      category: formData.category,
+      complexity: formData.complexity,
+      budget: formData.budget,
+      hasParticipants: !!formData.students
+    });
     
-    // Mostrar loading
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
-    submitBtn.disabled = true;
-
-    try {
-        const newIdea = await apiCall('/ideas', {
-            method: 'POST',
-            body: JSON.stringify(formData)
-        });
-
-        ('✅ Idea creada exitosamente:', newIdea);
-        
-        // Agregar a la lista local
-        ideas.unshift(newIdea);
-        
-        // Actualizar la vista
-        renderIdeas();
-        
-        // Cerrar modal y limpiar formulario
-        closeModal(document.getElementById('upload-idea-modal'));
-        document.getElementById('idea-form').reset();
-        
-        // Limpiar participantes
-        const participantsContainer = document.getElementById('idea-participants');
-        if (participantsContainer) {
-            participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay colaboradores agregados</p></div>';
-        }
-        
-        showNotification('¡Idea publicada exitosamente!', 'success');
-        
-        // Actualizar estadísticas del usuario
-        updateUserCounters();
-
-    } catch (error) {
-        console.error('❌ Error publicando idea:', error);
-        showNotification('Error al publicar la idea: ' + error.message, 'error');
-    } finally {
-        // Restaurar botón
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+    // Enviar a la API
+    const response = await fetch(`${API_BASE}/ideas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    console.log('📥 Respuesta del servidor:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    if (response.ok) {
+      const newIdea = await response.json();
+      console.log('✅ Idea creada exitosamente:', newIdea);
+      
+      // Agregar a la lista local
+      ideas.unshift(newIdea);
+      
+      // Recargar la vista
+      renderIdeas();
+      
+      // Cerrar modal y limpiar formulario
+      closeModal(document.getElementById('upload-idea-modal'));
+      document.getElementById('idea-form').reset();
+      
+      // Limpiar participantes
+      const participantsContainer = document.getElementById('idea-participants');
+      if (participantsContainer) {
+        participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay colaboradores agregados</p></div>';
+      }
+      
+      showNotification('¡Idea publicada exitosamente!', 'success');
+      
+    } else {
+      // Obtener detalles del error
+      let errorMessage = 'Error al publicar la idea';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+        console.error('❌ Error del servidor:', errorData);
+      } catch (parseError) {
+        const errorText = await response.text();
+        console.error('❌ Error texto:', errorText);
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
     }
+    
+  } catch (error) {
+    console.error('❌ Error publicando idea:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  } finally {
+    // Restaurar botón
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  }
 }
 
 // Función para renderizar las ideas en el grid

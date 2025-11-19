@@ -2033,6 +2033,28 @@ app.post('/api/projects/:id/links', authenticateToken, checkProjectPermissions, 
     }
 });
 
+// Ruta de diagnóstico para ideas (temporal)
+app.get('/api/debug/ideas-latest', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT i.*, u.first_name || ' ' || u.last_name as author_name 
+      FROM ideas i 
+      LEFT JOIN users u ON i.created_by = u.id 
+      ORDER BY i.created_at DESC 
+      LIMIT 5
+    `);
+    
+    res.json({
+      latest_ideas: result.rows,
+      total_count: result.rows.length,
+      table_columns: result.fields.map(f => f.name)
+    });
+  } catch (error) {
+    console.error('Error en diagnóstico ideas:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Eliminar archivo de proyecto - VERSIÓN SUPABASE
 app.delete('/api/projects/:id/files/:fileId', authenticateToken, checkProjectPermissions, async (req, res) => {
   try {
