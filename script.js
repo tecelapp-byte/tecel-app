@@ -1372,6 +1372,58 @@ function setupConversionFormListener() {
   console.log('✅ Botón configurado correctamente');
 }
 
+// SOLUCIÓN DEFINITIVA PARA EL BOTÓN DE CONVERSIÓN
+function setupConversionButton() {
+  console.log('🎯 CONFIGURANDO BOTÓN DE CONVERSIÓN...');
+  
+  // Buscar el botón por múltiples métodos
+  let convertBtn = document.getElementById('convert-idea-submit-btn');
+  
+  if (!convertBtn) {
+    console.log('🔍 Buscando botón alternativamente...');
+    // Buscar por texto
+    const buttons = document.querySelectorAll('#convert-idea-modal button');
+    buttons.forEach(btn => {
+      const text = btn.textContent.toLowerCase();
+      if (text.includes('crear proyecto') || text.includes('convertir')) {
+        convertBtn = btn;
+        console.log('✅ Botón encontrado por texto:', text);
+      }
+    });
+  }
+  
+  if (!convertBtn) {
+    console.error('❌ No se pudo encontrar el botón de conversión');
+    return;
+  }
+  
+  console.log('✅ Botón encontrado:', convertBtn);
+  
+  // ELIMINAR CUALQUIER EVENT LISTENER EXISTENTE
+  const newBtn = convertBtn.cloneNode(true);
+  convertBtn.parentNode.replaceChild(newBtn, convertBtn);
+  
+  // CONFIGURAR EL NUEVO LISTENER - MÉTODO MÁS ROBUSTO
+  newBtn.onclick = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🚀 BOTÓN CONVERTIR CLICKEADO - EJECUTANDO...');
+    handleConvertIdeaToProject(e);
+    return false;
+  };
+  
+  // También agregar event listener normal
+  newBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🎯 EVENT LISTENER ADICIONAL ACTIVADO');
+    handleConvertIdeaToProject(e);
+    return false;
+  });
+  
+  console.log('✅ Botón de conversión configurado correctamente');
+}
+
 // Función alternativa para buscar el botón
 function findAndFixConversionButton() {
   console.log('🔍 Buscando botón de conversión alternativamente...');
@@ -4415,35 +4467,29 @@ async function uploadProjectFiles(projectId) {
         });
       } 
       else if (isDocumentFile(file)) {
-        // Documentos (Word, PDF, etc.) - subir sin compresión pero con validación de tamaño
+        // Documentos (Word, PDF, etc.) - subir sin compresión
         console.log('📄 Procesando documento...');
-        if (file.size > 3 * 1024 * 1024) {
-          console.warn(`⚠️ Documento demasiado grande: ${file.name}`);
-          showNotification(`"${file.name}" es muy grande (máx. 3MB)`, 'warning');
-          failedUploads++;
-          continue;
-        }
         
-        // ✅ USAR NOMBRE SEGURO Y CORTO
+        // ✅ USAR NOMBRE MUY CORTO
         const safeFileName = generateSafeFileName(file.name);
         base64File = await fileToBase64(file);
         
-        console.log('🔧 Nombre original:', file.name, '-> Seguro:', safeFileName);
+        console.log('🔧 Nombre seguro generado:', safeFileName);
         
         // Enviar con nombre seguro
         response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-          method: 'POST',
-          headers: {
+            method: 'POST',
+            headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
+            },
+            body: JSON.stringify({
             file: base64File,
-            fileName: safeFileName, // ✅ ENVIAR NOMBRE SEGURO
+            fileName: safeFileName,
             fileType: file.type
-          })
+            })
         });
-      }
+        }
       else {
         // Otros archivos
         base64File = await fileToOptimizedBase64(file);
@@ -5915,40 +5961,38 @@ async function convertIdeaToProject(idea) {
   // Inicializar búsqueda de estudiantes para conversión
   initConversionStudentSearch();
   
-  // CONFIGURAR EVENT LISTENER cuando se abre el modal
+    // CONFIGURAR EVENT LISTENER cuando se abre el modal
   setTimeout(() => {
-    setupConversionFormListener();
+    setupConversionButton(); // CAMBIAR POR LA NUEVA FUNCIÓN
     console.log('🎯 Modal de conversión completamente configurado');
-  }, 300);
+  }, 500); // Aumentar el delay para asegurar que el DOM esté listo
   
   console.log('✅ Modal de conversión configurado, abriendo...');
   openModal('convert-idea-modal');
 }
 
-// Función para debug del botón de conversión
+// Función de debug para verificar el estado del botón
 function debugConversionButton() {
-  console.log('=== DEBUG BOTÓN CONVERTIR ===');
+  console.log('=== DEBUG BOTÓN CONVERSIÓN ===');
   
-  const convertButtons = document.querySelectorAll('.btn-success');
-  console.log('Botones success encontrados:', convertButtons.length);
+  const btn = document.getElementById('convert-idea-submit-btn');
+  console.log('Botón encontrado:', !!btn);
   
-  convertButtons.forEach((btn, index) => {
-    console.log(`Botón ${index + 1}:`, {
-      text: btn.textContent.trim(),
-      html: btn.innerHTML,
-      onclick: btn.onclick,
-      eventListeners: getEventListeners(btn)
+  if (btn) {
+    console.log('Propiedades del botón:', {
+      id: btn.id,
+      text: btn.textContent,
+      disabled: btn.disabled,
+      onclick: btn.onclick
     });
     
-    // Agregar listener directo temporal para debug
-    btn.addEventListener('click', function(e) {
-      console.log('🎯 CLICK CAPTURADO en botón:', this.textContent);
-      e.stopPropagation();
+    // Test manual
+    btn.addEventListener('click', function testHandler() {
+      console.log('🎯 TEST: Click funcionando!');
     });
-  });
+  }
   
-  console.log('Current Idea:', currentIdea);
-  console.log('Current User:', currentUser);
+  console.log('==============================');
 }
 
 // Ejecutar debug después de cargar detalles de idea
@@ -5991,26 +6035,32 @@ setTimeout(() => {
   }
 }, 2000);
 
-// Función mejorada para generar nombres seguros
+// Función para generar nombres de archivo MUY cortos y seguros
 function generateSafeFileName(originalName) {
   // Extraer extensión
   const ext = originalName.includes('.') ? 
     originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : 
     '';
   
-  // Obtener nombre sin extensión
+  // Obtener nombre sin extensión y acortar a máximo 15 caracteres
   const nameWithoutExt = originalName.replace(ext, '');
-  
-  // Acortar nombre a máximo 30 caracteres
   const shortName = nameWithoutExt
-    .substring(0, 30)
-    .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]/g, '_')
-    .replace(/\s+/g, '_');
+    .substring(0, 15) // MÁXIMO 15 CARACTERES
+    .replace(/[^a-zA-Z0-9]/g, '_') // Solo caracteres alfanuméricos
+    .replace(/_+/g, '_');
   
-  // ID único corto
+  // ID único muy corto (4 caracteres)
   const uniqueId = Date.now().toString(36).substring(2, 6);
   
-  return shortName + '_' + uniqueId + ext;
+  const finalName = shortName + '_' + uniqueId + ext;
+  
+  console.log('🔧 Nombre generado:', {
+    original: originalName,
+    final: finalName,
+    length: finalName.length
+  });
+  
+  return finalName;
 }
 
 // Función para verificar que todos los sistemas de conversión estén funcionando
