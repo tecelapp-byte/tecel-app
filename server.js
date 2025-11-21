@@ -369,8 +369,6 @@ app.get('/api/ideas', async (req, res) => {
     }
 });
 
-
-
 // Ruta para crear ideas con participantes - ACTUALIZADA
 app.post('/api/ideas', authenticateToken, async (req, res) => {
     let transactionClient;
@@ -1945,79 +1943,83 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
 });
 
 // Ruta CORREGIDA para subir archivos a proyectos - VERSIÓN SIMPLIFICADA
-// Ruta TEMPORAL para subir archivos - VERSIÓN SEGURA
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
-  try {
-    console.log('🚀 SUBIDA SEGURA - Guardando archivo en BD');
-    const { id } = req.params;
-    const { file, fileName, fileType } = req.body;
+    try {
+        console.log('🚀 SUBIDA SEGURA - Guardando archivo en BD');
+        const { id } = req.params;
+        const { file, fileName, fileType } = req.body;
 
-    if (!file || !fileName) {
-      return res.status(400).json({ error: 'Datos de archivo incompletos' });
+        if (!file || !fileName) {
+            return res.status(400).json({ error: 'Datos de archivo incompletos' });
+        }
+
+        console.log('📁 Procesando archivo:', fileName);
+
+        // 🔥 CORRECCIÓN: Acortar el nombre del archivo más agresivamente
+        const originalName = fileName;
+        const fileExtension = originalName.includes('.') ? 
+            originalName.substring(originalName.lastIndexOf('.')) : '';
+        
+        // Generar nombre corto y seguro
+        const baseName = originalName.replace(fileExtension, '')
+            .substring(0, 20) // Máximo 20 caracteres para el nombre base
+            .replace(/[^a-zA-Z0-9]/g, '_');
+        
+        const safeFileName = baseName + fileExtension;
+        const dbFileName = `file-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+        console.log('🔧 Nombres generados:', { 
+            original: originalName, 
+            safe: safeFileName, 
+            db: dbFileName 
+        });
+
+        // Validar tamaño del archivo
+        if (file.length > 10 * 1024 * 1024) { // 10MB máximo
+            return res.status(400).json({ error: 'Archivo demasiado grande (máximo 10MB)' });
+        }
+
+        // Guardar en BD con nombres acortados
+        const result = await pool.query(
+            `INSERT INTO project_files (
+                project_id, filename, original_name, file_data, file_type, 
+                file_size, file_path, uploaded_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+            RETURNING id, filename, original_name`,
+            [
+                id,
+                dbFileName.substring(0, 50), // filename
+                safeFileName.substring(0, 100), // original_name
+                file, // file_data
+                fileType || 'application/octet-stream',
+                file.length,
+                'database_storage',
+                req.user.id
+            ]
+        );
+
+        console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
+        res.status(201).json({ 
+            success: true, 
+            fileId: result.rows[0].id, 
+            message: 'Archivo guardado correctamente' 
+        });
+
+    } catch (error) {
+        console.error('💥 ERROR en subida segura:', error);
+        
+        if (error.code === '22001') {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Nombre de archivo demasiado largo. Intenta con un nombre más corto.' 
+            });
+        }
+        
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error guardando archivo: ' + error.message 
+        });
     }
-
-    console.log('📁 Procesando archivo:', fileName);
-    console.log('📊 Tamaño base64:', file.length, 'caracteres');
-
-    // Validar tamaño del archivo (máximo 3MB en base64)
-    if (file.length > 3 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Archivo demasiado grande (máximo 3MB)' });
-    }
-
-    // Generar nombres seguros y cortos
-    const safeFileName = fileName.substring(0, 100);
-    const dbFileName = `file-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    
-    // Acortar aún más el filename para la BD
-    const shortFileName = dbFileName.substring(0, 50);
-
-    console.log('🔧 Nombres generados:', {
-      original: fileName,
-      safe: safeFileName,
-      db: shortFileName
-    });
-
-    // Guardar el archivo en la base de datos
-    const result = await pool.query(
-      `INSERT INTO project_files (
-        project_id, filename, original_name, file_data, file_type, file_size, 
-        file_path, uploaded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, filename, original_name`,
-      [
-        id,
-        shortFileName, // filename - máximo 50 caracteres
-        safeFileName, // original_name
-        file, // file_data
-        fileType || 'application/octet-stream',
-        file.length,
-        'database_storage',
-        req.user.id
-      ]
-    );
-
-    console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
-    res.status(201).json({ 
-      success: true, 
-      fileId: result.rows[0].id,
-      message: 'Archivo guardado correctamente' 
-    });
-
-  } catch (error) {
-    console.error('💥 ERROR en subida segura:', error);
-    
-    // Manejar error específico de longitud
-    if (error.code === '22001') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Nombre de archivo demasiado largo. Por favor usa un nombre más corto.' 
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error guardando archivo: ' + error.message 
-    });
-  }
 });
 
 // Agregar enlace a proyecto
