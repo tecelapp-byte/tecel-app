@@ -1608,7 +1608,7 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Solo alumnos de 7mo pueden crear proyectos' });
         }
 
-        // INSERTAR PROYECTO (SIN original_idea_id - esa columna no existe)
+         // INSERTAR PROYECTO
         console.log('📝 Insertando proyecto en la base de datos...');
         const projectResult = await transactionClient.query(
             `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by) 
@@ -1629,16 +1629,25 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
 
-        // 🔥 ACTUALIZAR EL project_status DE LA IDEA SI VIENE DE UNA CONVERSIÓN
-        if (original_idea_id) {
-            console.log('🔄 Actualizando estado de la idea original:', original_idea_id);
+        // 🔥 ACTUALIZAR EL project_status DE LA IDEA DIRECTAMENTE
+        if (original_idea_id && original_idea_id !== 'undefined') {
+            console.log('🔄 Actualizando project_status de la idea:', original_idea_id);
             
-            // Actualizar el project_status de la idea a 'converted' o 'en_proyecto'
-            await transactionClient.query(
-                'UPDATE ideas SET project_status = $1 WHERE id = $2',
-                ['converted', original_idea_id]  // o 'en_proyecto' según lo que uses
+            // Actualizar el project_status de la idea a 'converted'
+            const updateResult = await transactionClient.query(
+                'UPDATE ideas SET project_status = $1 WHERE id = $2 RETURNING id, name, project_status',
+                ['converted', original_idea_id]
             );
-            console.log('✅ Idea marcada como convertida');
+            
+            if (updateResult.rows.length > 0) {
+                console.log('✅ Idea actualizada:', {
+                    id: updateResult.rows[0].id,
+                    name: updateResult.rows[0].name,
+                    new_project_status: updateResult.rows[0].project_status
+                });
+            } else {
+                console.log('⚠️ No se pudo encontrar la idea para actualizar');
+            }
         }
 
         // PROCESAR ESTUDIANTES PARTICIPANTES
@@ -1693,6 +1702,29 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         if (transactionClient) {
             transactionClient.release();
         }
+    }
+});
+
+// Ruta temporal para forzar actualización de una idea
+app.put('/api/ideas/:id/mark-converted', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log('🔥 FORZANDO actualización de idea a converted:', id);
+        
+        const result = await pool.query(
+            'UPDATE ideas SET project_status = $1 WHERE id = $2 RETURNING *',
+            ['converted', id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Idea no encontrada' });
+        }
+        
+        console.log('✅ Idea forzada a converted:', result.rows[0]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error forzando actualización:', error);
+        res.status(500).json({ error: 'Error interno' });
     }
 });
 
