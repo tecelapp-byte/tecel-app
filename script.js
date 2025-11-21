@@ -6756,7 +6756,7 @@ async function handleConvertIdeaToProject(e) {
             requirements: 'Por definir en base a los recursos disponibles',
             problem: currentIdea.problem,
             status: status,
-            original_idea_id: currentIdea.id,  // 🔥 ESTO ES IMPORTANTE para que el servidor sepa qué idea actualizar
+            original_idea_id: currentIdea.id,
             original_idea_name: currentIdea.name
         };
         
@@ -6798,35 +6798,30 @@ async function handleConvertIdeaToProject(e) {
         }
         
         const newProject = await response.json();
-    console.log('✅ Proyecto creado exitosamente:', newProject);
+        console.log('✅ Proyecto creado exitosamente:', newProject);
 
-    // 🔥 FORZAR UNA PAUSA Y LUEGO RECARGAR IDEAS COMPLETAMENTE
-    console.log('🔄 Esperando y recargando ideas...');
-    
-    // Pequeña pausa para asegurar que el servidor procesó todo
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Recargar ideas desde el servidor
-    await loadIdeas();
-    
-    // 🔥 VERIFICAR MANUALMENTE EL ESTADO DE LA IDEA
-    console.log('🔍 Verificando estado actualizado de la idea...');
-    const updatedIdea = ideas.find(i => i.id === currentIdea.id);
-    
-    if (updatedIdea) {
-        console.log('📊 Estado de la idea después de conversión:', {
-            id: updatedIdea.id,
-            name: updatedIdea.name,
-            project_status: updatedIdea.project_status,
-            canConvert: canConvertIdeaToProject(updatedIdea)
-        });
-        
-        if (updatedIdea.project_status === 'converted') {
-            console.log('🎉 ¡La idea fue marcada correctamente como convertida!');
-        } else {
-            console.log('❌ La idea NO fue actualizada - project_status sigue siendo:', updatedIdea.project_status);
+        // 🔥 ACTUALIZACIÓN DIRECTA DEL ESTADO DE LA IDEA (usando ruta específica)
+        console.log('🔥 ACTUALIZANDO ESTADO DE LA IDEA A "converted"...');
+        try {
+            const updateResponse = await fetch(`${API_BASE}/ideas/${currentIdea.id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    project_status: 'converted'
+                })
+            });
+            
+            if (updateResponse.ok) {
+                console.log('✅ Estado de la idea actualizado a "converted"');
+            } else {
+                console.warn('⚠️ No se pudo actualizar el estado de la idea');
+            }
+        } catch (updateError) {
+            console.error('❌ Error actualizando estado de idea:', updateError);
         }
-    }
         
         // SEGUNDO: Subir archivos si existen
         if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
@@ -6834,17 +6829,29 @@ async function handleConvertIdeaToProject(e) {
             await uploadConversionFiles(newProject.id);
         }
         
-        // 🔥 TERCERO: FORZAR RECARGA COMPLETA DE IDEAS
-        console.log('🔄 FORZANDO RECARGA DE IDEAS PARA ACTUALIZAR project_status...');
-        await loadIdeas(); // Esto recargará todas las ideas desde el servidor
-            
+        // TERCERO: Recargar ideas para reflejar el cambio
+        console.log('🔄 Recargando ideas...');
+        await loadIdeas();
+        
+        // Verificar que la idea se actualizó
+        const updatedIdea = ideas.find(i => i.id === currentIdea.id);
+        if (updatedIdea) {
+            console.log('📊 Estado final de la idea:', {
+                id: updatedIdea.id,
+                name: updatedIdea.name,
+                project_status: updatedIdea.project_status
+            });
+        }
+        
+        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como convertida.`, 'success');
+        
         // Cerrar modales y limpiar
         closeModal(document.getElementById('convert-idea-modal'));
         closeModal(document.getElementById('idea-detail-modal'));
         window.conversionUploadedFiles = [];
         currentIdea = null;
         
-        // Recargar proyectos también
+        // Recargar proyectos
         await loadProjects();
         
         // Navegar a la sección de proyectos
