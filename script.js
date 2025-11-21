@@ -4416,144 +4416,73 @@ function validateProjectPermissions() {
 }
 
 async function uploadProjectFiles(projectId) {
-  if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
-    console.log('📁 No hay archivos para subir');
-    return;
-  }
-
-  console.log(`📤 Subiendo ${window.uploadedFiles.length} archivos a la BD...`);
-  
-  let successfulUploads = 0;
-  let failedUploads = 0;
-  
-  for (let i = 0; i < window.uploadedFiles.length; i++) {
-    const file = window.uploadedFiles[i];
+    console.log('📤 SUBIENDO ARCHIVOS - Iniciando...');
     
-    try {
-      console.log(`⬆️ Procesando archivo ${i + 1}/${window.uploadedFiles.length}: ${file.name} (${file.type})`);
-      
-      let processedFile = file;
-      let base64File;
-      let response; // ✅ DECLARAR response AQUÍ para que esté en scope
-      
-      // MANEJO DIFERENTE SEGÚN EL TIPO DE ARCHIVO
-      if (file.type.startsWith('image/') && file.size > 500 * 1024) {
-        // Comprimir imágenes grandes
-        console.log('🖼️ Comprimiendo imagen...');
-        processedFile = await compressImage(file);
-        base64File = await fileToOptimizedBase64(processedFile);
-        
-        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            file: base64File,
-            fileName: file.name,
-            fileType: processedFile.type || file.type
-          })
-        });
-      } 
-      else if (isDocumentFile(file)) {
-        // Documentos (Word, PDF, etc.) - subir sin compresión
-        console.log('📄 Procesando documento...');
-        
-        // ✅ USAR NOMBRE MUY CORTO
-        const safeFileName = generateSafeFileName(file.name);
-        base64File = await fileToBase64(file);
-        
-        console.log('🔧 Nombre seguro generado:', safeFileName);
-        
-        // Enviar con nombre seguro
-        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-            file: base64File,
-            fileName: safeFileName,
-            fileType: file.type
-            })
-        });
-        }
-      else {
-        // Otros archivos
-        base64File = await fileToOptimizedBase64(file);
-        
-        response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            file: base64File,
-            fileName: file.name,
-            fileType: file.type
-          })
-        });
-      }
-      
-      if (!base64File) {
-        console.warn(`⚠️ No se pudo procesar: ${file.name}`);
-        failedUploads++;
-        continue;
-      }
-      
-      console.log(`📤 Enviando ${file.name} (${Math.round(base64File.length / 1024)}KB)`);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`✅ Archivo guardado: ${file.name} (ID: ${result.fileId})`);
-        successfulUploads++;
-      } else if (response.status === 413) {
-        console.error(`❌ Archivo demasiado grande: ${file.name}`);
-        failedUploads++;
-        
-        // Solo intentar comprimir si es imagen
-        if (file.type.startsWith('image/')) {
-          console.log('🔄 Intentando con versión más comprimida...');
-          const success = await uploadCompressedVersion(projectId, file);
-          if (success) successfulUploads++;
-        }
-      } else {
-        console.error(`❌ Error ${response.status} subiendo ${file.name}`);
-        failedUploads++;
-        
-        // Intentar obtener mensaje de error
-        try {
-          const errorData = await response.json();
-          console.error('❌ Detalles del error:', errorData);
-        } catch (e) {
-          console.error('❌ No se pudo obtener detalles del error');
-        }
-      }
-      
-      // Pausa entre archivos
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-    } catch (error) {
-      console.error(`💥 Error procesando ${file.name}:`, error);
-      failedUploads++;
+    if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
+        console.log('📭 No hay archivos para subir');
+        return { success: true, uploaded: 0 };
     }
-  }
 
-  console.log(`📊 Resultado: ${successfulUploads} exitosos, ${failedUploads} fallidos`);
-  
-  if (successfulUploads > 0) {
-    showNotification(`${successfulUploads} archivo(s) guardados correctamente`, 'success');
-  }
-  
-  if (failedUploads > 0) {
-    showNotification(`${failedUploads} archivo(s) no se pudieron subir`, 'warning');
-  }
-  
-  // Limpiar archivos
-  window.uploadedFiles = [];
+    let successfulUploads = 0;
+    let failedUploads = 0;
+
+    console.log(`📦 Procesando ${window.uploadedFiles.length} archivos...`);
+
+    for (const file of window.uploadedFiles) {
+        try {
+            console.log(`⬆️ Procesando archivo: ${file.name} (${file.type})`);
+            
+            // Convertir archivo a base64
+            const base64Data = await readFileAsBase64(file);
+            console.log(`📄 Archivo convertido a base64, tamaño: ${base64Data.length} caracteres`);
+
+            // Preparar datos para enviar
+            const fileData = {
+                file: base64Data,
+                fileName: file.name, // 🔥 ENVIAR NOMBRE ORIGINAL
+                fileType: file.type,
+                fileSize: file.size
+            };
+
+            console.log('🔧 Datos a enviar:', {
+                fileName: fileData.fileName,
+                fileType: fileData.fileType,
+                fileSize: fileData.fileSize,
+                base64Length: fileData.file.length
+            });
+
+            console.log('📤 Enviando a servidor...');
+            
+            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(fileData)
+            });
+
+            console.log(`📥 Respuesta del servidor: ${response.status} ${response.statusText}`);
+
+            const result = await response.json();
+            console.log('📋 Resultado completo:', result);
+
+            if (response.ok && result.success) {
+                console.log(`✅ ${file.name} subido exitosamente`);
+                successfulUploads++;
+            } else {
+                console.error(`❌ Error subiendo ${file.name}:`, result.error);
+                failedUploads++;
+            }
+
+        } catch (error) {
+            console.error(`💥 Error fatal con ${file.name}:`, error);
+            failedUploads++;
+        }
+    }
+
+    console.log(`📊 Resumen: ${successfulUploads} exitosos, ${failedUploads} fallidos`);
+    return { success: failedUploads === 0, uploaded: successfulUploads };
 }
 
 // Función para detectar documentos
