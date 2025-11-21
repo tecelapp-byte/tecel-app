@@ -6650,14 +6650,13 @@ function loadConversionParticipants(idea) {
 
 // Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
 async function handleConvertIdeaToProject(e) {
-  e.preventDefault();
-  conversionInProgress = true;
-  
-  console.log('🚀 Iniciando conversión de idea a proyecto...');
+    e.preventDefault();
+    
+    console.log('🚀 Iniciando conversión de idea a proyecto...');
 
     // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
     if (conversionInProgress) {
-        ('⏳ Conversión ya en progreso, ignorando click adicional');
+        console.log('⏳ Conversión ya en progreso, ignorando click adicional');
         return;
     }
     
@@ -6666,7 +6665,7 @@ async function handleConvertIdeaToProject(e) {
         return;
     }
     
-    ('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
+    console.log('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
     
     const title = document.getElementById('project-title-from-idea').value.trim();
     const year = document.getElementById('project-year-from-idea').value;
@@ -6730,22 +6729,17 @@ async function handleConvertIdeaToProject(e) {
         
         projectData.students = JSON.stringify(participants);
         
-        ('📤 Enviando datos del proyecto:', projectData);
+        console.log('📤 Enviando datos del proyecto:', projectData);
         
-        // Crear FormData para enviar archivos
+        // Crear FormData para enviar datos (NO archivos todavía)
         const formData = new FormData();
         for (const key in projectData) {
             formData.append(key, projectData[key]);
         }
         
-        // Después de guardar el proyecto, subir archivos
-        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
-        console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
+        console.log('📤 Enviando solicitud de creación de proyecto...');
         
-        // Usar la MISMA función de subida
-        await uploadProjectFiles(newProject.id);
-        }
-        
+        // PRIMERO: Crear el proyecto sin archivos
         const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
             headers: {
@@ -6754,19 +6748,35 @@ async function handleConvertIdeaToProject(e) {
             body: formData
         });
         
-        if (response.ok) {
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al crear el proyecto');
+        }
+        
         const newProject = await response.json();
-        ('✅ Proyecto creado exitosamente:', newProject);
+        console.log('✅ Proyecto creado exitosamente:', newProject);
+        
+        // SEGUNDO: Subir archivos si existen
+        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
+            console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
+            
+            // Usar una función específica para subir archivos de conversión
+            await uploadConversionFiles(newProject.id);
+        } else {
+            console.log('📁 No hay archivos para subir desde conversión');
+        }
+        
+        // TERCERO: Actualizar el estado de la idea
+        console.log('🔄 Actualizando estado de la idea...');
         
         // FORZAR RECARGA DE IDEAS DESDE EL SERVIDOR
-        ('🔄 Recargando ideas desde el servidor...');
-        await loadIdeas(); // Esto recargará todas las ideas con el estado actualizado
+        await loadIdeas();
         
         // Buscar la idea actualizada en la lista
         const updatedIdea = ideas.find(i => i.id === currentIdea.id);
         
         if (updatedIdea) {
-            ('✅ Idea actualizada encontrada:', {
+            console.log('✅ Idea actualizada encontrada:', {
                 id: updatedIdea.id,
                 name: updatedIdea.name,
                 project_status: updatedIdea.project_status
@@ -6791,11 +6801,6 @@ async function handleConvertIdeaToProject(e) {
         // Navegar a la sección de proyectos
         showSection('semillero');
         
-    } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear el proyecto');
-    }
-        
     } catch (error) {
         console.error('❌ Error convirtiendo idea a proyecto:', error);
         showNotification(`Error al crear el proyecto: ${error.message}`, 'error');
@@ -6808,6 +6813,73 @@ async function handleConvertIdeaToProject(e) {
             submitBtn.disabled = false;
         }
     }
+}
+
+// Función auxiliar para subir archivos de conversión
+async function uploadConversionFiles(projectId) {
+    if (!window.conversionUploadedFiles || window.conversionUploadedFiles.length === 0) {
+        console.log('📁 No hay archivos de conversión para subir');
+        return;
+    }
+    
+    console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos de conversión al proyecto ${projectId}...`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const file of window.conversionUploadedFiles) {
+        try {
+            console.log(`⬆️ Procesando archivo: ${file.name} (${file.type})`);
+            
+            // Leer el archivo como base64
+            const fileData = await readFileAsBase64(file);
+            
+            // Preparar datos para subir
+            const uploadData = {
+                file: fileData,
+                fileName: file.name,
+                fileType: file.type
+            };
+            
+            // Subir archivo individual
+            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(uploadData)
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Archivo subido: ${file.name}`);
+                successCount++;
+            } else {
+                const errorData = await response.json();
+                console.error(`❌ Error subiendo ${file.name}:`, errorData.error);
+                failCount++;
+            }
+        } catch (error) {
+            console.error(`❌ Error procesando ${file.name}:`, error);
+            failCount++;
+        }
+    }
+    
+    console.log(`📊 Resultado: ${successCount} exitosos, ${failCount} fallidos`);
+}
+
+// Función para leer archivo como base64
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Remover el prefijo data:application/...;base64,
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 // Función para cargar participantes en el modal de conversión

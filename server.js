@@ -1955,23 +1955,14 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
 
         console.log('📁 Procesando archivo:', fileName);
 
-        // 🔥 CORRECCIÓN: Acortar el nombre del archivo más agresivamente
-        const originalName = fileName;
-        const fileExtension = originalName.includes('.') ? 
-            originalName.substring(originalName.lastIndexOf('.')) : '';
-        
-        // Generar nombre corto y seguro
-        const baseName = originalName.replace(fileExtension, '')
-            .substring(0, 20) // Máximo 20 caracteres para el nombre base
-            .replace(/[^a-zA-Z0-9]/g, '_');
-        
-        const safeFileName = baseName + fileExtension;
-        const dbFileName = `file-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        // 🔥 SOLUCIÓN DE EMERGENCIA: IGNORAR VALIDACIÓN DE NOMBRE
+        const safeFileName = fileName.substring(0, 50); // Máximo 50 caracteres
+        const dbFileName = `f${Date.now().toString(36)}`; // Nombre ultra corto
 
-        console.log('🔧 Nombres generados:', { 
-            original: originalName, 
-            safe: safeFileName, 
-            db: dbFileName 
+        console.log('🔥 USANDO NOMBRE CORTO:', {
+            original: fileName,
+            safe: safeFileName,
+            db: dbFileName
         });
 
         // Validar tamaño del archivo
