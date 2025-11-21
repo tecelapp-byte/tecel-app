@@ -5900,6 +5900,17 @@ async function convertIdeaToProject(idea) {
         return;
     }
     
+    // 🔥 CARGAR ESTUDIANTES ANTES DE ABRIR EL MODAL
+    console.log('👥 Cargando estudiantes para conversión...');
+    try {
+        await loadStudentsForProject();
+        console.log('✅ Estudiantes cargados:', window.availableStudents?.length);
+    } catch (error) {
+        console.error('❌ Error cargando estudiantes:', error);
+        // Continuar sin estudiantes
+        window.availableStudents = [];
+    }
+    
     // Llenar información en el modal
     document.getElementById('convert-idea-name').textContent = idea.name || 'Sin nombre';
     document.getElementById('convert-idea-author').textContent = idea.author || 'Autor desconocido';
@@ -5917,7 +5928,7 @@ async function convertIdeaToProject(idea) {
         participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
     }
     
-    // 🔥 FORZAR CONFIGURACIÓN DE EVENT LISTENERS
+    // 🔥 FORZAR CONFIGURACIÓN DESPUÉS DE CARGAR ESTUDIANTES
     setTimeout(() => {
         setupConversionFormListener();
         initConversionStudentSearch();
@@ -6439,10 +6450,25 @@ function initConversionStudentSearch() {
         
         if (searchTerm.length < 2) return;
         
-        // VERIFICAR que los estudiantes estén disponibles
-        if (!window.availableStudents || !Array.isArray(window.availableStudents)) {
-            console.error('❌ availableStudents no está disponible:', window.availableStudents);
-            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Error al cargar estudiantes</div>';
+        // 🔥 MANEJO MEJORADO DE ESTUDIANTES NO DISPONIBLES
+        if (!window.availableStudents) {
+            console.warn('⚠️ availableStudents no disponible, intentando cargar...');
+            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Cargando estudiantes...</div>';
+            resultsContainer.style.display = 'block';
+            
+            // Intentar cargar estudiantes
+            loadStudentsForProject().then(() => {
+                if (window.availableStudents && window.availableStudents.length > 0) {
+                    console.log('✅ Estudiantes cargados, reintentando búsqueda...');
+                    handleConversionSearchInput.call(this); // Re-ejecutar la búsqueda
+                }
+            });
+            return;
+        }
+        
+        if (!Array.isArray(window.availableStudents)) {
+            console.error('❌ availableStudents no es un array:', window.availableStudents);
+            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Error en datos de estudiantes</div>';
             resultsContainer.style.display = 'block';
             return;
         }
@@ -6486,6 +6512,10 @@ function initConversionStudentSearch() {
             resultsContainer.style.display = 'block';
         }
     }
+    
+        // Limpiar y agregar event listener
+    searchInput.removeEventListener('input', handleConversionSearchInput);
+    searchInput.addEventListener('input', handleConversionSearchInput);
     
     // Cerrar resultados al hacer clic fuera
     document.addEventListener('click', function(e) {
