@@ -1608,11 +1608,11 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Solo alumnos de 7mo pueden crear proyectos' });
         }
 
-        // INSERTAR PROYECTO (CON original_idea_id si existe)
+        // INSERTAR PROYECTO (SIN original_idea_id - esa columna no existe)
         console.log('📝 Insertando proyecto en la base de datos...');
         const projectResult = await transactionClient.query(
-            `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by, original_idea_id) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [
                 title.trim(),
                 parseInt(year),
@@ -1622,20 +1622,21 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
                 (requirements || '').trim(),
                 problem.trim(),
                 status || 'iniciado',
-                req.user.id,
-                original_idea_id || null  // 🔥 AGREGAR original_idea_id
+                req.user.id
             ]
         );
 
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
 
-        // 🔥 ACTUALIZAR LA IDEA SI VIENE DE UNA CONVERSIÓN (CORREGIDO)
+        // 🔥 ACTUALIZAR EL project_status DE LA IDEA SI VIENE DE UNA CONVERSIÓN
         if (original_idea_id) {
             console.log('🔄 Actualizando estado de la idea original:', original_idea_id);
+            
+            // Actualizar el project_status de la idea a 'converted' o 'en_proyecto'
             await transactionClient.query(
-                'UPDATE ideas SET project_status = $1, project_id = $2 WHERE id = $3',
-                ['converted', project.id, original_idea_id]
+                'UPDATE ideas SET project_status = $1 WHERE id = $2',
+                ['converted', original_idea_id]  // o 'en_proyecto' según lo que uses
             );
             console.log('✅ Idea marcada como convertida');
         }
@@ -1692,6 +1693,21 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         if (transactionClient) {
             transactionClient.release();
         }
+    }
+});
+
+// Ruta temporal para diagnosticar ideas
+app.get('/api/debug/ideas-status', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT project_status, COUNT(*) as count 
+            FROM ideas 
+            GROUP BY project_status
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error en diagnóstico:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
