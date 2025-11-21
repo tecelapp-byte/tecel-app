@@ -3966,6 +3966,9 @@ function showProjectForm(project = null) {
     const form = document.getElementById('project-form');
     if (form) form.reset();
     
+    // 🔥 INICIALIZAR ARRAY DE ARCHIVOS A ELIMINAR
+    window.filesToRemove = [];
+    
     // LIMPIAR SISTEMA DE ARCHIVOS
     resetFileUpload();
     
@@ -4075,21 +4078,22 @@ function displayExistingFiles(files) {
     });
 }
 
-// Función para quitar archivo existente (solo de la vista de edición, no del servidor)
+// Función para quitar archivo existente (marcar para eliminación)
 function removeExistingFile(fileId, button) {
     const fileItem = button.closest('.file-preview-item');
     const fileName = fileItem.querySelector('.file-name').textContent;
     
-    if (confirm(`¿Quitar el archivo "${fileName}" del proyecto? Esto no eliminará el archivo del servidor.`)) {
+    if (confirm(`¿Eliminar el archivo "${fileName}" del proyecto?`)) {
         fileItem.remove();
         
-        // Agregar el fileId a una lista de archivos a eliminar
+        // 🔥 AGREGAR EL FILEID A LA LISTA DE ARCHIVOS A ELIMINAR
         if (!window.filesToRemove) {
             window.filesToRemove = [];
         }
         window.filesToRemove.push(fileId);
         
-        showNotification(`Archivo marcado para quitar: ${fileName}`, 'info');
+        console.log(`🗑️ Archivo marcado para eliminar: ${fileName} (ID: ${fileId})`);
+        showNotification(`Archivo "${fileName}" marcado para eliminar`, 'info');
         
         // Si no quedan archivos, mostrar mensaje vacío
         const filePreview = document.getElementById('file-preview');
@@ -4260,11 +4264,10 @@ async function handleProjectSubmit(e) {
     e.preventDefault();
     
     if (!checkAuth()) return;
-    
+
     console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
     console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
-    console.log('Usuario actual:', currentUser);
-    
+
     // Validar permisos
     if (!currentProject && !validateProjectPermissions()) {
         showNotification('No tienes permisos para crear proyectos. Solo profesores, administradores y alumnos de 7mo pueden crear proyectos.', 'error');
@@ -4289,26 +4292,27 @@ async function handleProjectSubmit(e) {
     submitBtn.disabled = true;
 
     try {
-        // VOLVER A LA RUTA ORIGINAL
+        let response;
         const url = currentProject ? 
             `${API_BASE}/projects/${currentProject.id}` : 
-            `${API_BASE}/projects`;  // ← Esta es la ruta correcta
+            `${API_BASE}/projects`;
             
         const method = currentProject ? 'PUT' : 'POST';
 
-        // Preparar datos como JSON (NO FormData)
-        const projectData = {
-            title: title,
-            year: parseInt(year),
-            description: description,
-            detailed_description: document.getElementById('project-detailed-description').value.trim(),
-            objectives: document.getElementById('project-objectives').value.trim(),
-            requirements: document.getElementById('project-requirements').value.trim(),
-            problem: problem,
-            status: document.getElementById('project-status').value
-        };
+        // PREPARAR FORM DATA
+        const formData = new FormData();
+        
+        // Agregar campos del proyecto
+        formData.append('title', title);
+        formData.append('year', parseInt(year));
+        formData.append('description', description);
+        formData.append('detailed_description', document.getElementById('project-detailed-description').value.trim());
+        formData.append('objectives', document.getElementById('project-objectives').value.trim());
+        formData.append('requirements', document.getElementById('project-requirements').value.trim());
+        formData.append('problem', problem);
+        formData.append('status', document.getElementById('project-status').value);
 
-        // Agregar participantes
+        // Agregar participantes como JSON string
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
         const participants = Array.from(participantInputs).map(input => {
             try {
@@ -4319,27 +4323,47 @@ async function handleProjectSubmit(e) {
             }
         }).filter(participant => participant !== null);
         
-        if (participants.length > 0) {
-            projectData.students = JSON.stringify(participants);
-            console.log(`👥 Participantes a enviar: ${participants.length}`);
+        formData.append('students', JSON.stringify(participants));
+
+        // 🔥 AGREGAR ARCHIVOS A ELIMINAR (SOLUCIÓN AL PROBLEMA)
+        if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
+            formData.append('files_to_remove', JSON.stringify(window.filesToRemove));
+            console.log(`🗑️ Archivos marcados para eliminar: ${window.filesToRemove.length}`, window.filesToRemove);
+        } else {
+            console.log('📝 No hay archivos para eliminar');
+            formData.append('files_to_remove', JSON.stringify([]));
         }
 
-        // Agregar idea original si existe (para conversión)
-        if (window.currentConversionIdeaId) {
-            projectData.original_idea_id = window.currentConversionIdeaId;
-            console.log(`💡 Idea original para conversión: ${window.currentConversionIdeaId}`);
+        // Agregar nuevos archivos
+        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+            console.log(`📤 Agregando ${window.uploadedFiles.length} archivos nuevos`);
+            window.uploadedFiles.forEach((file) => {
+                formData.append('files', file);
+            });
+        } else {
+            console.log('📁 No hay archivos nuevos para agregar');
         }
 
-        console.log('📤 Enviando datos del proyecto:', projectData);
-        console.log('🔑 Token de autenticación:', authToken ? 'PRESENTE' : 'AUSENTE');
+        // DEBUG: Mostrar contenido del FormData
+        console.log('📤 Contenido del FormData:');
+        for (let pair of formData.entries()) {
+            if (pair[0] === 'files') {
+                console.log(`   ${pair[0]}: [File] ${pair[1].name} (${pair[1].size} bytes)`);
+            } else if (pair[0] === 'files_to_remove') {
+                console.log(`   ${pair[0]}: ${pair[1]}`);
+            } else {
+                console.log(`   ${pair[0]}: ${typeof pair[1] === 'string' ? pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : pair[1]}`);
+            }
+        }
 
-        const response = await fetch(url, {
+        // ENVIAR CON FORM DATA
+        console.log(`🚀 Enviando ${method} request a: ${url}`);
+        response = await fetch(url, {
             method: method,
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
             },
-            body: JSON.stringify(projectData)
+            body: formData
         });
 
         console.log('📥 Respuesta del servidor:', {
@@ -4352,20 +4376,28 @@ async function handleProjectSubmit(e) {
             const project = await response.json();
             console.log('✅ Proyecto guardado exitosamente:', {
                 id: project.id,
-                title: project.title
+                title: project.title,
+                archivos: project.files?.length || 0,
+                participantes: project.participants?.length || 0
             });
-            
-            // SUBIR ARCHIVOS DESPUÉS DE CREAR EL PROYECTO
-            if (window.uploadedFiles && window.uploadedFiles.length > 0) {
-                console.log(`📤 Iniciando subida de ${window.uploadedFiles.length} archivos...`);
-                await uploadProjectFiles(project.id);
-            }
             
             showNotification(`Proyecto ${currentProject ? 'actualizado' : 'creado'} exitosamente`, 'success');
             closeModal(document.getElementById('project-modal'));
             
-            // Limpiar formulario
-            cleanupProjectForm();
+            // Limpiar todo
+            document.getElementById('project-form').reset();
+            const participantsContainer = document.getElementById('project-participants');
+            if (participantsContainer) {
+                participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
+            }
+            
+            // Limpiar preview de archivos
+            const filePreview = document.getElementById('file-preview');
+            if (filePreview) filePreview.innerHTML = '';
+            
+            // 🔥 LIMPIAR ARRAYS GLOBALES
+            window.uploadedFiles = [];
+            window.filesToRemove = [];
             
             // Recargar proyectos
             if (currentProject) {
@@ -4375,19 +4407,16 @@ async function handleProjectSubmit(e) {
             }
             
         } else {
-            // Intentar obtener más información del error
-            let errorMessage = `Error ${response.status}`;
+            let errorData;
             try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-                console.error('❌ Error detallado del servidor:', errorData);
+                errorData = await response.json();
+                console.error('❌ Error del servidor:', errorData);
             } catch (parseError) {
-                const errorText = await response.text();
-                console.error('❌ Error texto del servidor:', errorText);
-                errorMessage = errorText || errorMessage;
+                console.error('❌ Error parseando respuesta de error:', parseError);
+                errorData = { error: `Error ${response.status}: ${response.statusText}` };
             }
             
-            showNotification(errorMessage, 'error');
+            showNotification(errorData.error || `Error ${response.status}: No se pudo guardar el proyecto`, 'error');
         }
     } catch (error) {
         console.error('❌ Error de conexión guardando proyecto:', error);
