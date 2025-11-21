@@ -3962,6 +3962,15 @@ function showProjectForm(project = null) {
     
     console.log('🎯 Abriendo formulario de proyecto:', project ? 'EDITAR' : 'NUEVO');
     
+    // 🔥 INICIALIZAR ARRAYS DE ARCHIVOS
+    window.uploadedFiles = [];
+    window.filesToRemove = [];
+    
+    console.log('📁 Arrays inicializados:', {
+        uploadedFiles: window.uploadedFiles,
+        filesToRemove: window.filesToRemove
+    });
+    
     // Limpiar formulario
     const form = document.getElementById('project-form');
     if (form) form.reset();
@@ -4032,7 +4041,6 @@ function showProjectForm(project = null) {
     openModal('project-modal');
 }
 
-// Función para mostrar archivos existentes en el preview
 function displayExistingFiles(files) {
     const filePreview = document.getElementById('file-preview');
     if (!filePreview) return;
@@ -4044,7 +4052,7 @@ function displayExistingFiles(files) {
         return;
     }
     
-    (`📁 Mostrando ${files.length} archivos existentes en preview`);
+    console.log(`📁 Mostrando ${files.length} archivos existentes en preview`);
     
     files.forEach(file => {
         const fileItem = document.createElement('div');
@@ -4078,26 +4086,33 @@ function displayExistingFiles(files) {
     });
 }
 
-// Función para quitar archivo existente (marcar para eliminación)
+// Función MEJORADA para quitar archivo existente
 function removeExistingFile(fileId, button) {
-    const fileItem = button.closest('.file-preview-item');
+    const fileItem = button.closest('.existing-file');
     const fileName = fileItem.querySelector('.file-name').textContent;
     
     if (confirm(`¿Eliminar el archivo "${fileName}" del proyecto?`)) {
+        // Remover del DOM
         fileItem.remove();
         
         // 🔥 AGREGAR EL FILEID A LA LISTA DE ARCHIVOS A ELIMINAR
         if (!window.filesToRemove) {
             window.filesToRemove = [];
         }
-        window.filesToRemove.push(fileId);
         
-        console.log(`🗑️ Archivo marcado para eliminar: ${fileName} (ID: ${fileId})`);
+        // Verificar que no esté ya en la lista
+        if (!window.filesToRemove.includes(fileId)) {
+            window.filesToRemove.push(fileId);
+            console.log(`🗑️ Archivo existente marcado para eliminar: ${fileName} (ID: ${fileId})`);
+            console.log(`📋 filesToRemove actual:`, window.filesToRemove);
+        }
+        
         showNotification(`Archivo "${fileName}" marcado para eliminar`, 'info');
         
         // Si no quedan archivos, mostrar mensaje vacío
         const filePreview = document.getElementById('file-preview');
-        if (filePreview.children.length === 0) {
+        const remainingFiles = filePreview.querySelectorAll('.file-preview-item');
+        if (remainingFiles.length === 0) {
             filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
         }
     }
@@ -9620,8 +9635,8 @@ function confirmRemoveParticipant(button) {
 
 // Función para quitar archivo existente (ahora abre modal de confirmación)
 function confirmRemoveExistingFile(fileId, button) {
-    const fileItem = button.closest('.file-preview-item');
-    const fileName = fileItem.querySelector('.file-name').textContent.split(' (Existente)')[0];
+    const fileItem = button.closest('.existing-file');
+    const fileName = fileItem.querySelector('.file-name').textContent;
     
     pendingRemoveFile = {
         id: fileId,
