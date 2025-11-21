@@ -2381,7 +2381,7 @@ app.delete('/api/projects/:id/links/:linkId', authenticateToken, checkProjectPer
     }
 });
 
-// Ruta para eliminar proyecto - VERSIÓN COMPLETA CORREGIDA
+// Ruta para eliminar proyecto - ORDEN CORREGIDO
 app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
     let transactionClient;
     
@@ -2418,7 +2418,7 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
         
         console.log('✅ Permisos verificados, procediendo con eliminación...');
 
-        // 🔥 PRIMERO: BUSCAR IDEA ASOCIADA USANDO project_id
+        // 🔥 PRIMERO: BUSCAR Y RESETEAR LA IDEA ASOCIADA (ANTES DE ELIMINAR EL PROYECTO)
         console.log('🔍 Buscando idea asociada al proyecto...');
         const ideaResult = await transactionClient.query(
             'SELECT id, name FROM ideas WHERE project_id = $1',
@@ -2432,6 +2432,17 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
             associatedIdeaId = ideaResult.rows[0].id;
             associatedIdeaName = ideaResult.rows[0].name;
             console.log('✅ Idea asociada encontrada:', { id: associatedIdeaId, name: associatedIdeaName });
+            
+            // 🔥 RESETEAR LA IDEA PRIMERO (ANTES DE ELIMINAR EL PROYECTO)
+            console.log('🔄 Reseteando estado de la idea asociada...');
+            const resetResult = await transactionClient.query(
+                'UPDATE ideas SET project_status = $1, project_id = NULL WHERE id = $2 RETURNING id, name, project_status',
+                ['idea', associatedIdeaId]
+            );
+            
+            if (resetResult.rows.length > 0) {
+                console.log('✅ Idea reseteada a estado "idea":', resetResult.rows[0]);
+            }
         } else {
             console.log('📝 No hay idea asociada a este proyecto');
         }
@@ -2468,22 +2479,9 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
         await transactionClient.query('DELETE FROM project_students WHERE project_id = $1', [id]);
         console.log('✅ Participantes eliminados');
         
-        // Cuarto: Eliminar el proyecto
+        // Cuarto: Eliminar el proyecto (AHORA SÍ, DESPUÉS DE RESETEAR LA IDEA)
         await transactionClient.query('DELETE FROM projects WHERE id = $1', [id]);
         console.log('✅ Proyecto eliminado de BD');
-        
-        // 🔥 QUINTO: RESETEAR EL ESTADO DE LA IDEA ASOCIADA (SI EXISTE)
-        if (associatedIdeaId) {
-            console.log('🔄 Reseteando estado de la idea asociada:', associatedIdeaId);
-            const resetResult = await transactionClient.query(
-                'UPDATE ideas SET project_status = $1, project_id = NULL WHERE id = $2 RETURNING id, name, project_status',
-                ['idea', associatedIdeaId]
-            );
-            
-            if (resetResult.rows.length > 0) {
-                console.log('✅ Idea reseteada a estado "idea":', resetResult.rows[0]);
-            }
-        }
         
         // Confirmar transacción
         await transactionClient.query('COMMIT');
