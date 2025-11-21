@@ -1608,7 +1608,7 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Solo alumnos de 7mo pueden crear proyectos' });
         }
 
-         // INSERTAR PROYECTO
+        // INSERTAR PROYECTO
         console.log('📝 Insertando proyecto en la base de datos...');
         const projectResult = await transactionClient.query(
             `INSERT INTO projects (title, year, description, detailed_description, objectives, requirements, problem, status, created_by) 
@@ -1629,22 +1629,17 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
 
-        // 🔥 ACTUALIZAR EL project_status DE LA IDEA DIRECTAMENTE
+        // 🔥 ACTUALIZAR LA IDEA CON project_status Y project_id
         if (original_idea_id && original_idea_id !== 'undefined') {
-            console.log('🔄 Actualizando project_status de la idea:', original_idea_id);
+            console.log('🔄 Actualizando idea con project_id:', original_idea_id);
             
-            // Actualizar el project_status de la idea a 'converted'
             const updateResult = await transactionClient.query(
-                'UPDATE ideas SET project_status = $1 WHERE id = $2 RETURNING id, name, project_status',
-                ['converted', original_idea_id]
+                'UPDATE ideas SET project_status = $1, project_id = $2 WHERE id = $3 RETURNING id, name, project_status, project_id',
+                ['converted', project.id, original_idea_id]
             );
             
             if (updateResult.rows.length > 0) {
-                console.log('✅ Idea actualizada:', {
-                    id: updateResult.rows[0].id,
-                    name: updateResult.rows[0].name,
-                    new_project_status: updateResult.rows[0].project_status
-                });
+                console.log('✅ Idea actualizada:', updateResult.rows[0]);
             } else {
                 console.log('⚠️ No se pudo encontrar la idea para actualizar');
             }
@@ -2366,7 +2361,7 @@ app.delete('/api/projects/:id/links/:linkId', authenticateToken, checkProjectPer
     }
 });
 
-// Ruta para eliminar proyecto
+// Ruta para eliminar proyecto - VERSIÓN COMPLETA CORREGIDA
 app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
     let transactionClient;
     
@@ -2402,6 +2397,24 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
         await transactionClient.query('BEGIN');
         
         console.log('✅ Permisos verificados, procediendo con eliminación...');
+
+        // 🔥 PRIMERO: BUSCAR IDEA ASOCIADA USANDO project_id
+        console.log('🔍 Buscando idea asociada al proyecto...');
+        const ideaResult = await transactionClient.query(
+            'SELECT id, name FROM ideas WHERE project_id = $1',
+            [id]
+        );
+        
+        let associatedIdeaId = null;
+        let associatedIdeaName = null;
+        
+        if (ideaResult.rows.length > 0) {
+            associatedIdeaId = ideaResult.rows[0].id;
+            associatedIdeaName = ideaResult.rows[0].name;
+            console.log('✅ Idea asociada encontrada:', { id: associatedIdeaId, name: associatedIdeaName });
+        } else {
+            console.log('📝 No hay idea asociada a este proyecto');
+        }
         
         // 1. Obtener archivos del proyecto para eliminarlos físicamente
         const filesResult = await transactionClient.query(
@@ -2421,7 +2434,7 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
             }
         }
         
-        // 3. Eliminar registros de la base de datos en orden correcto (evitar restricciones de clave foránea)
+        // 3. Eliminar registros de la base de datos en orden correcto
         
         // Primero: Eliminar archivos
         await transactionClient.query('DELETE FROM project_files WHERE project_id = $1', [id]);
@@ -2439,11 +2452,29 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
         await transactionClient.query('DELETE FROM projects WHERE id = $1', [id]);
         console.log('✅ Proyecto eliminado de BD');
         
+        // 🔥 QUINTO: RESETEAR EL ESTADO DE LA IDEA ASOCIADA (SI EXISTE)
+        if (associatedIdeaId) {
+            console.log('🔄 Reseteando estado de la idea asociada:', associatedIdeaId);
+            const resetResult = await transactionClient.query(
+                'UPDATE ideas SET project_status = $1, project_id = NULL WHERE id = $2 RETURNING id, name, project_status',
+                ['idea', associatedIdeaId]
+            );
+            
+            if (resetResult.rows.length > 0) {
+                console.log('✅ Idea reseteada a estado "idea":', resetResult.rows[0]);
+            }
+        }
+        
         // Confirmar transacción
         await transactionClient.query('COMMIT');
         
-        console.log('🎉 Proyecto eliminado completamente');
-        res.json({ message: 'Proyecto eliminado exitosamente' });
+        console.log('🎉 Proyecto eliminado completamente' + (associatedIdeaId ? ' e idea reseteada' : ''));
+        
+        res.json({ 
+            message: 'Proyecto eliminado exitosamente',
+            idea_reset: !!associatedIdeaId,
+            idea_name: associatedIdeaName
+        });
         
     } catch (error) {
         // Rollback en caso de error
