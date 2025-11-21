@@ -1629,6 +1629,16 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
 
+        // 🔥 ACTUALIZAR LA IDEA SI VIENE DE UNA CONVERSIÓN
+        if (projectData.original_idea_id) {
+            console.log('🔄 Actualizando estado de la idea original:', projectData.original_idea_id);
+            await transactionClient.query(
+                'UPDATE ideas SET project_status = $1, project_id = $2 WHERE id = $3',
+                ['converted', project.id, projectData.original_idea_id]
+            );
+            console.log('✅ Idea marcada como convertida');
+        }
+
         
         // PROCESAR ESTUDIANTES PARTICIPANTES
         let studentsArray = [];
