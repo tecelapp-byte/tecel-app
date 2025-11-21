@@ -1733,18 +1733,28 @@ app.put('/api/ideas/:id/mark-converted', authenticateToken, async (req, res) => 
     }
 });
 
-// Ruta específica para actualizar el project_status de una idea
+// Ruta para actualizar el estado de una idea con project_id
 app.put('/api/ideas/:id/status', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { project_status } = req.body;
+        const { project_status, project_id } = req.body;
         
-        console.log('🔥 Actualizando project_status de idea:', { id, project_status });
+        console.log('🔥 Actualizando estado de idea:', { id, project_status, project_id });
         
-        const result = await pool.query(
-            'UPDATE ideas SET project_status = $1 WHERE id = $2 RETURNING id, name, project_status',
-            [project_status, id]
-        );
+        let result;
+        if (project_id) {
+            // Actualizar con project_id
+            result = await pool.query(
+                'UPDATE ideas SET project_status = $1, project_id = $2 WHERE id = $3 RETURNING id, name, project_status, project_id',
+                [project_status, project_id, id]
+            );
+        } else {
+            // Actualizar solo project_status
+            result = await pool.query(
+                'UPDATE ideas SET project_status = $1 WHERE id = $2 RETURNING id, name, project_status, project_id',
+                [project_status, id]
+            );
+        }
         
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Idea no encontrada' });

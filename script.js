@@ -6697,7 +6697,7 @@ function loadConversionParticipants(idea) {
     }
 }
 
-// Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
+// Función mejorada para manejar la conversión de idea a proyecto - VERSIÓN CORREGIDA
 async function handleConvertIdeaToProject(e) {
     e.preventDefault();
     
@@ -6756,7 +6756,7 @@ async function handleConvertIdeaToProject(e) {
             requirements: 'Por definir en base a los recursos disponibles',
             problem: currentIdea.problem,
             status: status,
-            original_idea_id: currentIdea.id,
+            original_idea_id: currentIdea.id,  // 🔥 ESTO ES CLAVE
             original_idea_name: currentIdea.name
         };
         
@@ -6774,22 +6774,18 @@ async function handleConvertIdeaToProject(e) {
         projectData.students = JSON.stringify(participants);
         
         console.log('📤 Enviando datos del proyecto:', projectData);
+        console.log('🎯 original_idea_id que se envía:', projectData.original_idea_id);
+        console.log('🎯 Tipo de original_idea_id:', typeof projectData.original_idea_id);
         
-        // Crear FormData para enviar datos
-        const formData = new FormData();
-        for (const key in projectData) {
-            formData.append(key, projectData[key]);
-        }
-        
-        console.log('📤 Enviando solicitud de creación de proyecto...');
-        
-        // PRIMERO: Crear el proyecto
+        // 🔥 ENVIAR COMO JSON EN LUGAR DE FORMData - ESTO ES CLAVE
+        console.log('📤 Enviando como JSON para asegurar que llegue original_idea_id...');
         const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'  // 🔥 ENVIAR COMO JSON
             },
-            body: formData
+            body: JSON.stringify(projectData)  // 🔥 ENVIAR COMO JSON
         });
         
         if (!response.ok) {
@@ -6800,7 +6796,7 @@ async function handleConvertIdeaToProject(e) {
         const newProject = await response.json();
         console.log('✅ Proyecto creado exitosamente:', newProject);
 
-        // 🔥 ACTUALIZACIÓN DIRECTA DEL ESTADO DE LA IDEA (usando ruta específica)
+        // 🔥 ACTUALIZACIÓN DIRECTA DEL ESTADO DE LA IDEA
         console.log('🔥 ACTUALIZANDO ESTADO DE LA IDEA A "converted"...');
         try {
             const updateResponse = await fetch(`${API_BASE}/ideas/${currentIdea.id}/status`, {
@@ -6810,14 +6806,32 @@ async function handleConvertIdeaToProject(e) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    project_status: 'converted'
+                    project_status: 'converted',
+                    project_id: newProject.id  // 🔥 ENVIAR EL project_id TAMBIÉN
                 })
             });
             
             if (updateResponse.ok) {
-                console.log('✅ Estado de la idea actualizado a "converted"');
+                const updatedIdea = await updateResponse.json();
+                console.log('✅ Estado de la idea actualizado:', updatedIdea);
             } else {
                 console.warn('⚠️ No se pudo actualizar el estado de la idea');
+                
+                // Intentar con la ruta alternativa
+                const altResponse = await fetch(`${API_BASE}/ideas/${currentIdea.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        project_status: 'converted'
+                    })
+                });
+                
+                if (altResponse.ok) {
+                    console.log('✅ Idea actualizada con ruta alternativa');
+                }
             }
         } catch (updateError) {
             console.error('❌ Error actualizando estado de idea:', updateError);
@@ -6839,8 +6853,13 @@ async function handleConvertIdeaToProject(e) {
             console.log('📊 Estado final de la idea:', {
                 id: updatedIdea.id,
                 name: updatedIdea.name,
-                project_status: updatedIdea.project_status
+                project_status: updatedIdea.project_status,
+                project_id: updatedIdea.project_id
             });
+            
+            if (updatedIdea.project_status === 'converted') {
+                console.log('🎉 ¡La idea fue marcada correctamente como convertida!');
+            }
         }
         
         showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como convertida.`, 'success');
