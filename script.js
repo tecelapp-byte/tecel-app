@@ -5858,19 +5858,20 @@ function loadIdeaDataIntoForm(idea) {
 // Función para verificar si el usuario puede convertir la idea a proyecto - VERSIÓN MEJORADA
 function canConvertIdeaToProject(idea) {
     if (!currentUser) {
-        ('❌ Usuario no autenticado');
+        console.log('❌ Usuario no autenticado');
         return false;
     }
     
-    ('🔍 Verificando permisos para convertir idea:', {
+    console.log('🔍 Verificando permisos para convertir idea:', {
         ideaId: idea.id,
         projectStatus: idea.project_status,
         userType: currentUser.user_type
     });
     
-    // Si la idea ya tiene proyecto, NO se puede convertir
+    // 🔥 VERIFICACIÓN MÁS EXPLÍCITA DEL ESTADO
+    // Si la idea ya tiene un project_status que no es 'idea', NO se puede convertir
     if (idea.project_status && idea.project_status !== 'idea') {
-        ('❌ Idea no convertible - ya tiene proyecto:', idea.project_status);
+        console.log('❌ Idea no convertible - ya tiene project_status:', idea.project_status);
         return false;
     }
     
@@ -5878,10 +5879,29 @@ function canConvertIdeaToProject(idea) {
     const canConvert = currentUser.user_type === 'teacher' || currentUser.user_type === 'admin';
     
     if (!canConvert) {
-        ('❌ Usuario no tiene permisos para convertir ideas');
+        console.log('❌ Usuario no tiene permisos para convertir ideas');
+    } else {
+        console.log('✅ Usuario tiene permisos para convertir');
     }
     
     return canConvert;
+}
+
+function debugIdeaStatus(ideaId) {
+    console.log('=== DEBUG ESTADO DE IDEA ===');
+    const idea = ideas.find(i => i.id === ideaId);
+    if (idea) {
+        console.log('Idea encontrada:', {
+            id: idea.id,
+            name: idea.name,
+            project_status: idea.project_status,
+            canConvert: canConvertIdeaToProject(idea)
+        });
+    } else {
+        console.log('❌ Idea no encontrada en el array local');
+    }
+    console.log('Total de ideas cargadas:', ideas.length);
+    console.log('===========================');
 }
 
 async function convertIdeaToProject(idea) {
@@ -6516,7 +6536,7 @@ function initConversionStudentSearch() {
         // Limpiar y agregar event listener
     searchInput.removeEventListener('input', handleConversionSearchInput);
     searchInput.addEventListener('input', handleConversionSearchInput);
-    
+
     // Cerrar resultados al hacer clic fuera
     document.addEventListener('click', function(e) {
         if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
@@ -6684,7 +6704,6 @@ async function handleConvertIdeaToProject(e) {
     
     console.log('🚀 Iniciando conversión de idea a proyecto...');
 
-    // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
     if (conversionInProgress) {
         console.log('⏳ Conversión ya en progreso, ignorando click adicional');
         return;
@@ -6707,7 +6726,6 @@ async function handleConvertIdeaToProject(e) {
         return;
     }
     
-    // ENCONTRAR el botón de submit
     let submitBtn = document.querySelector('#convert-idea-form button[type="submit"]');
     if (!submitBtn) {
         submitBtn = document.getElementById('convert-idea-submit-btn');
@@ -6725,10 +6743,7 @@ async function handleConvertIdeaToProject(e) {
     const originalText = submitBtn.innerHTML;
     
     try {
-        // BLOQUEAR CONVERSIÓN MÚLTIPLE
         conversionInProgress = true;
-        
-        // Mostrar loading
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando Proyecto...';
         submitBtn.disabled = true;
         
@@ -6742,7 +6757,7 @@ async function handleConvertIdeaToProject(e) {
             requirements: 'Por definir en base a los recursos disponibles',
             problem: currentIdea.problem,
             status: status,
-            original_idea_id: currentIdea.id,
+            original_idea_id: currentIdea.id,  // 🔥 ESTO ES IMPORTANTE para que el servidor sepa qué idea actualizar
             original_idea_name: currentIdea.name
         };
         
@@ -6761,7 +6776,7 @@ async function handleConvertIdeaToProject(e) {
         
         console.log('📤 Enviando datos del proyecto:', projectData);
         
-        // Crear FormData para enviar datos (NO archivos todavía)
+        // Crear FormData para enviar datos
         const formData = new FormData();
         for (const key in projectData) {
             formData.append(key, projectData[key]);
@@ -6769,7 +6784,7 @@ async function handleConvertIdeaToProject(e) {
         
         console.log('📤 Enviando solicitud de creación de proyecto...');
         
-        // PRIMERO: Crear el proyecto sin archivos
+        // PRIMERO: Crear el proyecto
         const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
             headers: {
@@ -6789,43 +6804,38 @@ async function handleConvertIdeaToProject(e) {
         // SEGUNDO: Subir archivos si existen
         if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
             console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
-            
-            // Usar una función específica para subir archivos de conversión
             await uploadConversionFiles(newProject.id);
-        } else {
-            console.log('📁 No hay archivos para subir desde conversión');
         }
         
-        // TERCERO: Actualizar el estado de la idea
-        console.log('🔄 Actualizando estado de la idea...');
+        // 🔥 TERCERO: FORZAR RECARGA COMPLETA DE IDEAS
+        console.log('🔄 FORZANDO RECARGA DE IDEAS PARA ACTUALIZAR project_status...');
+        await loadIdeas(); // Esto recargará todas las ideas desde el servidor
         
-        // FORZAR RECARGA DE IDEAS DESDE EL SERVIDOR
-        await loadIdeas();
-        
-        // Buscar la idea actualizada en la lista
+        // 🔥 VERIFICAR QUE LA IDEA SE ACTUALIZÓ
         const updatedIdea = ideas.find(i => i.id === currentIdea.id);
-        
         if (updatedIdea) {
             console.log('✅ Idea actualizada encontrada:', {
                 id: updatedIdea.id,
                 name: updatedIdea.name,
                 project_status: updatedIdea.project_status
             });
+            
+            // 🔥 VERIFICAR SI canConvertIdeaToProject AHORA DETECTA EL CAMBIO
+            const canStillConvert = canConvertIdeaToProject(updatedIdea);
+            console.log('🔍 ¿Se puede seguir convirtiendo?', canStillConvert);
         } else {
             console.error('❌ No se pudo encontrar la idea actualizada');
         }
         
-        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como "Proyecto en curso".`, 'success');
+        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como convertida.`, 'success');
         
-        // Cerrar modales
+        // Cerrar modales y limpiar
         closeModal(document.getElementById('convert-idea-modal'));
         closeModal(document.getElementById('idea-detail-modal'));
-        
-        // Limpiar datos temporales
         window.conversionUploadedFiles = [];
         currentIdea = null;
         
-        // Recargar proyectos
+        // Recargar proyectos también
         await loadProjects();
         
         // Navegar a la sección de proyectos
@@ -6835,9 +6845,7 @@ async function handleConvertIdeaToProject(e) {
         console.error('❌ Error convirtiendo idea a proyecto:', error);
         showNotification(`Error al crear el proyecto: ${error.message}`, 'error');
     } finally {
-        // RESTAURAR ESTADO sin importar el resultado
         conversionInProgress = false;
-        
         if (submitBtn) {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
