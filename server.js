@@ -2042,7 +2042,7 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Ruta CORREGIDA para subir archivos a proyectos - VERSIÓN SIMPLIFICADA
+// Ruta CORREGIDA para subir archivos a proyectos - VERSIÓN MEJORADA
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
         console.log('🚀 SUBIDA SEGURA - Guardando archivo en BD');
@@ -2055,32 +2055,56 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
 
         console.log('📁 Procesando archivo:', fileName);
 
-        // 🔥 SOLUCIÓN DE EMERGENCIA: IGNORAR VALIDACIÓN DE NOMBRE
-        const safeFileName = fileName.substring(0, 50); // Máximo 50 caracteres
-        const dbFileName = `f${Date.now().toString(36)}`; // Nombre ultra corto
+        // 🔥 SOLUCIÓN: Generar nombre único corto para la BD pero mantener el original
+        const fileExtension = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '';
+        const dbFileName = `file_${Date.now()}${fileExtension}`;
+        const safeOriginalName = fileName.substring(0, 255); // Máximo permitido por VARCHAR
 
-        console.log('🔥 USANDO NOMBRE CORTO:', {
+        console.log('🔥 NOMBRES CORREGIDOS:', {
             original: fileName,
-            safe: safeFileName,
-            db: dbFileName
+            db: dbFileName,
+            safeOriginal: safeOriginalName
         });
 
         // Validar tamaño del archivo
-        if (file.length > 10 * 1024 * 1024) { // 10MB máximo
-            return res.status(400).json({ error: 'Archivo demasiado grande (máximo 10MB)' });
+        if (file.length > 50 * 1024 * 1024) { // 50MB máximo para documentos
+            return res.status(400).json({ error: 'Archivo demasiado grande (máximo 50MB)' });
         }
 
-        // Guardar en BD con nombres acortados
+        // Validar tipo de archivo
+        const allowedTypes = [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/pdf',
+            'text/plain',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+
+        if (!allowedTypes.includes(fileType) && !fileType?.includes('image/')) {
+            return res.status(400).json({ error: 'Tipo de archivo no permitido' });
+        }
+
+        // Guardar en BD con nombres corregidos
         const result = await pool.query(
             `INSERT INTO project_files (
-                project_id, filename, original_name, file_data, file_type, 
-                file_size, file_path, uploaded_by
+                project_id, 
+                filename, 
+                original_name, 
+                file_data, 
+                file_type, 
+                file_size, 
+                file_path, 
+                uploaded_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-            RETURNING id, filename, original_name`,
+            RETURNING id, filename, original_name, file_type, file_size`,
             [
                 id,
-                dbFileName.substring(0, 50), // filename
-                safeFileName.substring(0, 100), // original_name
+                dbFileName, // Nombre único corto para la BD
+                safeOriginalName, // Nombre original (hasta 255 chars)
                 file, // file_data
                 fileType || 'application/octet-stream',
                 file.length,
@@ -2090,9 +2114,13 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
         );
 
         console.log('🎉 ARCHIVO GUARDADO EN BD con ID:', result.rows[0].id);
+        
         res.status(201).json({ 
             success: true, 
-            fileId: result.rows[0].id, 
+            fileId: result.rows[0].id,
+            fileName: result.rows[0].original_name,
+            fileType: result.rows[0].file_type,
+            fileSize: result.rows[0].file_size,
             message: 'Archivo guardado correctamente' 
         });
 
@@ -2102,10 +2130,17 @@ app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
         if (error.code === '22001') {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Nombre de archivo demasiado largo. Intenta con un nombre más corto.' 
+                error: 'Nombre de archivo demasiado largo. Por favor, renombra el archivo con un nombre más corto.' 
             });
         }
         
+        if (error.code === '23514') {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'El archivo excede el tamaño máximo permitido.' 
+            });
+        }
+
         res.status(500).json({ 
             success: false, 
             error: 'Error guardando archivo: ' + error.message 

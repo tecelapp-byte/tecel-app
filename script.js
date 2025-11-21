@@ -6192,37 +6192,72 @@ function initFileUpload() {
         }
     });
 
-    // *** FUNCIÓN handleFiles ***
-    function handleFiles(files) {
-  if (!files || files.length === 0) return;
-  
-  console.log(`📁 Procesando ${files.length} archivos`);
-  
-  // Filtrar archivos grandes
-  const validFiles = filterLargeFiles(files);
-  
-  let filesAdded = 0;
-  
-  validFiles.forEach(file => {
-    // Validar duplicados
-    const isDuplicate = window.uploadedFiles.some(
-      existingFile => existingFile.name === file.name && existingFile.size === file.size
-    );
+// Función mejorada para manejar archivos
+function handleFiles(files) {
+    if (!files || files.length === 0) return;
     
-    if (isDuplicate) {
-      showNotification(`"${file.name}" ya está agregado`, 'warning');
-      return;
+    console.log(`📁 Procesando ${files.length} archivos`);
+    
+    let filesAdded = 0;
+    const filesArray = Array.from(files);
+    
+    filesArray.forEach(file => {
+        // Validar tipo de archivo
+        const allowedTypes = [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/pdf',
+            'text/plain',
+            'image/jpeg', 
+            'image/png',
+            'image/gif',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        
+        const isValidType = allowedTypes.includes(file.type) || 
+                           file.type.includes('image/') ||
+                           file.name.endsWith('.docx') ||
+                           file.name.endsWith('.doc') ||
+                           file.name.endsWith('.pdf') ||
+                           file.name.endsWith('.txt');
+        
+        if (!isValidType) {
+            showNotification(`Tipo de archivo no permitido: ${file.name}`, 'error');
+            return;
+        }
+        
+        // Validar duplicados
+        const isDuplicate = window.uploadedFiles.some(
+            existingFile => existingFile.name === file.name && existingFile.size === file.size
+        );
+        
+        if (isDuplicate) {
+            showNotification(`"${file.name}" ya está agregado`, 'warning');
+            return;
+        }
+        
+        // Validar tamaño (50MB máximo)
+        if (file.size > 50 * 1024 * 1024) {
+            showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+            return;
+        }
+        
+        // Validar nombre (máximo 255 caracteres)
+        if (file.name.length > 255) {
+            showNotification(`El nombre de "${file.name}" es demasiado largo. Por favor, renómbralo.`, 'error');
+            return;
+        }
+        
+        // Agregar archivo
+        window.uploadedFiles.push(file);
+        filesAdded++;
+        addFileToPreview(file);
+    });
+    
+    if (filesAdded > 0) {
+        showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
     }
-    
-    // Agregar archivo
-    window.uploadedFiles.push(file);
-    filesAdded++;
-    addFileToPreview(file);
-  });
-  
-  if (filesAdded > 0) {
-    showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
-  }
 }
     
     // *** FUNCIÓN addFileToPreview ***
