@@ -1629,20 +1629,30 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
 
-        // 🔥 ACTUALIZAR LA IDEA CON project_status Y project_id
-        if (original_idea_id && original_idea_id !== 'undefined') {
-            console.log('🔄 Actualizando idea con project_id:', original_idea_id);
+        // 🔥 VERIFICAR Y ACTUALIZAR LA IDEA CON project_id
+        console.log('🔄 Verificando si hay idea para actualizar...');
+        console.log('original_idea_id recibido:', original_idea_id);
+        console.log('Tipo de original_idea_id:', typeof original_idea_id);
+        
+        if (original_idea_id) {
+            console.log('🔥 ACTUALIZANDO IDEA CON project_id:', {
+                idea_id: original_idea_id,
+                project_id: project.id
+            });
             
+            // Actualizar la idea con project_status y project_id
             const updateResult = await transactionClient.query(
                 'UPDATE ideas SET project_status = $1, project_id = $2 WHERE id = $3 RETURNING id, name, project_status, project_id',
                 ['converted', project.id, original_idea_id]
             );
             
             if (updateResult.rows.length > 0) {
-                console.log('✅ Idea actualizada:', updateResult.rows[0]);
+                console.log('✅ Idea actualizada exitosamente:', updateResult.rows[0]);
             } else {
-                console.log('⚠️ No se pudo encontrar la idea para actualizar');
+                console.log('❌ No se pudo actualizar la idea - no se encontró');
             }
+        } else {
+            console.log('📝 No se proporcionó original_idea_id para actualizar');
         }
 
         // PROCESAR ESTUDIANTES PARTICIPANTES
