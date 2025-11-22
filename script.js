@@ -11833,17 +11833,7 @@ async function showResourceDetails(resourceId) {
         const hasFile = resource.file_data || resource.file_name;
         
         const modalContent = `
-            <div class="modal-header">
-                <h2>${escapeHtml(resource.title)}</h2>
-                <span class="resource-type-badge ${resource.resource_type}">
-                    ${getResourceTypeLabel(resource.resource_type)}
-                </span>
-                <button class="close-modal" onclick="closeModal(this.closest('.modal'))">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="modal-body resource-details">
+            <div class="resource-details">
                 <div class="resource-info">
                     <div class="detail-section">
                         <h3><i class="fas fa-align-left"></i> Descripción</h3>
@@ -11873,6 +11863,12 @@ async function showResourceDetails(resourceId) {
                         <div class="meta-item">
                             <strong><i class="fas fa-file"></i> Archivo:</strong>
                             <span>${escapeHtml(resource.file_name)}</span>
+                        </div>
+                        ` : ''}
+                        ${isLink && resource.external_url ? `
+                        <div class="meta-item">
+                            <strong><i class="fas fa-link"></i> Tipo:</strong>
+                            <span>Enlace Externo</span>
                         </div>
                         ` : ''}
                     </div>
@@ -11926,7 +11922,8 @@ async function showResourceDetails(resourceId) {
             </div>
         `;
         
-        showModal('Detalles del Recurso', modalContent, 'large');
+        // MOSTRAR EL MODAL CORRECTAMENTE
+        showModal(`Detalles: ${escapeHtml(resource.title)}`, modalContent, 'large');
         
         // Agregar event listeners para los botones en el modal
         setTimeout(() => {
@@ -11963,6 +11960,67 @@ async function showResourceDetails(resourceId) {
         console.error('❌ Error mostrando detalles:', error);
         showNotification('Error al cargar los detalles del recurso', 'error');
     }
+}
+
+function showModal(title, content, size = 'medium') {
+    // Cerrar modal existente si hay uno
+    const existingModal = document.querySelector('.modal-overlay');
+    if (existingModal) {
+        document.body.removeChild(existingModal);
+    }
+    
+    // Crear overlay del modal
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+    modalOverlay.innerHTML = `
+        <div class="modal ${size}">
+            <div class="modal-header">
+                <h2>${title}</h2>
+                <button class="close-modal" onclick="closeModal(this.closest('.modal-overlay'))">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                ${content}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modalOverlay);
+    
+    // Animación de entrada
+    setTimeout(() => {
+        modalOverlay.classList.add('active');
+    }, 10);
+    
+    // Cerrar al hacer clic fuera
+    modalOverlay.addEventListener('click', function(e) {
+        if (e.target === modalOverlay) {
+            closeModal(modalOverlay);
+        }
+    });
+    
+    // Cerrar con ESC
+    const closeOnEsc = function(e) {
+        if (e.key === 'Escape') {
+            closeModal(modalOverlay);
+            document.removeEventListener('keydown', closeOnEsc);
+        }
+    };
+    document.addEventListener('keydown', closeOnEsc);
+}
+
+// Función para cerrar modales - AGREGAR ESTA FUNCIÓN TAMBIÉN
+function closeModal(modalElement) {
+    if (!modalElement) return;
+    
+    modalElement.classList.remove('active');
+    
+    setTimeout(() => {
+        if (modalElement.parentNode) {
+            modalElement.parentNode.removeChild(modalElement);
+        }
+    }, 300);
 }
 
 // Función para mostrar detalles en el modal
