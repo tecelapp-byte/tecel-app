@@ -11147,8 +11147,17 @@ function loadCategoryResourcesForModal(category, modalId) {
         countElement.textContent = categoryResources.length;
     }
     
-    // Renderizar recursos
-    if (categoryResources.length === 0) {
+    // Renderizar recursos usando la MISMA función que en la vista general
+    renderResourcesInContainer(container, categoryResources);
+    
+    // Configurar event listeners para búsqueda y filtros
+    setupCategoryFilters(category, modalId);
+}
+
+function renderResourcesInContainer(container, resources) {
+    if (!container) return;
+    
+    if (resources.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-folder-open"></i>
@@ -11162,58 +11171,8 @@ function loadCategoryResourcesForModal(category, modalId) {
         return;
     }
     
-    // Renderizar recursos en el grid
-    container.innerHTML = categoryResources.map(resource => `
-        <div class="resource-card" data-resource-id="${resource.id}">
-            <div class="resource-header">
-                <h3 class="resource-title">${resource.title}</h3>
-                <span class="resource-type-badge ${resource.resource_type}">
-                    ${resource.resource_type === 'manual' ? '📚 Manual' : '🔗 Enlace'}
-                </span>
-            </div>
-            
-            <div class="resource-category">
-                <span class="category-tag">${getCategoryLabel(resource.main_category)}</span>
-                ${resource.subcategory ? `<span class="subcategory-tag">${getSubcategoryLabel(resource.main_category, resource.subcategory)}</span>` : ''}
-            </div>
-            
-            <p class="resource-description">${resource.description}</p>
-            
-            <div class="resource-meta">
-                <span class="uploader">
-                    <i class="fas fa-user"></i>
-                    ${resource.uploader_name || 'Usuario'}
-                </span>
-                <span class="date">
-                    <i class="fas fa-calendar"></i>
-                    ${new Date(resource.created_at).toLocaleDateString('es-ES')}
-                </span>
-            </div>
-            
-            <div class="resource-actions">
-                ${resource.resource_type === 'manual' && resource.file_data ? 
-                    `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id})">
-                        <i class="fas fa-download"></i> Descargar
-                    </button>` : ''
-                }
-                
-                ${resource.resource_type === 'enlace' && resource.external_url ? 
-                    `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
-                        <i class="fas fa-external-link-alt"></i> Visitar
-                    </button>` : ''
-                }
-                
-                ${currentUser && (currentUser.user_type === 'teacher' || currentUser.user_type === 'admin') ? 
-                    `<button class="btn-danger btn-sm" onclick="deleteLibraryResource(${resource.id})">
-                        <i class="fas fa-trash"></i> Eliminar
-                    </button>` : ''
-                }
-            </div>
-        </div>
-    `).join('');
-    
-    // Configurar event listeners para búsqueda y filtros
-    setupCategoryFilters(category, modalId);
+    // Usar la función createLibraryCard que ya tienes
+    container.innerHTML = resources.map(resource => createLibraryCard(resource)).join('');
 }
 
 function setupCategoryFilters(category, modalId) {
@@ -11955,7 +11914,6 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
         // Filtro de tipo (solo para programas)
         let matchesType = true;
         if (filters.type && currentType !== 'all') {
-            // Aquí podrías agregar lógica específica para tipos si es necesario
             matchesType = resource.resource_type === currentType;
         }
         
@@ -11964,59 +11922,8 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
     
     console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
     
-    // Re-renderizar recursos filtrados
-    if (filteredResources.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-search"></i>
-                <h3>No se encontraron recursos</h3>
-                <p>Intenta con otros términos de búsqueda o filtros</p>
-            </div>
-        `;
-    } else {
-        container.innerHTML = filteredResources.map(resource => `
-            <div class="resource-card" data-resource-id="${resource.id}">
-                <div class="resource-header">
-                    <h3 class="resource-title">${resource.title}</h3>
-                    <span class="resource-type-badge ${resource.resource_type}">
-                        ${resource.resource_type === 'manual' ? '📚 Manual' : '🔗 Enlace'}
-                    </span>
-                </div>
-                
-                <div class="resource-category">
-                    <span class="category-tag">${getCategoryLabel(resource.main_category)}</span>
-                    ${resource.subcategory ? `<span class="subcategory-tag">${getSubcategoryLabel(resource.main_category, resource.subcategory)}</span>` : ''}
-                </div>
-                
-                <p class="resource-description">${resource.description}</p>
-                
-                <div class="resource-meta">
-                    <span class="uploader">
-                        <i class="fas fa-user"></i>
-                        ${resource.uploader_name || 'Usuario'}
-                    </span>
-                    <span class="date">
-                        <i class="fas fa-calendar"></i>
-                        ${new Date(resource.created_at).toLocaleDateString('es-ES')}
-                    </span>
-                </div>
-                
-                <div class="resource-actions">
-                    ${resource.resource_type === 'manual' && resource.file_data ? 
-                        `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id})">
-                            <i class="fas fa-download"></i> Descargar
-                        </button>` : ''
-                    }
-                    
-                    ${resource.resource_type === 'enlace' && resource.external_url ? 
-                        `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
-                            <i class="fas fa-external-link-alt"></i> Visitar
-                        </button>` : ''
-                    }
-                </div>
-            </div>
-        `).join('');
-    }
+    // Re-renderizar recursos filtrados usando la MISMA función
+    renderResourcesInContainer(container, filteredResources);
 }
 
 // Actualizar estadísticas de categoría
