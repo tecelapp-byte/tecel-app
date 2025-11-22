@@ -4469,20 +4469,39 @@ async function handleProjectSubmit(e) {
             
         const method = currentProject ? 'PUT' : 'POST';
 
-        // PREPARAR FORM DATA
-        const formData = new FormData();
+        // 🔥 CONVERTIR ARCHIVOS A BASE64 ANTES DE ENVIAR
+        const base64Files = [];
+        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+            console.log(`📤 Convirtiendo ${window.uploadedFiles.length} archivos a base64...`);
+            
+            for (const file of window.uploadedFiles) {
+                try {
+                    const base64File = await fileToBase64(file);
+                    base64Files.push(base64File);
+                    console.log(`✅ Archivo convertido: ${file.name}`);
+                } catch (error) {
+                    console.error(`❌ Error convirtiendo archivo ${file.name}:`, error);
+                }
+            }
+            console.log(`🎉 ${base64Files.length} archivos convertidos a base64`);
+        } else {
+            console.log('📁 No hay archivos nuevos para agregar');
+        }
+
+        // PREPARAR DATOS COMO JSON (NO FORM DATA)
+        const jsonData = {};
         
         // Agregar campos del proyecto
-        formData.append('title', title);
-        formData.append('year', parseInt(year));
-        formData.append('description', description);
-        formData.append('detailed_description', document.getElementById('project-detailed-description').value.trim());
-        formData.append('objectives', document.getElementById('project-objectives').value.trim());
-        formData.append('requirements', document.getElementById('project-requirements').value.trim());
-        formData.append('problem', problem);
-        formData.append('status', document.getElementById('project-status').value);
+        jsonData.title = title;
+        jsonData.year = parseInt(year);
+        jsonData.description = description;
+        jsonData.detailed_description = document.getElementById('project-detailed-description').value.trim();
+        jsonData.objectives = document.getElementById('project-objectives').value.trim();
+        jsonData.requirements = document.getElementById('project-requirements').value.trim();
+        jsonData.problem = problem;
+        jsonData.status = document.getElementById('project-status').value;
 
-        // Agregar participantes como JSON string
+        // Agregar participantes como JSON
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
         const participants = Array.from(participantInputs).map(input => {
             try {
@@ -4493,47 +4512,44 @@ async function handleProjectSubmit(e) {
             }
         }).filter(participant => participant !== null);
         
-        formData.append('students', JSON.stringify(participants));
+        jsonData.students = JSON.stringify(participants);
 
-        // 🔥 AGREGAR ARCHIVOS A ELIMINAR (SOLUCIÓN AL PROBLEMA)
+        // 🔥 AGREGAR ARCHIVOS A ELIMINAR
         if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
-            formData.append('files_to_remove', JSON.stringify(window.filesToRemove));
+            jsonData.files_to_remove = window.filesToRemove;
             console.log(`🗑️ Archivos marcados para eliminar: ${window.filesToRemove.length}`, window.filesToRemove);
         } else {
             console.log('📝 No hay archivos para eliminar');
-            formData.append('files_to_remove', JSON.stringify([]));
+            jsonData.files_to_remove = [];
         }
 
-        // Agregar nuevos archivos
-        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
-            console.log(`📤 Agregando ${window.uploadedFiles.length} archivos nuevos`);
-            window.uploadedFiles.forEach((file) => {
-                formData.append('files', file);
-            });
+        // 🔥 AGREGAR ARCHIVOS CONVERTIDOS A BASE64
+        if (base64Files.length > 0) {
+            jsonData.files = base64Files;
+            console.log(`📁 Enviando ${base64Files.length} archivos como base64`);
         } else {
-            console.log('📁 No hay archivos nuevos para agregar');
+            jsonData.files = [];
+            console.log('📁 No hay archivos para enviar');
         }
 
-        // DEBUG: Mostrar contenido del FormData
-        console.log('📤 Contenido del FormData:');
-        for (let pair of formData.entries()) {
-            if (pair[0] === 'files') {
-                console.log(`   ${pair[0]}: [File] ${pair[1].name} (${pair[1].size} bytes)`);
-            } else if (pair[0] === 'files_to_remove') {
-                console.log(`   ${pair[0]}: ${pair[1]}`);
-            } else {
-                console.log(`   ${pair[0]}: ${typeof pair[1] === 'string' ? pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : pair[1]}`);
-            }
-        }
+        // DEBUG: Mostrar contenido del JSON
+        console.log('📤 Contenido del JSON a enviar:');
+        console.log('   title:', jsonData.title);
+        console.log('   year:', jsonData.year);
+        console.log('   description:', jsonData.description);
+        console.log('   files_to_remove:', jsonData.files_to_remove);
+        console.log('   files:', jsonData.files ? `${jsonData.files.length} archivos base64` : 'ninguno');
+        console.log('   students:', jsonData.students ? 'con participantes' : 'sin participantes');
 
-        // ENVIAR CON FORM DATA
-        console.log(`🚀 Enviando ${method} request a: ${url}`);
+        // 🔥 ENVIAR COMO JSON (NO COMO FORM DATA)
+        console.log(`🚀 Enviando ${method} request a: ${url} como JSON`);
         response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json', // 🔥 IMPORTANTE: Cambiar a JSON
             },
-            body: formData
+            body: JSON.stringify(jsonData) // 🔥 Enviar como JSON
         });
 
         console.log('📥 Respuesta del servidor:', {
@@ -4818,19 +4834,18 @@ async function uploadCompressedVersion(projectId, originalFile, index) {
   }
 }
 
-// Función para convertir archivos a base64 - DEBE ESTAR CORRECTA
+// Función para convertir archivo a base64 (AGREGAR EN LAS FUNCIONES DE UTILIDAD)
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            // El resultado es "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ..." 
-            // Necesitamos extraer solo la parte base64
-            const base64 = reader.result.split(',')[1];
+            // Extraer solo la parte base64 (sin el data:image/jpeg;base64, prefix)
+            const base64String = reader.result.split(',')[1];
             resolve({
                 name: file.name,
                 type: file.type,
                 size: file.size,
-                data: base64 // Solo la parte base64, sin el prefix
+                data: base64String
             });
         };
         reader.onerror = error => reject(error);
