@@ -10911,7 +10911,7 @@ function initEnhancedLibrary() {
     }
 }
 
-// Función para cargar recursos filtrados por categoría
+// Función CORREGIDA para cargar recursos por categoría
 async function loadResourcesByCategory(mainCategory) {
     try {
         console.log(`📂 Cargando recursos de categoría: ${mainCategory}`);
@@ -10929,10 +10929,20 @@ async function loadResourcesByCategory(mainCategory) {
         const allResources = await response.json();
         console.log(`📦 Total de recursos cargados: ${allResources.length}`);
         
-        // Filtrar recursos por categoría principal
-        const filteredResources = allResources.filter(resource => 
-            resource.main_category === mainCategory
-        );
+        // DEBUG: Mostrar todos los recursos y sus categorías
+        console.log('🔍 Todos los recursos:', allResources.map(r => ({
+            id: r.id,
+            title: r.title,
+            main_category: r.main_category,
+            resource_type: r.resource_type
+        })));
+        
+        // Filtrar recursos por categoría principal - CORREGIDO
+        const filteredResources = allResources.filter(resource => {
+            const matches = resource.main_category === mainCategory;
+            console.log(`📄 ${resource.title} - ${resource.main_category} === ${mainCategory} -> ${matches}`);
+            return matches;
+        });
         
         console.log(`✅ Recursos filtrados para ${mainCategory}:`, filteredResources.length);
         
@@ -10950,16 +10960,22 @@ async function loadResourcesByCategory(mainCategory) {
     }
 }
 
-// Función para mostrar recursos filtrados
+// Función para mostrar recursos filtrados - NUEVA
 function showFilteredResources(resources, category) {
-    const resourcesGrid = document.getElementById('filtered-resources-grid');
+    const mainView = document.getElementById('library-main-view');
+    const filteredView = document.getElementById('library-filtered-view');
     const categoryTitle = document.getElementById('filtered-category-title');
     const resourcesCount = document.getElementById('filtered-resources-count');
+    const resourcesGrid = document.getElementById('filtered-resources-grid');
     
-    if (!resourcesGrid || !categoryTitle || !resourcesCount) {
-        console.error('❌ Elementos del contenedor de recursos filtrados no encontrados');
+    if (!mainView || !filteredView || !categoryTitle || !resourcesCount || !resourcesGrid) {
+        console.error('❌ Elementos de la vista filtrada no encontrados');
         return;
     }
+    
+    // Ocultar vista principal, mostrar vista filtrada
+    mainView.style.display = 'none';
+    filteredView.style.display = 'block';
     
     // Actualizar título y contador
     categoryTitle.textContent = getCategoryLabel(category);
@@ -10974,6 +10990,9 @@ function showFilteredResources(resources, category) {
                 <i class="fas fa-folder-open"></i>
                 <h3>No hay recursos en esta categoría</h3>
                 <p>No se encontraron recursos en la categoría ${getCategoryLabel(category)}</p>
+                <button class="btn-primary" onclick="showModalById('new-resource-modal')">
+                    <i class="fas fa-plus"></i> Subir Primer Recurso
+                </button>
             </div>
         `;
         return;
@@ -10987,6 +11006,7 @@ function showFilteredResources(resources, category) {
     
     console.log(`✅ Mostrando ${resources.length} recursos en la categoría ${category}`);
 }
+
 
 // Función para mostrar vista filtrada
 function showCategoryView(category) {
@@ -12057,7 +12077,7 @@ async function showResourceDetails(resourceId) {
         modal.style.display = 'block';
         setTimeout(() => {
             modal.classList.add('active');
-        }, 10);
+        }, 1);
         
     } catch (error) {
         console.error('❌ Error mostrando detalles:', error);
@@ -12470,7 +12490,7 @@ async function loadLibraryResources() {
             console.log(`✅ ${libraryResources.length} recursos cargados`);
             renderLibraryResources();
             updateLibraryStats();
-
+            setupLibraryCategoryCards();
             // Event listener para botones de descarga en las cards
             document.addEventListener('click', function(e) {
                 // Botón descargar en cards
@@ -12520,6 +12540,25 @@ async function loadLibraryResources() {
         libraryResources = getSampleLibraryResources();
         renderLibraryResources();
         updateLibraryStats();
+    }
+}
+
+// Configurar las cards de categoría
+function setupLibraryCategoryCards() {
+    const categoryCards = document.querySelectorAll('.library-category-card');
+    
+    categoryCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const category = this.id.replace('-card', '');
+            console.log('🎯 Categoría seleccionada:', category);
+            showCategoryView(category);
+        });
+    });
+    
+    // Botón volver
+    const backBtn = document.getElementById('back-to-main-library');
+    if (backBtn) {
+        backBtn.addEventListener('click', backToMainLibrary);
     }
 }
 
