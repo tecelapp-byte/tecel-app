@@ -1389,6 +1389,28 @@ app.get('/api/library/download/:resourceId', authenticateToken, async (req, res)
     }
 });
 
+// Ruta para obtener un recurso específico de biblioteca
+app.get('/api/library/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
+            FROM library_resources lr 
+            LEFT JOIN users u ON lr.uploaded_by = u.id 
+            WHERE lr.id = $1
+        `, [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Recurso no encontrado' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error obteniendo recurso:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
 app.post('/api/library', authenticateToken, async (req, res) => {
     try {
         console.log('📚 === SUBIENDO RECURSO A BIBLIOTECA ===');

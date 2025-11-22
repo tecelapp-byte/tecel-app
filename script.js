@@ -2912,33 +2912,63 @@ function verifyDetailModalElements() {
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
-    card.style.cursor = 'pointer';
+    
+    // Determinar si es archivo o enlace
+    const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
+    const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
     
     card.innerHTML = `
         <div class="library-header">
             <h3 class="library-title">${resource.title}</h3>
             <span class="library-type">${getResourceTypeLabel(resource.resource_type)}</span>
         </div>
-        <div class="library-category">Categoría: ${getCategoryLabel(resource.main_category)}</div>
+        <div class="library-category">${getCategoryLabel(resource.main_category)}${resource.subcategory ? ` • ${resource.subcategory}` : ''}</div>
         <p class="library-description">${resource.description}</p>
         <div class="library-actions">
-            ${resource.file_url ? 
-                `<button class="btn-primary" onclick="event.stopPropagation(); downloadResource(${JSON.stringify(resource).replace(/"/g, '&quot;')})">
+            ${isFileResource ? 
+                `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
                     <i class="fas fa-download"></i> Descargar
                 </button>` : ''}
-            ${resource.external_url ? 
-                `<button class="btn-outline" onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
-                    <i class="fas fa-external-link-alt"></i> Visitar
+            ${isLinkResource ? 
+                `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
+                    <i class="fas fa-external-link-alt"></i> Visitar Enlace
                 </button>` : ''}
+            <button class="btn-outline" onclick="showResourceDetails(${resource.id})">
+                <i class="fas fa-eye"></i> Ver Detalles
+            </button>
         </div>
     `;
     
-    // Hacer toda la tarjeta clickeable para ver detalles
-    card.addEventListener('click', function() {
-        showResourceDetails(resource);
-    });
-    
     return card;
+}
+
+// Función para eliminar recurso de biblioteca
+async function deleteLibraryResource(resourceId, resourceName) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el recurso "${resourceName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/library/${resourceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            showNotification(`Recurso "${resourceName}" eliminado exitosamente`, 'success');
+            // Recargar recursos
+            loadLibraryResources();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al eliminar el recurso');
+        }
+    } catch (error) {
+        console.error('Error eliminando recurso:', error);
+        showNotification(`Error: ${error.message}`, 'error');
+    }
 }
 
 function renderAdminUsers() {
@@ -9163,58 +9193,49 @@ async function downloadProjectFile(projectId, fileId, fileName) {
     }
 }
 
-async function downloadLibraryResource(resourceId, resourceTitle, fileUrl) {
+// Función para descargar recursos de biblioteca
+async function downloadLibraryResource(resourceId, fileName) {
     try {
-        ('📚 Descargando recurso de biblioteca:', { resourceId, resourceTitle, fileUrl });
+        showNotification(`Iniciando descarga de ${fileName}...`, 'info');
         
-        // Si no hay autenticación, intentar descarga directa
-        if (!authToken) {
-            ('🔓 Sin autenticación, intentando descarga directa...');
-            attemptDirectDownload(fileUrl, resourceTitle);
-            return;
-        }
-
-        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-        ('📥 Usando endpoint de descarga:', downloadUrl);
-        
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
             }
         });
         
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = resourceTitle || 'recurso';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            
-            showNotification('Descarga iniciada', 'success');
-        } else if (response.status === 403) {
-            console.warn('🚫 Acceso denegado a descarga, intentando método directo...');
-            // Intentar descarga directa como fallback
-            attemptDirectDownload(fileUrl, resourceTitle);
-        } else {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Error ${response.status}`);
+        if (!response.ok) {
+            throw new Error('Error al descargar el recurso');
         }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Obtener nombre de archivo del header o usar el título
+        const contentDisposition = response.headers.get('content-disposition');
+        let downloadFileName = fileName;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+            if (filenameMatch && filenameMatch[1]) {
+                downloadFileName = filenameMatch[1];
+            }
+        }
+        
+        a.download = downloadFileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showNotification(`"${fileName}" descargado exitosamente`, 'success');
         
     } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
-        
-        // Si hay error de autenticación o permisos, intentar descarga directa
-        if (error.message.includes('No tienes permisos') || error.message.includes('Acceso denegado') || error.message.includes('403')) {
-            ('🔄 Intentando descarga directa...');
-            attemptDirectDownload(fileUrl, resourceTitle);
-        } else {
-            showNotification(`Error en descarga: ${error.message}`, 'error');
-        }
+        console.error('Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${error.message}`, 'error');
     }
 }
 
@@ -10723,30 +10744,32 @@ function initEnhancedFilters() {
 
 // Inicializar sistema de biblioteca mejorado - VERSIÓN CON FORZADO
 function initEnhancedLibrary() {
-    ('📚 Inicializando biblioteca mejorada...');
+    console.log('🔄 Inicializando biblioteca mejorada...');
     
-    // Forzar la configuración después de múltiples delays
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 1...');
-        setupLibraryCategoryCards();
-        setupEnhancedResourceForm();
-    }, 100);
+    // Remover event listeners existentes para evitar duplicación
+    const mainCategory = document.getElementById('resource-main-category');
+    const newMainCategory = mainCategory.cloneNode(true);
+    mainCategory.parentNode.replaceChild(newMainCategory, mainCategory);
     
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 2...');
-        setupCategoryModals();
-    }, 300);
+    // Configurar el cambio de categoría principal
+    document.getElementById('resource-main-category').addEventListener('change', function() {
+        const mainCategory = this.value;
+        const subcategorySelect = document.getElementById('resource-subcategory');
+        
+        subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
+        
+        if (mainCategory && librarySubcategories[mainCategory]) {
+            librarySubcategories[mainCategory].forEach(subcat => {
+                const option = document.createElement('option');
+                option.value = subcat.value;
+                option.textContent = subcat.label;
+                subcategorySelect.appendChild(option);
+            });
+        }
+    });
     
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 3...');
-        loadLibraryResources();
-        verifyModalPositions(); // Verificar posiciones
-    }, 500);
-    
-    setTimeout(() => {
-        ('✅ Biblioteca mejorada inicializada completamente');
-        debugLibrarySetup();
-    }, 1000);
+    // Inicializar sistema de archivos para biblioteca
+    initLibraryFileUpload();
 }
 
 // Configurar cards de categorías - VERSIÓN ULTRA ROBUSTA
@@ -11684,57 +11707,53 @@ function canManageLibrary() {
 let currentResource = null;
 
 // Función para mostrar detalles del recurso
-function showResourceDetails(resource) {
-    currentResource = resource;
-    
-    console.log('📖 Mostrando detalles del recurso:', resource);
-    
+// Función para mostrar detalles de recurso
+async function showResourceDetails(resourceId) {
+    try {
+        const response = await fetch(`${API_BASE}/library/${resourceId}`);
+        if (!response.ok) {
+            throw new Error('Recurso no encontrado');
+        }
+        
+        const resource = await response.json();
+        displayResourceDetails(resource);
+    } catch (error) {
+        console.error('Error cargando detalles del recurso:', error);
+        showNotification('Error al cargar los detalles del recurso', 'error');
+    }
+}
+
+// Función para mostrar detalles en el modal
+function displayResourceDetails(resource) {
     // Llenar información básica
     document.getElementById('detail-resource-title').textContent = resource.title;
+    document.getElementById('detail-resource-description').textContent = resource.description;
     document.getElementById('detail-resource-type').textContent = getResourceTypeLabel(resource.resource_type);
     document.getElementById('detail-resource-category').textContent = getCategoryLabel(resource.main_category);
-    document.getElementById('detail-resource-uploader').textContent = `Subido por ${resource.uploader_name || 'Usuario'}`;
-    document.getElementById('detail-resource-date').textContent = formatDate(resource.created_at);
-    document.getElementById('detail-resource-downloads').textContent = `${resource.download_count || 0} descargas`;
-    document.getElementById('detail-resource-description').textContent = resource.description;
+    document.getElementById('detail-resource-uploader').textContent = resource.uploader_name || 'Usuario';
+    document.getElementById('detail-resource-date').textContent = new Date(resource.created_at).toLocaleDateString('es-ES');
     
-    // Información detallada
+    // Información adicional
     document.getElementById('detail-info-type').textContent = getResourceTypeLabel(resource.resource_type);
     document.getElementById('detail-info-category').textContent = getCategoryLabel(resource.main_category);
-    document.getElementById('detail-info-subcategory').textContent = getSubcategoryLabel(resource.main_category, resource.subcategory);
-    document.getElementById('detail-info-size').textContent = resource.file_size ? formatFileSize(resource.file_size) : 'N/A';
-    document.getElementById('detail-info-format').textContent = getFileFormat(resource.file_url || resource.external_url);
+    document.getElementById('detail-info-subcategory').textContent = resource.subcategory || 'No especificada';
     
     // Configurar botones de acción
     const downloadBtn = document.getElementById('resource-download-btn');
     const linkBtn = document.getElementById('resource-link-btn');
     
-    if (resource.resource_type === 'enlace') {
-        // Es un enlace externo
-        downloadBtn.style.display = 'none';
-        linkBtn.style.display = 'flex';
-        linkBtn.onclick = function() {
-            window.open(resource.external_url, '_blank');
-        };
+    if (resource.resource_type !== 'enlace' && resource.file_url) {
+        downloadBtn.style.display = 'block';
+        downloadBtn.onclick = () => downloadLibraryResource(resource.id, resource.title);
     } else {
-        // Es un archivo
-        downloadBtn.style.display = 'flex';
-        linkBtn.style.display = 'none';
-        downloadBtn.onclick = function() {
-            downloadResource(resource);
-        };
+        downloadBtn.style.display = 'none';
     }
     
-    // Mostrar archivos si es una carpeta o múltiples archivos
-    const filesSection = document.getElementById('resource-files-section');
-    const filesList = document.getElementById('detail-resource-files');
-    
-    // Por ahora, mostramos el archivo principal
-    if (resource.file_url) {
-        filesSection.style.display = 'block';
-        filesList.innerHTML = createResourceFileItem(resource);
+    if (resource.resource_type === 'enlace' && resource.external_url) {
+        linkBtn.style.display = 'block';
+        linkBtn.onclick = () => window.open(resource.external_url, '_blank');
     } else {
-        filesSection.style.display = 'none';
+        linkBtn.style.display = 'none';
     }
     
     openModal('resource-detail-modal');
@@ -11843,18 +11862,18 @@ async function updateDownloadCount(resourceId) {
     }
 }
 
-// Funciones auxiliares
-function getResourceTypeLabel(type) {
+// Función para obtener etiqueta de tipo de recurso
+function getResourceTypeLabel(resourceType) {
     const types = {
         'documento': 'Documento',
-        'video': 'Video',
+        'video': 'Video', 
         'enlace': 'Enlace',
         'software': 'Software',
         'presentacion': 'Presentación',
         'manual': 'Manual',
         'carpeta': 'Carpeta'
     };
-    return types[type] || type;
+    return types[resourceType] || resourceType;
 }
 
 function getCategoryLabel(category) {
