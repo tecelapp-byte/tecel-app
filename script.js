@@ -11149,58 +11149,78 @@ function updateSubcategories(mainCategory) {
     }
 }
 
-// Inicializar upload de archivos para recursos
+// Sistema de archivos para recursos de biblioteca
 function initResourceFileUpload() {
     const fileInput = document.getElementById('resource-file');
-    const uploadArea = document.getElementById('resource-file-upload-area');
+    const fileUploadArea = document.getElementById('resource-file-upload-area');
     const filePreview = document.getElementById('resource-file-preview');
     
-    if (!fileInput || !uploadArea) return;
+    if (!fileInput || !fileUploadArea) {
+        console.error('❌ Elementos de upload no encontrados');
+        return;
+    }
     
-    // Array para almacenar archivos temporalmente
-    window.resourceUploadedFiles = [];
+    console.log('🔄 Inicializando sistema de archivos para recursos...');
+    
+    // Inicializar array global para recursos
+    if (!window.resourceUploadedFiles) {
+        window.resourceUploadedFiles = [];
+    }
     
     // Configurar event listeners
+    fileUploadArea.addEventListener('click', function() {
+        console.log('🎯 Click en área de upload');
+        fileInput.click();
+    });
+    
     fileInput.addEventListener('change', function(e) {
+        console.log('📁 Input file cambiado:', e.target.files);
         handleResourceFiles(e.target.files);
     });
     
     // Drag and drop
-    uploadArea.addEventListener('dragover', function(e) {
+    fileUploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
-        uploadArea.classList.add('dragover');
+        this.classList.add('dragover');
     });
     
-    uploadArea.addEventListener('dragleave', function(e) {
+    fileUploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        this.classList.remove('dragover');
     });
     
-    uploadArea.addEventListener('drop', function(e) {
+    fileUploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        this.classList.remove('dragover');
+        console.log('📁 Archivos soltados:', e.dataTransfer.files);
         handleResourceFiles(e.dataTransfer.files);
     });
     
     function handleResourceFiles(files) {
         if (!files || files.length === 0) return;
         
-        for (let file of files) {
-            // Validar tamaño
+        console.log(`📁 Procesando ${files.length} archivos para recursos`);
+        
+        let filesAdded = 0;
+        const filesArray = Array.from(files);
+        
+        filesArray.forEach(file => {
+            // Validar tamaño (50MB máximo)
             if (file.size > 50 * 1024 * 1024) {
-                showNotification(`El archivo ${file.name} es demasiado grande (máx. 50MB)`, 'error');
-                continue;
+                showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+                return;
             }
             
             // Agregar archivo
             window.resourceUploadedFiles.push(file);
+            filesAdded++;
             addResourceFileToPreview(file);
+        });
+        
+        if (filesAdded > 0) {
+            showNotification(`✅ ${filesAdded} archivo(s) listo(s) para subir`, 'success');
+            console.log('📋 Archivos listos:', window.resourceUploadedFiles);
         }
-        
-        // Limpiar input para permitir nuevas selecciones
-        fileInput.value = '';
-        
-        showNotification(`Se agregaron ${files.length} archivo(s)`, 'success');
     }
     
     function addResourceFileToPreview(file) {
@@ -11234,18 +11254,20 @@ function initResourceFileUpload() {
             filePreview.appendChild(fileItem);
         }
         
-        // Configurar event listener para eliminar
+        // Configurar botón de eliminar
         const removeBtn = fileItem.querySelector('.file-remove');
-        removeBtn.addEventListener('click', function() {
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
             const fileName = this.getAttribute('data-file-name');
             removeResourceFileFromPreview(fileName);
         });
     }
     
-    // Función para eliminar archivo del preview
     window.removeResourceFileFromPreview = function(fileName) {
+        // Remover del array
         window.resourceUploadedFiles = window.resourceUploadedFiles.filter(file => file.name !== fileName);
         
+        // Remover del DOM
         const fileItem = document.querySelector(`.file-preview-item[data-file-name="${fileName}"]`);
         if (fileItem) {
             fileItem.remove();
@@ -11255,7 +11277,16 @@ function initResourceFileUpload() {
         if (window.resourceUploadedFiles.length === 0 && filePreview) {
             filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
         }
+        
+        showNotification(`🗑️ "${fileName}" removido`, 'info');
     };
+    
+    // Inicializar preview vacío
+    if (filePreview && window.resourceUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    console.log('✅ Sistema de archivos para recursos inicializado');
 }
 
 // Configurar modales de categorías - VERSIÓN MEJORADA
@@ -11668,6 +11699,28 @@ async function submitEnhancedResource(formData) {
     }
 }
 
+function debugFileInput() {
+    const fileInput = document.getElementById('resource-file');
+    console.log('🔍 DEBUG FILE INPUT:');
+    console.log('Elemento:', fileInput);
+    console.log('Files:', fileInput?.files);
+    console.log('Files length:', fileInput?.files?.length);
+    console.log('Files array:', Array.from(fileInput?.files || []));
+    
+    if (fileInput && fileInput.files.length > 0) {
+        Array.from(fileInput.files).forEach((file, index) => {
+            console.log(`📄 Archivo ${index + 1}:`, {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            });
+        });
+    } else {
+        console.log('❌ No hay archivos seleccionados');
+    }
+}
+
 // Función para convertir archivo a base64
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
@@ -11930,7 +11983,6 @@ function handleResourceTypeChange() {
     }
 }
 
-// Reemplaza la función submitNewResource existente con esta:
 async function submitNewResource(e) {
     e.preventDefault();
     
@@ -11946,7 +11998,9 @@ async function submitNewResource(e) {
         const externalUrl = document.getElementById('resource-url')?.value;
         const mainCategory = document.getElementById('resource-main-category')?.value;
         const subcategory = document.getElementById('resource-subcategory')?.value;
-        const fileInput = document.getElementById('resource-file');
+        
+        // 🔥 USAR EL ARRAY GLOBAL EN LUGAR DEL INPUT FILE
+        const hasFiles = window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0;
         
         console.log('🔍 Elementos encontrados:', {
             title: !!title,
@@ -11955,23 +12009,27 @@ async function submitNewResource(e) {
             externalUrl: externalUrl,
             mainCategory: mainCategory,
             subcategory: subcategory,
-            hasFile: fileInput?.files?.length > 0
+            hasFiles: hasFiles,
+            filesCount: window.resourceUploadedFiles?.length || 0
         });
+        
+        // Debug del input file
+        debugFileInput();
         
         // Validar campos requeridos
         if (!title || !description || !resourceType || !mainCategory) {
             throw new Error('Todos los campos marcados con * son requeridos');
         }
         
-        // 🔥 VALIDACIÓN CORREGIDA - Solo validar archivo si NO es enlace
+        // 🔥 VALIDACIÓN CORREGIDA - Usar el array global
         if (resourceType !== 'enlace') {
-            if (!fileInput || fileInput.files.length === 0) {
+            if (!hasFiles) {
                 throw new Error('El archivo es requerido para este tipo de recurso');
             }
-            console.log('📁 Validación de archivo pasada');
+            console.log('📁 Validación de archivo pasada:', window.resourceUploadedFiles.length, 'archivos');
         }
         
-        // 🔥 VALIDACIÓN CORREGIDA - Solo validar URL si ES enlace
+        // Validar URL para enlaces
         if (resourceType === 'enlace' && !externalUrl) {
             throw new Error('La URL es requerida para recursos de tipo enlace');
         }
@@ -11983,7 +12041,7 @@ async function submitNewResource(e) {
             externalUrl,
             mainCategory,
             subcategory,
-            hasFile: fileInput?.files?.length > 0
+            filesCount: window.resourceUploadedFiles?.length || 0
         });
         
         // Crear FormData manualmente
@@ -11997,13 +12055,12 @@ async function submitNewResource(e) {
         if (externalUrl) formData.append('external_url', externalUrl);
         if (subcategory) formData.append('subcategory', subcategory);
         
-        // 🔥 AGREGAR ARCHIVO SOLO SI NO ES ENLACE
-        if (resourceType !== 'enlace' && fileInput && fileInput.files.length > 0) {
-            // Si son múltiples archivos
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('files', fileInput.files[i]);
-            }
-            console.log('📁 Archivos agregados:', fileInput.files.length);
+        // 🔥 AGREGAR ARCHIVOS DEL ARRAY GLOBAL
+        if (resourceType !== 'enlace' && window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0) {
+            window.resourceUploadedFiles.forEach((file, index) => {
+                formData.append('files', file);
+            });
+            console.log('📁 Archivos agregados al FormData:', window.resourceUploadedFiles.length);
         }
         
         console.log('📦 FormData creado manualmente');
@@ -12020,9 +12077,10 @@ async function submitNewResource(e) {
         console.log('✅ Recurso subido exitosamente:', result);
         showNotification('Recurso subido exitosamente a la biblioteca', 'success');
         
-        // Cerrar modal y limpiar formulario
+        // Cerrar modal y limpiar TODO
         closeModal(document.getElementById('new-resource-modal'));
         e.target.reset();
+        window.resourceUploadedFiles = []; // 🔥 LIMPIAR ARRAY
         
         // Recargar la biblioteca
         loadLibraryResources();
