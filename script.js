@@ -4818,23 +4818,24 @@ async function uploadCompressedVersion(projectId, originalFile, index) {
   }
 }
 
+// Función para convertir archivos a base64 - DEBE ESTAR CORRECTA
 function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    // Validar tamaño antes de convertir
-    if (file.size > 5 * 1024 * 1024) {
-      reject(new Error('Archivo demasiado grande (máximo 5MB)'));
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      // Extraer solo la parte base64 (sin el prefijo data:...)
-      const base64 = reader.result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = error => reject(error);
-  });
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // El resultado es "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ..." 
+            // Necesitamos extraer solo la parte base64
+            const base64 = reader.result.split(',')[1];
+            resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: base64 // Solo la parte base64, sin el prefix
+            });
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
 }
 
 function filterLargeFiles(files) {
