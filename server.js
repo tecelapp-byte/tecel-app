@@ -1391,60 +1391,120 @@ app.get('/api/library/download/:resourceId', authenticateToken, async (req, res)
 
 
 app.post('/api/library', authenticateToken, async (req, res) => {
-  try {
-    const { title, description, resource_type, external_url, main_category, subcategory, fileData, fileName, fileType } = req.body;
-    
-    let file_url = null;
+    try {
+        console.log('📚 === SUBIENDO RECURSO A BIBLIOTECA ===');
+        console.log('Headers:', req.headers);
+        console.log('Content-Type:', req.get('Content-Type'));
+        console.log('Body keys:', Object.keys(req.body));
+        console.log('User:', req.user);
 
-    // Procesar archivo si se proporciona
-    if (fileData && fileName) {
-      console.log('📤 Subiendo recurso a biblioteca...');
+        const { title, description, resource_type, external_url, main_category, subcategory, fileData, fileName, fileType } = req.body;
 
-      const fileBuffer = Buffer.from(fileData, 'base64');
-      const uniqueFileName = `library-${Date.now()}-${fileName}`;
-      const filePath = `library/${uniqueFileName}`;
-
-      // Subir a Supabase
-      const { data, error } = await supabase.storage
-        .from('tecel-files-public')
-        .upload(filePath, fileBuffer, {
-          contentType: fileType || 'application/octet-stream'
+        console.log('📥 Datos recibidos:', {
+            title: title?.substring(0, 50),
+            description: description?.substring(0, 100),
+            resource_type: resource_type,
+            external_url: external_url?.substring(0, 100),
+            main_category: main_category,
+            subcategory: subcategory,
+            hasFileData: !!fileData,
+            fileName: fileName,
+            fileType: fileType,
+            fileDataLength: fileData?.length
         });
 
-      if (error) {
-        console.error('❌ Error subiendo recurso:', error);
-        return res.status(500).json({ error: 'Error subiendo archivo' });
-      }
+        // Validaciones básicas
+        if (!title || !description || !resource_type || !main_category) {
+            console.log('❌ Campos requeridos faltantes');
+            return res.status(400).json({ error: 'Todos los campos son requeridos' });
+        }
 
-      // Obtener URL pública
-      const { data: urlData } = supabase.storage
-        .from('tecel-files-public')
-        .getPublicUrl(filePath);
+        let file_url = null;
 
-      file_url = urlData.publicUrl;
+        // Procesar archivo si se proporciona
+        if (fileData && fileName) {
+            console.log('📤 Procesando archivo para biblioteca...');
+            
+            try {
+                const fileBuffer = Buffer.from(fileData, 'base64');
+                console.log('📊 Tamaño del archivo:', fileBuffer.length, 'bytes');
+                
+                const uniqueFileName = `library-${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+                const filePath = `library/${uniqueFileName}`;
+                
+                console.log('📁 Subiendo a Supabase:', {
+                    fileName: uniqueFileName,
+                    filePath: filePath,
+                    fileSize: fileBuffer.length
+                });
+
+                // Subir a Supabase
+                const { data, error } = await supabase.storage
+                    .from('tecel-files-public')
+                    .upload(filePath, fileBuffer, {
+                        contentType: fileType || 'application/octet-stream',
+                        upsert: false
+                    });
+
+                if (error) {
+                    console.error('❌ Error subiendo a Supabase:', error);
+                    return res.status(500).json({ error: 'Error subiendo archivo: ' + error.message });
+                }
+
+                // Obtener URL pública
+                const { data: urlData } = supabase.storage
+                    .from('tecel-files-public')
+                    .getPublicUrl(filePath);
+                
+                file_url = urlData.publicUrl;
+                console.log('✅ Archivo subido exitosamente:', file_url);
+
+            } catch (fileError) {
+                console.error('❌ Error procesando archivo:', fileError);
+                return res.status(500).json({ error: 'Error procesando archivo: ' + fileError.message });
+            }
+        } else {
+            console.log('📝 No hay archivo para subir');
+        }
+
+        // Validar que si es tipo "enlace" tenga URL
+        if (resource_type === 'enlace' && !external_url) {
+            console.log('❌ URL requerida para tipo enlace');
+            return res.status(400).json({ error: 'La URL es requerida para recursos de tipo enlace' });
+        }
+
+        console.log('💾 Insertando en base de datos...');
+        
+        // Insertar en base de datos
+        const result = await pool.query(
+            'INSERT INTO library_resources (title, description, resource_type, file_url, external_url, uploaded_by, main_category, subcategory) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+            [title, description, resource_type, file_url, external_url, req.user.id, main_category, subcategory]
+        );
+
+        console.log('✅ Recurso insertado en BD, ID:', result.rows[0].id);
+
+        // Obtener recurso completo
+        const fullResource = await pool.query(`
+            SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
+            FROM library_resources lr 
+            LEFT JOIN users u ON lr.uploaded_by = u.id 
+            WHERE lr.id = $1
+        `, [result.rows[0].id]);
+
+        console.log('🎉 Recurso de biblioteca creado exitosamente');
+        res.status(201).json(fullResource.rows[0]);
+
+    } catch (error) {
+        console.error('❌ ERROR EN SUBIDA DE BIBLIOTECA:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            constraint: error.constraint,
+            table: error.table,
+            column: error.column
+        });
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
-
-    // Insertar en base de datos
-    const result = await pool.query(
-      'INSERT INTO library_resources (title, description, resource_type, file_url, external_url, uploaded_by, main_category, subcategory) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [title, description, resource_type, file_url, external_url, req.user.id, main_category, subcategory]
-    );
-
-    // Obtener recurso completo
-    const fullResource = await pool.query(`
-      SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
-      FROM library_resources lr 
-      LEFT JOIN users u ON lr.uploaded_by = u.id 
-      WHERE lr.id = $1
-    `, [result.rows[0].id]);
-
-    console.log('✅ Recurso de biblioteca creado:', title);
-    res.status(201).json(fullResource.rows[0]);
-
-  } catch (error) {
-    console.error('Error subiendo recurso:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
 });
 
 // Rutas de administración

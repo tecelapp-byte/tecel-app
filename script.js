@@ -11532,66 +11532,56 @@ function updateCategoryStats(category, count) {
 }
 
 // Función para enviar recurso mejorado
-async function submitEnhancedResource(e) {
-    e.preventDefault();
-    
-    if (!checkAuth()) return;
-    
-    const formData = new FormData();
-    
-    // Campos básicos
-    formData.append('title', document.getElementById('resource-title').value);
-    formData.append('description', document.getElementById('resource-description').value);
-    formData.append('resource_type', document.getElementById('resource-type').value);
-    formData.append('main_category', document.getElementById('resource-main-category').value);
-    formData.append('subcategory', document.getElementById('resource-subcategory').value);
-    
-    // Archivos o URL
-    const resourceType = document.getElementById('resource-type').value;
-    if (resourceType === 'enlace') {
-        formData.append('external_url', document.getElementById('resource-url').value);
-    } else {
-        // Agregar archivos
-        if (window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0) {
-            window.resourceUploadedFiles.forEach(file => {
-                formData.append('files', file);
-            });
-        }
-    }
-    
+async function submitEnhancedResource(formData) {
     try {
+        console.log('📚 === ENVIANDO RECURSO A BIBLIOTECA ===');
+        console.log('FormData recibido:', formData);
+        
+        // Convertir FormData a objeto para debug
+        const formDataObj = {};
+        for (let [key, value] of formData.entries()) {
+            if (key === 'file') {
+                formDataObj[key] = `[File] ${value.name} (${value.size} bytes)`;
+            } else {
+                formDataObj[key] = value;
+            }
+        }
+        console.log('📤 Datos a enviar:', formDataObj);
+
         const response = await fetch(`${API_BASE}/library`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
             },
             body: formData
         });
-        
-        if (response.ok) {
-            const newResource = await response.json();
-            libraryResources.unshift(newResource);
-            
-            // Actualizar vistas
-            renderLibraryResources();
-            updateLibraryStats();
-            updateCategoryCards();
-            
-            showNotification('Recurso subido exitosamente', 'success');
-            closeModal(document.getElementById('new-resource-modal'));
-            document.getElementById('resource-form').reset();
-            
-            // Limpiar archivos temporales
-            window.resourceUploadedFiles = [];
-            const filePreview = document.getElementById('resource-file-preview');
-            if (filePreview) filePreview.innerHTML = '';
-            
-        } else {
-            throw new Error('Error en la respuesta del servidor');
+
+        console.log('📥 Respuesta del servidor:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+        });
+
+        if (!response.ok) {
+            let errorText;
+            try {
+                const errorData = await response.json();
+                errorText = errorData.error || `Error ${response.status}`;
+                console.error('❌ Error del servidor:', errorData);
+            } catch (e) {
+                errorText = await response.text();
+                console.error('❌ Error texto:', errorText);
+            }
+            throw new Error(errorText);
         }
+
+        const result = await response.json();
+        console.log('✅ Recurso subido exitosamente:', result);
+        return result;
+
     } catch (error) {
-        console.error('Error subiendo recurso:', error);
-        showNotification('Error al subir el recurso', 'error');
+        console.error('❌ Error subiendo recurso:', error);
+        throw new Error('Error en la respuesta del servidor');
     }
 }
 
