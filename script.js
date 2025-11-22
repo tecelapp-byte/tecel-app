@@ -2583,60 +2583,59 @@ function generateSafeShortName(originalName) {
 }
 
 async function loadSuggestions() {
-  try {
-    ('🔄 Cargando sugerencias...');
-    
-    if (!authToken) {
-      ('❌ No hay token de autenticación');
-      showNotification('Debes iniciar sesión para ver las sugerencias', 'error');
-      suggestions = [];
-      renderSuggestions();
-      return;
-    }
+    try {
+        console.log('🔄 Cargando sugerencias...');
+        
+        if (!authToken) {
+            console.log('❌ No hay token de autenticación');
+            showNotification('Debes iniciar sesión para ver las sugerencias', 'error');
+            suggestions = [];
+            renderSuggestions();
+            return;
+        }
 
-    const response = await fetch(`${API_BASE}/suggestions`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    ('📨 Respuesta de sugerencias:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
+        const response = await fetch(`${API_BASE}/suggestions`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📨 Respuesta de sugerencias:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+        });
 
-    if (response.ok) {
-      suggestions = await response.json();
-      (`✅ ${suggestions.length} sugerencias cargadas exitosamente`);
-      renderSuggestions();
-      
-      // INICIALIZAR EL BUSCADOR DE SUGERENCIAS - AGREGAR ESTA LÍNEA
-      setTimeout(() => {
-        initSuggestionsSearch();
-      }, 100);
-      
-    } else if (response.status === 401) {
-      ('🔐 Error 401 - Token inválido o expirado');
-      showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
-      logout();
-      
-    } else {
-      const errorText = await response.text();
-      console.error('❌ Error del servidor:', errorText);
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+        if (response.ok) {
+            suggestions = await response.json();
+            console.log(`✅ ${suggestions.length} sugerencias cargadas exitosamente`);
+            
+            // 🔥 ACTUALIZAR CONTADORES DESPUÉS DE CARGAR
+            updateSuggestionCounters();
+            
+            renderSuggestions();
+            
+        } else if (response.status === 401) {
+            console.log('🔐 Error 401 - Token inválido o expirado');
+            showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
+            logout();
+            
+        } else {
+            const errorText = await response.text();
+            console.error('❌ Error del servidor:', errorText);
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando sugerencias:', error);
+        suggestions = [];
+        renderSuggestions();
+        
+        if (!error.message.includes('Sesión expirada')) {
+            showNotification('Error cargando sugerencias', 'error');
+        }
     }
-    
-  } catch (error) {
-    console.error('❌ Error cargando sugerencias:', error);
-    suggestions = [];
-    renderSuggestions();
-    
-    if (!error.message.includes('Sesión expirada')) {
-      showNotification('Error cargando sugerencias', 'error');
-    }
-  }
 }
 
 async function loadStats() {
@@ -7290,46 +7289,47 @@ function showChangeStatusConfirmation(suggestionId, currentStatus) {
     openModal('confirm-change-status-modal');
 }
 
-// Ejecutar cambio de estado con endpoint real
+// También cuando cambia el estado de una sugerencia
 async function executeChangeSuggestionStatus(suggestionId, newStatus) {
     try {
-        (`🔄 Cambiando estado de sugerencia ${suggestionId} a: ${newStatus}`);
+        console.log(`🔄 Cambiando estado de sugerencia ${suggestionId} a: ${newStatus}`);
         
         const response = await fetch(`${API_BASE}/suggestions/${suggestionId}`, {
             method: 'PUT',
-            headers: authToken ? {
+            headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
-            } : {},
+            },
             body: JSON.stringify({ status: newStatus })
         });
-        
+
         if (response.ok) {
             const updatedSuggestion = await response.json();
+            console.log('✅ Estado cambiado exitosamente:', updatedSuggestion);
             
-            // Actualizar lista local
-            const suggestionIndex = suggestions.findIndex(s => s.id === suggestionId);
-            if (suggestionIndex !== -1) {
-                suggestions[suggestionIndex] = updatedSuggestion;
+            // Actualizar la sugerencia en el array local
+            const index = suggestions.findIndex(s => s.id === suggestionId);
+            if (index !== -1) {
+                suggestions[index] = updatedSuggestion;
             }
             
-            showNotification(`Sugerencia marcada como ${newStatus === 'pendiente' ? 'Subida' : 'Realizada'}`, 'success');
+            // 🔥 ACTUALIZAR CONTADORES DESPUÉS DEL CAMBIO
+            updateSuggestionCounters();
             
-            // Cerrar modales
-            closeModal(document.getElementById('confirm-change-status-modal'));
-            closeModal(document.getElementById('suggestion-detail-modal'));
-            
-            // Recargar sugerencias
+            // Re-renderizar si es necesario
             renderSuggestions();
+            
+            showNotification('Estado de sugerencia actualizado', 'success');
+            closeModal(document.getElementById('change-status-modal'));
             
         } else {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Error al cambiar el estado');
+            throw new Error(errorData.error || 'Error cambiando estado');
         }
         
     } catch (error) {
         console.error('❌ Error cambiando estado:', error);
-        showNotification(`Error al cambiar el estado: ${error.message}`, 'error');
+        showNotification(`Error: ${error.message}`, 'error');
     }
 }
 
@@ -9050,6 +9050,36 @@ function switchAuthForm(formType) {
             loginForm.classList.add('active');
         }, 300);
     }
+}
+
+// Función de debug para los contadores de sugerencias
+function debugSuggestionCounters() {
+    console.log('=== DEBUG CONTADORES SUGERENCIAS ===');
+    console.log('suggestions array:', suggestions);
+    console.log('Total de sugerencias:', suggestions.length);
+    
+    const pendientes = suggestions.filter(s => s.status === 'pendiente').length;
+    const enProgreso = suggestions.filter(s => s.status === 'en_progreso').length;
+    const realizadas = suggestions.filter(s => s.status === 'realizada').length;
+    
+    console.log('Pendientes:', pendientes);
+    console.log('En progreso:', enProgreso);
+    console.log('Realizadas:', realizadas);
+    console.log('===============================');
+    
+    // También verificar los elementos HTML
+    const totalElement = document.getElementById('suggestions-total');
+    const pendientesElement = document.getElementById('suggestions-pendientes');
+    const realizadasElement = document.getElementById('suggestions-realizadas');
+    
+    console.log('Elementos HTML:');
+    console.log('Total element:', totalElement);
+    console.log('Pendientes element:', pendientesElement);
+    console.log('Realizadas element:', realizadasElement);
+    
+    if (totalElement) console.log('Total text:', totalElement.textContent);
+    if (pendientesElement) console.log('Pendientes text:', pendientesElement.textContent);
+    if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
 async function downloadProjectFile(projectId, fileId, fileName) {
@@ -11939,6 +11969,57 @@ function updateResultsInfo() {
         resultsInfo.style.display = 'block';
         resultsCount.textContent = visibleSuggestions;
     }
+}
+
+// Función MEJORADA para actualizar contadores de sugerencias
+function updateSuggestionCounters() {
+    console.log('🔄 Actualizando contadores de sugerencias...');
+    
+    if (!suggestions || !Array.isArray(suggestions)) {
+        console.error('❌ suggestions no es un array válido:', suggestions);
+        return;
+    }
+
+    // Calcular contadores
+    const total = suggestions.length;
+    const pendientes = suggestions.filter(s => s.status === 'pendiente').length;
+    const enProgreso = suggestions.filter(s => s.status === 'en_progreso').length;
+    const realizadas = suggestions.filter(s => s.status === 'realizada' || s.status === 'completada').length;
+
+    console.log('📊 Contadores calculados:', {
+        total,
+        pendientes,
+        enProgreso,
+        realizadas
+    });
+
+    // Actualizar elementos HTML
+    const totalElement = document.getElementById('suggestions-total');
+    const pendientesElement = document.getElementById('suggestions-pendientes');
+    const realizadasElement = document.getElementById('suggestions-realizadas');
+
+    if (totalElement) {
+        totalElement.textContent = total;
+        console.log('✅ Total actualizado:', total);
+    } else {
+        console.error('❌ Elemento suggestions-total no encontrado');
+    }
+
+    if (pendientesElement) {
+        pendientesElement.textContent = pendientes;
+        console.log('✅ Pendientes actualizado:', pendientes);
+    } else {
+        console.error('❌ Elemento suggestions-pendientes no encontrado');
+    }
+
+    if (realizadasElement) {
+        realizadasElement.textContent = realizadas;
+        console.log('✅ Realizadas actualizado:', realizadas);
+    } else {
+        console.error('❌ Elemento suggestions-realizadas no encontrado');
+    }
+
+    console.log('🎯 Contadores actualizados exitosamente');
 }
 
 // Modificar filterLibrary para incluir filtro por tipo
