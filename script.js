@@ -10911,6 +10911,107 @@ function initEnhancedLibrary() {
     }
 }
 
+// Función para cargar recursos filtrados por categoría
+async function loadResourcesByCategory(mainCategory) {
+    try {
+        console.log(`📂 Cargando recursos de categoría: ${mainCategory}`);
+        
+        const response = await fetch(`${API_BASE}/library`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al cargar recursos');
+        }
+        
+        const allResources = await response.json();
+        console.log(`📦 Total de recursos cargados: ${allResources.length}`);
+        
+        // Filtrar recursos por categoría principal
+        const filteredResources = allResources.filter(resource => 
+            resource.main_category === mainCategory
+        );
+        
+        console.log(`✅ Recursos filtrados para ${mainCategory}:`, filteredResources.length);
+        
+        // Mostrar en la consola para debugging
+        filteredResources.forEach(resource => {
+            console.log(`📄 Recurso: ${resource.title} - ${resource.main_category} - ${resource.subcategory}`);
+        });
+        
+        // Actualizar la interfaz
+        showFilteredResources(filteredResources, mainCategory);
+        
+    } catch (error) {
+        console.error(`❌ Error cargando recursos de ${mainCategory}:`, error);
+        showNotification(`Error al cargar recursos: ${error.message}`, 'error');
+    }
+}
+
+// Función para mostrar recursos filtrados
+function showFilteredResources(resources, category) {
+    const resourcesGrid = document.getElementById('filtered-resources-grid');
+    const categoryTitle = document.getElementById('filtered-category-title');
+    const resourcesCount = document.getElementById('filtered-resources-count');
+    
+    if (!resourcesGrid || !categoryTitle || !resourcesCount) {
+        console.error('❌ Elementos del contenedor de recursos filtrados no encontrados');
+        return;
+    }
+    
+    // Actualizar título y contador
+    categoryTitle.textContent = getCategoryLabel(category);
+    resourcesCount.textContent = `${resources.length} recurso${resources.length !== 1 ? 's' : ''}`;
+    
+    // Limpiar grid
+    resourcesGrid.innerHTML = '';
+    
+    if (resources.length === 0) {
+        resourcesGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>No hay recursos en esta categoría</h3>
+                <p>No se encontraron recursos en la categoría ${getCategoryLabel(category)}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Crear cards para cada recurso
+    resources.forEach(resource => {
+        const resourceCard = createResourceCard(resource);
+        resourcesGrid.innerHTML += resourceCard;
+    });
+    
+    console.log(`✅ Mostrando ${resources.length} recursos en la categoría ${category}`);
+}
+
+// Función para mostrar vista filtrada
+function showCategoryView(category) {
+    const mainView = document.getElementById('library-main-view');
+    const filteredView = document.getElementById('library-filtered-view');
+    
+    if (mainView) mainView.style.display = 'none';
+    if (filteredView) filteredView.style.display = 'block';
+    
+    // Cargar recursos de la categoría
+    loadResourcesByCategory(category);
+}
+
+// Función para volver a la vista principal
+function backToMainLibrary() {
+    const mainView = document.getElementById('library-main-view');
+    const filteredView = document.getElementById('library-filtered-view');
+    
+    if (mainView) mainView.style.display = 'block';
+    if (filteredView) filteredView.style.display = 'none';
+    
+    // Recargar recursos principales si es necesario
+    loadLibraryResources();
+}
+
 // Configurar cards de categorías - VERSIÓN ULTRA ROBUSTA
 function setupLibraryCategoryCards() {
     ('🔄 Configurando cards de categorías de biblioteca...');
@@ -10943,6 +11044,23 @@ function setupLibraryCategoryCards() {
                 // Intentar múltiples formas de abrir el modal
                 openCategoryModalRobust(card.modalId, card.category);
             });
+
+            // Cards de categorías principales
+            const categoryCards = document.querySelectorAll('.library-category-card');
+            
+            categoryCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const category = this.id.replace('-card', '');
+                    console.log('🎯 Categoría seleccionada:', category);
+                    showCategoryView(category);
+                });
+            });
+            
+            // Botón volver
+            const backBtn = document.getElementById('back-to-main-library');
+            if (backBtn) {
+                backBtn.addEventListener('click', backToMainLibrary);
+            }
             
             configuredCount++;
             (`✅ Card configurada: ${card.id}`);
@@ -12404,6 +12522,32 @@ async function loadLibraryResources() {
         updateLibraryStats();
     }
 }
+
+// En tu función que carga las categorías, asegúrate de tener esto:
+function setupCategoryCards() {
+    document.addEventListener('click', function(e) {
+        // Cards de categoría
+        if (e.target.closest('.category-card')) {
+            const card = e.target.closest('.category-card');
+            const category = card.getAttribute('data-category');
+            
+            if (category) {
+                console.log(`🎯 Categoría seleccionada: ${category}`);
+                showCategoryView(category);
+            }
+        }
+        
+        // Botón volver
+        if (e.target.closest('#back-to-main-library')) {
+            backToMainLibrary();
+        }
+    });
+}
+
+// Ejecutar cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    setupCategoryCards();
+});
 
 // Función para actualizar los contadores de categorías de biblioteca
 function updateLibraryCategoryCounters() {
