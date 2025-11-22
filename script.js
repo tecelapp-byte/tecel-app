@@ -11038,8 +11038,8 @@ function setupLibraryCategoryCards() {
     
     const categoryCards = [
         { id: 'programas-card', modalId: 'programas-modal', category: 'programas' },
-        { id: 'habilidades-tecnicas-card', modalId: 'habilidades-tecnicas-modal', category: 'habilidades-tecnicas' },
-        { id: 'habilidades-blandas-card', modalId: 'habilidades-blandas-modal', category: 'habilidades-blandas' }
+        { id: 'habilidades-tecnicas-card', modalId: 'habilidades-tecnicas-modal', category: 'habilidades_tecnicas' },
+        { id: 'habilidades-blandas-card', modalId: 'habilidades-blandas-modal', category: 'habilidades_blandas' }
     ];
     
     let configuredCount = 0;
@@ -12543,24 +12543,6 @@ async function loadLibraryResources() {
     }
 }
 
-// Configurar las cards de categoría
-function setupLibraryCategoryCards() {
-    const categoryCards = document.querySelectorAll('.library-category-card');
-    
-    categoryCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const category = this.id.replace('-card', '');
-            console.log('🎯 Categoría seleccionada:', category);
-            showCategoryView(category);
-        });
-    });
-    
-    // Botón volver
-    const backBtn = document.getElementById('back-to-main-library');
-    if (backBtn) {
-        backBtn.addEventListener('click', backToMainLibrary);
-    }
-}
 
 // En tu función que carga las categorías, asegúrate de tener esto:
 function setupCategoryCards() {
