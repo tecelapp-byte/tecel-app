@@ -730,6 +730,10 @@ function setupEventListeners() {
     // BOTÓN DE BIBLIOTECA - USANDO ONCLICK DIRECTO
     function initLibraryButton() {
         const addResourceBtn = document.getElementById('add-resource-btn');
+
+        // Establecer estado inicial de los campos
+        handleResourceTypeChange();
+
         if (!addResourceBtn) {
             console.log('⏳ Botón de biblioteca no encontrado, reintentando...');
             setTimeout(initLibraryButton, 500);
@@ -770,6 +774,12 @@ function setupEventListeners() {
             return false;
         };
         
+        // Establecer subcategorías iniciales si hay una categoría seleccionada
+        const mainCategory = document.getElementById('resource-main-category')?.value;
+        if (mainCategory) {
+            updateResourceSubcategories(mainCategory);
+        }
+
         console.log('✅ onclick configurado exitosamente');
     }
 
@@ -1026,6 +1036,24 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Configurar cambio de tipo de recurso
+const resourceTypeSelect = document.getElementById('resource-type');
+if (resourceTypeSelect) {
+    resourceTypeSelect.addEventListener('change', handleResourceTypeChange);
+    console.log('✅ Event listener de tipo de recurso configurado');
+    
+    // Ejecutar una vez al cargar para establecer el estado inicial
+    setTimeout(handleResourceTypeChange, 100);
+}
+
+// Configurar cambio de categoría principal para subcategorías
+const mainCategorySelect = document.getElementById('resource-main-category');
+if (mainCategorySelect) {
+    mainCategorySelect.addEventListener('change', function() {
+        updateResourceSubcategories(this.value);
+    });
+}
 }
 
     // Event listeners para ideas
@@ -11483,6 +11511,55 @@ function createCategoryResourceCard(resource) {
     return card;
 }
 
+// Función para actualizar subcategorías según la categoría principal
+function updateResourceSubcategories(mainCategory) {
+    const subcategorySelect = document.getElementById('resource-subcategory');
+    if (!subcategorySelect) return;
+    
+    console.log('🔄 Actualizando subcategorías para:', mainCategory);
+    
+    // Limpiar opciones actuales
+    subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
+    
+    if (!mainCategory) return;
+    
+    // Definir subcategorías según la categoría principal
+    const subcategories = {
+        programas: [
+            { value: 'programacion', label: 'Programación' },
+            { value: 'simulacion', label: 'Simulación' },
+            { value: 'diseno', label: 'Diseño' },
+            { value: 'utilidades', label: 'Utilidades' }
+        ],
+        habilidades_tecnicas: [
+            { value: 'electronica', label: 'Electrónica' },
+            { value: 'programacion', label: 'Programación' },
+            { value: 'robotica', label: 'Robótica' },
+            { value: 'iot', label: 'IoT' },
+            { value: 'proyectos', label: 'Proyectos' },
+            { value: 'manuales', label: 'Manuales' }
+        ],
+        habilidades_blandas: [
+            { value: 'comunicacion', label: 'Comunicación' },
+            { value: 'trabajo_equipo', label: 'Trabajo en Equipo' },
+            { value: 'liderazgo', label: 'Liderazgo' },
+            { value: 'presentaciones', label: 'Presentaciones' },
+            { value: 'gestion_proyectos', label: 'Gestión de Proyectos' }
+        ]
+    };
+    
+    // Agregar opciones
+    const categorySubcategories = subcategories[mainCategory] || [];
+    categorySubcategories.forEach(subcat => {
+        const option = document.createElement('option');
+        option.value = subcat.value;
+        option.textContent = subcat.label;
+        subcategorySelect.appendChild(option);
+    });
+    
+    console.log(`✅ ${categorySubcategories.length} subcategorías cargadas`);
+}
+
 // Filtrar recursos por categoría
 function filterCategoryResources(category, searchTerm = '') {
     const resources = libraryResources.filter(resource => 
@@ -11808,6 +11885,28 @@ function getFileExtension(url) {
     return extension ? '.' + extension : '';
 }
 
+// Función para manejar la visibilidad de campos según el tipo de recurso
+function handleResourceTypeChange() {
+    const resourceType = document.getElementById('resource-type').value;
+    const fileGroup = document.getElementById('resource-file-group');
+    const urlGroup = document.getElementById('resource-url-group');
+    
+    console.log('🔄 Cambiando tipo de recurso a:', resourceType);
+    
+    // Ocultar ambos grupos primero
+    if (fileGroup) fileGroup.style.display = 'none';
+    if (urlGroup) urlGroup.style.display = 'none';
+    
+    // Mostrar el grupo correspondiente
+    if (resourceType === 'enlace') {
+        if (urlGroup) urlGroup.style.display = 'block';
+        console.log('🔗 Mostrando campo de URL');
+    } else {
+        if (fileGroup) fileGroup.style.display = 'block';
+        console.log('📁 Mostrando campo de archivo');
+    }
+}
+
 // Reemplaza la función submitNewResource existente con esta:
 async function submitNewResource(e) {
     e.preventDefault();
@@ -11817,23 +11916,23 @@ async function submitNewResource(e) {
     console.log('📚 Iniciando subida de recurso...');
     
     try {
-        // 🔥 USAR LOS IDs CORRECTOS DEL HTML
+        // Obtener valores del formulario
         const title = document.getElementById('resource-title')?.value;
         const description = document.getElementById('resource-description')?.value;
         const resourceType = document.getElementById('resource-type')?.value;
         const externalUrl = document.getElementById('resource-url')?.value;
-        const mainCategory = document.getElementById('resource-main-category')?.value; // 🔥 CORREGIDO
+        const mainCategory = document.getElementById('resource-main-category')?.value;
         const subcategory = document.getElementById('resource-subcategory')?.value;
         const fileInput = document.getElementById('resource-file');
         
         console.log('🔍 Elementos encontrados:', {
             title: !!title,
             description: !!description,
-            resourceType: !!resourceType,
-            externalUrl: !!externalUrl,
-            mainCategory: !!mainCategory,
-            subcategory: !!subcategory,
-            fileInput: !!fileInput
+            resourceType: resourceType,
+            externalUrl: externalUrl,
+            mainCategory: mainCategory,
+            subcategory: subcategory,
+            hasFile: fileInput?.files?.length > 0
         });
         
         // Validar campos requeridos
@@ -11841,13 +11940,17 @@ async function submitNewResource(e) {
             throw new Error('Todos los campos marcados con * son requeridos');
         }
         
-        // Validar según el tipo de recurso
-        if (resourceType === 'enlace' && !externalUrl) {
-            throw new Error('La URL es requerida para recursos de tipo enlace');
+        // 🔥 VALIDACIÓN CORREGIDA - Solo validar archivo si NO es enlace
+        if (resourceType !== 'enlace') {
+            if (!fileInput || fileInput.files.length === 0) {
+                throw new Error('El archivo es requerido para este tipo de recurso');
+            }
+            console.log('📁 Validación de archivo pasada');
         }
         
-        if (resourceType !== 'enlace' && (!fileInput || fileInput.files.length === 0)) {
-            throw new Error('El archivo es requerido para este tipo de recurso');
+        // 🔥 VALIDACIÓN CORREGIDA - Solo validar URL si ES enlace
+        if (resourceType === 'enlace' && !externalUrl) {
+            throw new Error('La URL es requerida para recursos de tipo enlace');
         }
         
         console.log('📋 Datos del formulario:', {
@@ -11871,8 +11974,8 @@ async function submitNewResource(e) {
         if (externalUrl) formData.append('external_url', externalUrl);
         if (subcategory) formData.append('subcategory', subcategory);
         
-        // Agregar archivo(s) si existen
-        if (fileInput && fileInput.files.length > 0) {
+        // 🔥 AGREGAR ARCHIVO SOLO SI NO ES ENLACE
+        if (resourceType !== 'enlace' && fileInput && fileInput.files.length > 0) {
             // Si son múltiples archivos
             for (let i = 0; i < fileInput.files.length; i++) {
                 formData.append('files', fileInput.files[i]);
