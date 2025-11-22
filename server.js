@@ -1330,65 +1330,64 @@ app.get('/api/library', async (req, res) => {
     }
 });
 
-// Ruta para descargar recursos de biblioteca - VERSIÓN SUPABASE
+// Ruta para descargar recursos de biblioteca
 app.get('/api/library/download/:resourceId', authenticateToken, async (req, res) => {
-  try {
-    const { resourceId } = req.params;
-    
-    console.log('📥 Solicitando recurso de biblioteca:', resourceId);
+    try {
+        const { resourceId } = req.params;
+        console.log('📥 Descargando recurso:', resourceId);
 
-    // Obtener información del recurso
-    const resourceResult = await pool.query(
-      `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
-      [resourceId]
-    );
-    
-    if (resourceResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Recurso no encontrado' });
+        // Obtener información del recurso
+        const resourceResult = await pool.query(
+            `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
+            [resourceId]
+        );
+
+        if (resourceResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Recurso no encontrado' });
+        }
+
+        const resource = resourceResult.rows[0];
+
+        if (!resource.file_url) {
+            return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
+        }
+
+        // Extraer nombre del archivo de la URL
+        const fileName = resource.file_url.split('/').pop();
+        const filePath = `library/${fileName}`;
+
+        console.log('📥 Descargando de Supabase:', filePath);
+
+        // Descargar de Supabase
+        const { data, error } = await supabase.storage
+            .from('tecel-files-public')
+            .download(filePath);
+
+        if (error) {
+            console.error('❌ Error descargando recurso:', error);
+            return res.status(404).json({ error: 'Archivo no encontrado en storage' });
+        }
+
+        // Convertir y enviar
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Nombre seguro para descarga
+        const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
+                           (fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '');
+
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+        res.setHeader('Content-Length', buffer.length);
+
+        console.log('📤 Enviando recurso:', safeFileName);
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('❌ Error en descarga de biblioteca:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
-
-    const resource = resourceResult.rows[0];
-    
-    if (!resource.file_url) {
-      return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
-    }
-
-    // Extraer nombre del archivo de la URL
-    const fileName = resource.file_url.split('/').pop();
-    const filePath = `library/${fileName}`;
-
-    console.log('📥 Descargando de Supabase:', filePath);
-
-    // Descargar de Supabase
-    const { data, error } = await supabase.storage
-      .from('tecel-files-public')
-      .download(filePath);
-
-    if (error) {
-      console.error('❌ Error descargando recurso:', error);
-      return res.status(404).json({ error: 'Archivo no encontrado en storage' });
-    }
-
-    // Convertir y enviar
-    const arrayBuffer = await data.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
-                        (fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '');
-
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
-    res.setHeader('Content-Length', buffer.length);
-    
-    console.log('📤 Enviando recurso:', safeFileName);
-    res.send(buffer);
-
-  } catch (error) {
-    console.error('❌ Error en descarga de biblioteca:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
 });
-
 
 app.post('/api/library', authenticateToken, async (req, res) => {
     try {

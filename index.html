@@ -2962,6 +2962,97 @@
   </div>
 </div>
 
+<!-- Modal de detalles de recurso -->
+<div id="resource-detail-modal" class="modal resource-detail-modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2>Detalles del Recurso</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="resource-detail-header">
+                <div class="resource-detail-title">
+                    <h2 id="detail-resource-title">Título del Recurso</h2>
+                    <div>
+                        <span class="resource-type-badge" id="detail-resource-type">Documento</span>
+                        <span class="resource-category-badge" id="detail-resource-category">Programas</span>
+                    </div>
+                    <div class="resource-detail-meta">
+                        <div class="resource-meta-item">
+                            <i class="fas fa-user"></i>
+                            <span id="detail-resource-uploader">Subido por Admin</span>
+                        </div>
+                        <div class="resource-meta-item">
+                            <i class="fas fa-calendar"></i>
+                            <span id="detail-resource-date">15 Nov 2023</span>
+                        </div>
+                        <div class="resource-meta-item">
+                            <i class="fas fa-download"></i>
+                            <span id="detail-resource-downloads">0 descargas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resource-detail-content">
+                <div class="resource-detail-main">
+                    <div class="resource-detail-section">
+                        <h3><i class="fas fa-align-left"></i> Descripción</h3>
+                        <div class="resource-description" id="detail-resource-description">
+                            Descripción del recurso...
+                        </div>
+                    </div>
+
+                    <div class="resource-detail-section" id="resource-files-section" style="display: none;">
+                        <h3><i class="fas fa-file"></i> Archivos</h3>
+                        <div class="resource-files-list" id="detail-resource-files">
+                            <!-- Archivos se cargan dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resource-detail-sidebar">
+                    <div class="resource-actions">
+                        <button class="resource-action-btn primary" id="resource-download-btn">
+                            <i class="fas fa-download"></i> Descargar Recurso
+                        </button>
+                        <button class="resource-action-btn secondary" id="resource-link-btn" style="display: none;">
+                            <i class="fas fa-external-link-alt"></i> Visitar Enlace
+                        </button>
+                        <button class="resource-action-btn secondary" onclick="closeModal(document.getElementById('resource-detail-modal'))">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+
+                    <div class="resource-info-card">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Información</h3>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Tipo:</span>
+                            <span class="resource-info-value" id="detail-info-type">Documento</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Categoría:</span>
+                            <span class="resource-info-value" id="detail-info-category">Programas</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Subcategoría:</span>
+                            <span class="resource-info-value" id="detail-info-subcategory">Programación</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Tamaño:</span>
+                            <span class="resource-info-value" id="detail-info-size">2.5 MB</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Formato:</span>
+                            <span class="resource-info-value" id="detail-info-format">PDF</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Confirmación para Activar/Desactivar Usuario -->
 <div id="confirm-user-status-modal" class="modal">
     <div class="modal-content" style="max-width: 500px;">
