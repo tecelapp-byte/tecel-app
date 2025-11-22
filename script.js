@@ -11535,23 +11535,20 @@ function updateCategoryStats(category, count) {
 async function submitEnhancedResource(formData) {
     try {
         console.log('📚 === ENVIANDO RECURSO A BIBLIOTECA ===');
-        console.log('FormData recibido:', formData);
         
-        // Convertir FormData a objeto para debug
-        const formDataObj = {};
-        for (let [key, value] of formData.entries()) {
-            if (key === 'file') {
-                formDataObj[key] = `[File] ${value.name} (${value.size} bytes)`;
-            } else {
-                formDataObj[key] = value;
-            }
+        // Verificar que formData sea válido
+        if (!formData || typeof formData.entries !== 'function') {
+            throw new Error('FormData no es válido');
         }
-        console.log('📤 Datos a enviar:', formDataObj);
-
+        
+        console.log('📦 FormData verificado, enviando...');
+        
         const response = await fetch(`${API_BASE}/library`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                // NO agregar 'Content-Type' cuando usas FormData
+                // El navegador lo establece automáticamente con el boundary
             },
             body: formData
         });
@@ -11581,7 +11578,7 @@ async function submitEnhancedResource(formData) {
 
     } catch (error) {
         console.error('❌ Error subiendo recurso:', error);
-        throw new Error('Error en la respuesta del servidor');
+        throw new Error('Error en la respuesta del servidor: ' + error.message);
     }
 }
 
@@ -11817,8 +11814,58 @@ async function submitNewResource(e) {
     
     if (!checkAuth()) return;
     
-    // Usar el nuevo formulario mejorado
-    await submitEnhancedResource(e);
+    console.log('📚 Iniciando subida de recurso...');
+    
+    // Obtener el formulario
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    console.log('📝 Formulario obtenido:', form);
+    console.log('📦 FormData creado:', formData);
+    
+    // Agregar datos adicionales si es necesario
+    const resourceType = document.getElementById('resource-type').value;
+    const mainCategory = document.getElementById('resource-category').value;
+    const subcategory = document.getElementById('resource-subcategory').value;
+    
+    // Agregar estos valores al FormData
+    formData.append('resource_type', resourceType);
+    formData.append('main_category', mainCategory);
+    formData.append('subcategory', subcategory);
+    
+    console.log('🔍 Contenido de FormData:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`   ${key}:`, value);
+    }
+    
+    // Mostrar loading
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+    submitBtn.disabled = true;
+    
+    try {
+        console.log('🚀 Enviando recurso a la biblioteca...');
+        const result = await submitEnhancedResource(formData);
+        
+        console.log('✅ Recurso subido exitosamente:', result);
+        showNotification('Recurso subido exitosamente a la biblioteca', 'success');
+        
+        // Cerrar modal y limpiar formulario
+        closeModal(document.getElementById('new-resource-modal'));
+        form.reset();
+        
+        // Recargar la biblioteca
+        loadLibraryResources();
+        
+    } catch (error) {
+        console.error('❌ Error subiendo recurso:', error);
+        showNotification(`Error subiendo recurso: ${error.message}`, 'error');
+    } finally {
+        // Restaurar botón
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
 }
 
 function sortIdeasList(sortBy) {
