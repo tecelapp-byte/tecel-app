@@ -11157,6 +11157,9 @@ function loadCategoryResourcesForModal(category, modalId) {
 function renderResourcesInContainer(container, resources) {
     if (!container) return;
     
+    // Limpiar el contenedor primero
+    container.innerHTML = '';
+    
     if (resources.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
@@ -11171,8 +11174,13 @@ function renderResourcesInContainer(container, resources) {
         return;
     }
     
-    // Usar la función createLibraryCard que ya tienes
-    container.innerHTML = resources.map(resource => createLibraryCard(resource)).join('');
+    // Crear y agregar cada card como elemento DOM
+    resources.forEach(resource => {
+        const cardElement = createLibraryCard(resource);
+        container.appendChild(cardElement);
+    });
+    
+    console.log(`✅ ${resources.length} cards renderizadas en el contenedor`);
 }
 
 function setupCategoryFilters(category, modalId) {
@@ -11922,7 +11930,7 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
     
     console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
     
-    // Re-renderizar recursos filtrados usando la MISMA función
+    // Re-renderizar recursos filtrados
     renderResourcesInContainer(container, filteredResources);
 }
 
