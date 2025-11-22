@@ -988,12 +988,9 @@ function setupEventListeners() {
         pendingRemoveParticipant = { element: null, name: '' };
     });
     
-    // Quitar archivo
+    /// Configurar event listeners para el modal de eliminar archivo
     document.getElementById('confirm-remove-file')?.addEventListener('click', executeRemoveFile);
-    document.getElementById('cancel-remove-file')?.addEventListener('click', function() {
-        closeModal(document.getElementById('confirm-remove-file-modal'));
-        pendingRemoveFile = { id: null, name: '', element: null };
-    });
+    document.getElementById('cancel-remove-file')?.addEventListener('click', cancelRemoveFile);
     
     // Eliminar archivo físicamente
     document.getElementById('confirm-delete-file')?.addEventListener('click', executeDeleteFile);
@@ -9773,33 +9770,54 @@ function executeRemoveParticipant() {
     pendingRemoveParticipant = { element: null, name: '' };
 }
 
-// Función que se ejecuta cuando se confirma quitar archivo
+// Función que se ejecuta cuando se confirma la eliminación en el modal
 function executeRemoveFile() {
-    if (!pendingRemoveFile.element) return;
+    if (!pendingRemoveFile) {
+        console.error('❌ No hay archivo pendiente para eliminar');
+        return;
+    }
+
+    const { id, name, element } = pendingRemoveFile;
+    const fileItem = element.closest('.existing-file');
     
-    const button = pendingRemoveFile.element;
-    const fileItem = button.closest('.file-preview-item');
-    
+    console.log(`🗑️ Ejecutando eliminación del archivo: ${name} (ID: ${id})`);
+
+    // Remover del DOM
     if (fileItem) {
         fileItem.remove();
-        
-        // Agregar el fileId a la lista de archivos a eliminar
-        if (!window.filesToRemove) {
-            window.filesToRemove = [];
-        }
-        window.filesToRemove.push(pendingRemoveFile.id);
-        
-        showNotification(`Archivo marcado para quitar: ${pendingRemoveFile.name}`, 'info');
-        
-        // Si no quedan archivos, mostrar mensaje vacío
-        const filePreview = document.getElementById('file-preview');
-        if (filePreview && filePreview.children.length === 0) {
-            filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
-        }
+    }
+
+    // 🔥 AGREGAR A LA LISTA DE ARCHIVOS A ELIMINAR
+    if (!window.filesToRemove) {
+        window.filesToRemove = [];
     }
     
+    // Verificar que no esté ya en la lista
+    if (!window.filesToRemove.includes(id)) {
+        window.filesToRemove.push(id);
+        console.log(`✅ Archivo agregado a filesToRemove: ${name} (ID: ${id})`);
+        console.log(`📋 filesToRemove actual:`, window.filesToRemove);
+    }
+
+    showNotification(`Archivo "${name}" marcado para eliminar`, 'info');
+
+    // Si no quedan archivos, mostrar mensaje vacío
+    const filePreview = document.getElementById('file-preview');
+    const remainingFiles = filePreview.querySelectorAll('.file-preview-item');
+    if (remainingFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
+    }
+
+    // Cerrar modal y limpiar
     closeModal(document.getElementById('confirm-remove-file-modal'));
-    pendingRemoveFile = { id: null, name: '', element: null };
+    pendingRemoveFile = null;
+}
+
+// Función para cancelar la eliminación
+function cancelRemoveFile() {
+    console.log('❌ Eliminación de archivo cancelada');
+    closeModal(document.getElementById('confirm-remove-file-modal'));
+    pendingRemoveFile = null;
 }
 
 // Función que se ejecuta cuando se confirma eliminar archivo físicamente

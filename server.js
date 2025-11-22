@@ -1857,48 +1857,34 @@ app.put('/api/ideas/:id/reenable', authenticateToken, async (req, res) => {
     }
 });
 
-// Actualizar proyecto - MEJORADA para manejar archivos a eliminar
 app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (req, res) => {
     let transactionClient;
     try {
         const { id } = req.params;
         
         console.log('=== ACTUALIZANDO PROYECTO ===');
-        console.log('Datos recibidos (req.body):', req.body);
-        console.log('¿Tiene files_to_remove?', 'files_to_remove' in req.body);
-        
-        // 🔥 PROCESAR FORM DATA CORRECTAMENTE
-        let title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove;
-        
-        // Si viene como FormData (multipart/form-data)
-        if (req.is('multipart/form-data')) {
-            console.log('📦 Procesando como FormData...');
-            title = req.body.title;
-            year = req.body.year;
-            description = req.body.description;
-            detailed_description = req.body.detailed_description;
-            objectives = req.body.objectives;
-            requirements = req.body.requirements;
-            problem = req.body.problem;
-            status = req.body.status;
-            students = req.body.students;
-            files_to_remove = req.body.files_to_remove;
-            
-            console.log('📋 Datos extraídos:', {
-                title: title?.substring(0, 30) + '...',
-                files_to_remove: files_to_remove
-            });
-        } else {
-            // Si viene como JSON
-            console.log('📦 Procesando como JSON...');
-            ({ title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove } = req.body);
-        }
+        console.log('Body recibido:', req.body);
 
-        console.log('📊 files_to_remove después de extraer:', files_to_remove);
+        // Extraer datos del body
+        const { 
+            title, 
+            year, 
+            description, 
+            detailed_description, 
+            objectives, 
+            requirements, 
+            problem, 
+            status, 
+            students, 
+            files_to_remove 
+        } = req.body;
+
+        console.log('🔍 files_to_remove recibido:', files_to_remove);
+        console.log('🔍 Tipo de files_to_remove:', typeof files_to_remove);
 
         // Validar campos requeridos
         if (!title || !year || !description || !problem) {
-            return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos: Título, Año, Descripción, Problema' });
+            return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
         }
 
         // Iniciar transacción
@@ -1918,21 +1904,25 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
 
         const project = result.rows[0];
 
-        // 🔥 PROCESAR ARCHIVOS A ELIMINAR - CORREGIDO
+        // 🔥 PROCESAR ARCHIVOS A ELIMINAR
         if (files_to_remove) {
             try {
                 console.log(`🗑️ Procesando archivos a eliminar: ${files_to_remove}`);
                 
-                // Parsear el JSON string
-                const filesToRemoveArray = typeof files_to_remove === 'string' ? 
-                    JSON.parse(files_to_remove) : files_to_remove;
+                // Parsear el JSON string si es necesario
+                let filesToRemoveArray;
+                if (typeof files_to_remove === 'string') {
+                    filesToRemoveArray = JSON.parse(files_to_remove);
+                } else {
+                    filesToRemoveArray = files_to_remove;
+                }
                 
                 console.log(`🗑️ Eliminando ${filesToRemoveArray.length} archivos:`, filesToRemoveArray);
                 
                 for (const fileId of filesToRemoveArray) {
                     console.log(`🗑️ Eliminando archivo ID: ${fileId}`);
                     
-                    // Obtener información del archivo
+                    // 1. Obtener información del archivo
                     const fileResult = await transactionClient.query(
                         'SELECT * FROM project_files WHERE id = $1 AND project_id = $2',
                         [fileId, id]
@@ -1942,10 +1932,12 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
                         const file = fileResult.rows[0];
                         console.log(`📁 Encontrado archivo: ${file.original_name}`);
                         
-                        // Eliminar de Supabase Storage si existe
+                        // 2. Eliminar de Supabase Storage si existe
                         if (file.file_path && file.file_path !== 'database_storage') {
                             try {
                                 const filePath = `projects/${id}/${file.filename}`;
+                                console.log(`🗂️ Eliminando de Supabase: ${filePath}`);
+                                
                                 const { error: storageError } = await supabase.storage
                                     .from('tecel-files-public')
                                     .remove([filePath]);
@@ -1960,7 +1952,7 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
                             }
                         }
                         
-                        // Eliminar registro de la base de datos
+                        // 3. Eliminar registro de la base de datos
                         await transactionClient.query(
                             'DELETE FROM project_files WHERE id = $1',
                             [fileId]
@@ -1971,7 +1963,7 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
                         console.log(`⚠️ Archivo no encontrado en BD: ID ${fileId}`);
                     }
                 }
-                console.log(`🎉 Eliminación de archivos completada: ${filesToRemoveArray.length} archivos`);
+                console.log(`🎉 Eliminación de archivos completada: ${filesToRemoveArray.length} archivos eliminados`);
             } catch (parseError) {
                 console.error('❌ Error parseando files_to_remove:', parseError);
                 console.error('💥 Valor de files_to_remove:', files_to_remove);
@@ -2005,8 +1997,10 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
         await transactionClient.query('COMMIT');
         console.log('✅ Proyecto actualizado exitosamente');
 
-        // Obtener el proyecto completo actualizado
+        // Obtener el proyecto completo actualizado (para verificar que los archivos se eliminaron)
         const projectWithDetails = await getProjectWithDetails(project.id);
+        console.log(`📊 Proyecto actualizado - Archivos: ${projectWithDetails.files?.length || 0}`);
+        
         res.json(projectWithDetails);
 
     } catch (error) {
