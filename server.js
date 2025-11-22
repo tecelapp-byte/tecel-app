@@ -1628,13 +1628,30 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         transactionClient = await pool.connect();
         await transactionClient.query('BEGIN');
 
-        const { title, year, description, detailed_description, objectives, requirements, problem, status, students, original_idea_id } = req.body;
+        const { 
+            title, 
+            year, 
+            description, 
+            detailed_description, 
+            objectives, 
+            requirements, 
+            problem, 
+            status, 
+            students, 
+            original_idea_id,
+            files // 🔥 NUEVO: Archivos en base64
+        } = req.body;
 
         console.log('=== CREANDO NUEVO PROYECTO ===');
         console.log('Datos recibidos:', { 
-            title, year, description, problem, status, original_idea_id,
+            title, 
+            year, 
+            description, 
+            problem, 
+            status, 
+            original_idea_id,
             students_type: typeof students,
-            students_value: students
+            files: files ? `Sí, ${files.length} archivos` : 'No'
         });
 
         // VALIDACIONES BÁSICAS
@@ -1681,6 +1698,46 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
 
         const project = projectResult.rows[0];
         console.log('✅ Proyecto creado con ID:', project.id);
+
+        // 🔥 NUEVO: PROCESAR ARCHIVOS EN BASE64 PARA CREACIÓN
+        if (files && Array.isArray(files) && files.length > 0) {
+            console.log(`📤 Procesando ${files.length} archivos en base64 para nuevo proyecto...`);
+            
+            for (const fileData of files) {
+                try {
+                    console.log(`➕ Procesando archivo: ${fileData.name}`);
+                    
+                    if (!fileData.data || !fileData.name) {
+                        console.error('❌ Archivo sin datos o nombre:', fileData);
+                        continue;
+                    }
+
+                    const fileName = `${Date.now()}_${fileData.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+                    
+                    await transactionClient.query(
+                        `INSERT INTO project_files (
+                            project_id, filename, original_name, file_data, file_type, file_size, file_path, uploaded_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        [
+                            project.id,
+                            fileName,
+                            fileData.name,
+                            fileData.data,
+                            fileData.type || 'application/octet-stream',
+                            fileData.size || 0,
+                            'database_storage',
+                            req.user.id
+                        ]
+                    );
+                    
+                    console.log(`✅ Archivo guardado en BD: ${fileData.name}`);
+                } catch (fileError) {
+                    console.error(`❌ Error guardando archivo ${fileData.name}:`, fileError);
+                }
+            }
+            console.log(`🎉 ${files.length} archivos procesados para nuevo proyecto`);
+        }
+
 
         // 🔥 VERIFICAR Y ACTUALIZAR LA IDEA CON project_id
         console.log('🔄 Verificando si hay idea para actualizar...');
@@ -1738,13 +1795,13 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
         await transactionClient.query('COMMIT');
         console.log('🎉 Proyecto guardado completamente');
 
-        // OBTENER PROYECTO COMPLETO PARA RESPONDER
+        // OBTENER PROYECTO COMPLETO
         console.log('🔍 Obteniendo detalles completos del proyecto...');
         const projectWithDetails = await getProjectWithDetails(project.id);
-        
         console.log('📤 Enviando respuesta con proyecto completo');
+        
         res.status(201).json(projectWithDetails);
-
+        
     } catch (error) {
         // ROLLBACK EN CASO DE ERROR
         if (transactionClient) {
@@ -1920,33 +1977,26 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
         console.log('¿Tiene files_to_remove?', 'files_to_remove' in req.body);
         
         // 🔥 PROCESAR FORM DATA CORRECTAMENTE
-        let title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove;
+        let title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove, files;
         
-        // Si viene como FormData (multipart/form-data)
-        if (req.is('multipart/form-data')) {
-            console.log('📦 Procesando como FormData...');
-            title = req.body.title;
-            year = req.body.year;
-            description = req.body.description;
-            detailed_description = req.body.detailed_description;
-            objectives = req.body.objectives;
-            requirements = req.body.requirements;
-            problem = req.body.problem;
-            status = req.body.status;
-            students = req.body.students;
-            files_to_remove = req.body.files_to_remove;
-            
-            console.log('📋 Datos extraídos:', {
-                title: title?.substring(0, 30) + '...',
-                files_to_remove: files_to_remove
-            });
-        } else {
-            // Si viene como JSON
-            console.log('📦 Procesando como JSON...');
-            ({ title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove } = req.body);
-        }
+        // Si viene como JSON con archivos convertidos a base64
+        console.log('📦 Procesando como JSON con archivos base64...');
+        ({ 
+            title, 
+            year, 
+            description, 
+            detailed_description, 
+            objectives, 
+            requirements, 
+            problem, 
+            status, 
+            students, 
+            files_to_remove,
+            files // 🔥 NUEVO: Archivos en base64
+        } = req.body);
 
         console.log('📊 files_to_remove después de extraer:', files_to_remove);
+        console.log('📁 Archivos recibidos (base64):', files ? `Sí, ${files.length} archivos` : 'No');
 
         // Validar campos requeridos
         if (!title || !year || !description || !problem) {
@@ -1969,6 +2019,51 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
         }
 
         const project = result.rows[0];
+
+        // 🔥 NUEVO: PROCESAR ARCHIVOS EN BASE64
+        if (files && Array.isArray(files) && files.length > 0) {
+            console.log(`📤 Procesando ${files.length} archivos en base64...`);
+            
+            for (const fileData of files) {
+                try {
+                    console.log(`➕ Procesando archivo: ${fileData.name}`);
+                    
+                    // Validar que tenga los datos necesarios
+                    if (!fileData.data || !fileData.name) {
+                        console.error('❌ Archivo sin datos o nombre:', fileData);
+                        continue;
+                    }
+
+                    // Generar nombre único para el archivo
+                    const fileName = `${Date.now()}_${fileData.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+                    
+                    // Insertar en base de datos
+                    await transactionClient.query(
+                        `INSERT INTO project_files (
+                            project_id, filename, original_name, file_data, file_type, file_size, file_path, uploaded_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        [
+                            id,
+                            fileName,
+                            fileData.name,
+                            fileData.data, // Base64
+                            fileData.type || 'application/octet-stream',
+                            fileData.size || 0,
+                            'database_storage',
+                            req.user.id
+                        ]
+                    );
+                    
+                    console.log(`✅ Archivo guardado en BD: ${fileData.name}`);
+                } catch (fileError) {
+                    console.error(`❌ Error guardando archivo ${fileData.name}:`, fileError);
+                    // Continuar con otros archivos si hay error en uno
+                }
+            }
+            console.log(`🎉 ${files.length} archivos procesados`);
+        } else {
+            console.log('📝 No hay archivos nuevos para agregar');
+        }
 
         // 🔥 PROCESAR ARCHIVOS A ELIMINAR
         if (files_to_remove) {
@@ -2063,7 +2158,7 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
         await transactionClient.query('COMMIT');
         console.log('✅ Proyecto actualizado exitosamente');
 
-        // Obtener el proyecto completo actualizado (para verificar que los archivos se eliminaron)
+        // Obtener el proyecto completo actualizado
         const projectWithDetails = await getProjectWithDetails(project.id);
         console.log(`📊 Proyecto actualizado - Archivos: ${projectWithDetails.files?.length || 0}`);
         
