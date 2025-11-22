@@ -1197,7 +1197,6 @@ if (mainCategorySelect) {
         initEnhancedLibrary();
         
         // Verificar configuración después de un tiempo
-        setTimeout(debugLibrarySetup, 1000);
     }, 1000);
 
     ('Event listeners configurados correctamente');
@@ -11008,19 +11007,29 @@ function showFilteredResources(resources, category) {
 }
 
 
-// Función para mostrar vista filtrada
+// Función para mostrar vista de categoría
 function showCategoryView(category) {
+    console.log('🔄 Mostrando vista para categoría:', category);
+    
     const mainView = document.getElementById('library-main-view');
     const filteredView = document.getElementById('library-filtered-view');
     
-    if (mainView) mainView.style.display = 'none';
-    if (filteredView) filteredView.style.display = 'block';
+    if (!mainView || !filteredView) {
+        console.error('❌ Vistas no encontradas');
+        showNotification('Error: La vista de categoría no está disponible', 'error');
+        return;
+    }
+    
+    // Ocultar vista principal, mostrar vista filtrada
+    mainView.style.display = 'none';
+    filteredView.style.display = 'block';
     
     // Cargar recursos de la categoría
     loadResourcesByCategory(category);
 }
 
-// Función para volver a la vista principal
+
+// Función para volver a vista principal
 function backToMainLibrary() {
     const mainView = document.getElementById('library-main-view');
     const filteredView = document.getElementById('library-filtered-view');
@@ -11032,64 +11041,26 @@ function backToMainLibrary() {
     loadLibraryResources();
 }
 
-// Configurar cards de categorías - VERSIÓN ULTRA ROBUSTA
+// Función COMPLETAMENTE CORREGIDA para manejar categorías
 function setupLibraryCategoryCards() {
-    ('🔄 Configurando cards de categorías de biblioteca...');
-    
-    const categoryCards = [
-        { id: 'programas-card', modalId: 'programas-modal', category: 'programas' },
-        { id: 'habilidades-tecnicas-card', modalId: 'habilidades-tecnicas-modal', category: 'habilidades_tecnicas' },
-        { id: 'habilidades-blandas-card', modalId: 'habilidades-blandas-modal', category: 'habilidades_blandas' }
-    ];
-    
-    let configuredCount = 0;
+    const categoryCards = document.querySelectorAll('.library-category-card');
     
     categoryCards.forEach(card => {
-        const element = document.getElementById(card.id);
-        if (element) {
-            (`🎯 Configurando card: ${card.id}`);
+        card.addEventListener('click', function() {
+            // CORREGIDO: Extraer correctamente el ID de la categoría
+            const cardId = this.id; // Ej: "programas-card", "habilidades_tecnicas-card", etc.
+            const category = cardId.replace('-card', '');
             
-            // Crear un nuevo elemento para evitar problemas de event listeners
-            const newElement = element.cloneNode(true);
-            element.parentNode.replaceChild(newElement, element);
-            
-            // Agregar event listener directo y robusto
-            newElement.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                
-                (`🎯 Click en categoría: ${card.id}`);
-                (`📦 Datos:`, card);
-                
-                // Intentar múltiples formas de abrir el modal
-                openCategoryModalRobust(card.modalId, card.category);
-            });
-
-            // Cards de categorías principales
-            const categoryCards = document.querySelectorAll('.library-category-card');
-            
-            categoryCards.forEach(card => {
-                card.addEventListener('click', function() {
-                    const category = this.id.replace('-card', '');
-                    console.log('🎯 Categoría seleccionada:', category);
-                    showCategoryView(category);
-                });
-            });
-            
-            // Botón volver
-            const backBtn = document.getElementById('back-to-main-library');
-            if (backBtn) {
-                backBtn.addEventListener('click', backToMainLibrary);
-            }
-            
-            configuredCount++;
-            (`✅ Card configurada: ${card.id}`);
-        } else {
-            console.error(`❌ No se encontró el elemento: ${card.id}`);
-        }
+            console.log('🎯 Categoría seleccionada:', category);
+            showCategoryView(category);
+        });
     });
     
-    (`📊 Cards configuradas: ${configuredCount} de ${categoryCards.length}`);
+    // Botón volver
+    const backBtn = document.getElementById('back-to-main-library');
+    if (backBtn) {
+        backBtn.addEventListener('click', backToMainLibrary);
+    }
 }
 
 // Función ultra robusta para abrir modales
@@ -12077,7 +12048,7 @@ async function showResourceDetails(resourceId) {
         modal.style.display = 'block';
         setTimeout(() => {
             modal.classList.add('active');
-        }, 1);
+        }, 0);
         
     } catch (error) {
         console.error('❌ Error mostrando detalles:', error);
@@ -12401,14 +12372,8 @@ function getResourceTypeLabel(type) {
 function getCategoryLabel(category) {
     const categories = {
         'programas': 'Programas',
-        'habilidades_tecnicas': 'Habilidades Técnicas',
+        'habilidades_tecnicas': 'Habilidades Técnicas', 
         'habilidades_blandas': 'Habilidades Blandas',
-        'electronica': 'Electrónica',
-        'programacion': 'Programación', 
-        'robotica': 'Robótica',
-        'iot': 'IoT',
-        'proyectos': 'Proyectos',
-        'manuales': 'Manuales'
     };
     return categories[category] || category || 'Sin categoría';
 }
