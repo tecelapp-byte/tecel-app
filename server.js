@@ -1330,63 +1330,50 @@ app.get('/api/library', async (req, res) => {
     }
 });
 
-// Ruta para descargar recursos de biblioteca
+// Ruta ACTUALIZADA para descargar recursos de biblioteca - BASE64
 app.get('/api/library/download/:resourceId', authenticateToken, async (req, res) => {
-    try {
-        const { resourceId } = req.params;
-        console.log('📥 Descargando recurso:', resourceId);
+  try {
+    const { resourceId } = req.params;
+    console.log('📥 Descargando recurso (Base64):', resourceId);
 
-        // Obtener información del recurso
-        const resourceResult = await pool.query(
-            `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
-            [resourceId]
-        );
+    // Obtener información del recurso
+    const resourceResult = await pool.query(
+      `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
+      [resourceId]
+    );
 
-        if (resourceResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Recurso no encontrado' });
-        }
-
-        const resource = resourceResult.rows[0];
-
-        if (!resource.file_url) {
-            return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
-        }
-
-        // Extraer nombre del archivo de la URL
-        const fileName = resource.file_url.split('/').pop();
-        const filePath = `library/${fileName}`;
-
-        console.log('📥 Descargando de Supabase:', filePath);
-
-        // Descargar de Supabase
-        const { data, error } = await supabase.storage
-            .from('tecel-files-public')
-            .download(filePath);
-
-        if (error) {
-            console.error('❌ Error descargando recurso:', error);
-            return res.status(404).json({ error: 'Archivo no encontrado en storage' });
-        }
-
-        // Convertir y enviar
-        const arrayBuffer = await data.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Nombre seguro para descarga
-        const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
-                           (fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '');
-
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
-        res.setHeader('Content-Length', buffer.length);
-
-        console.log('📤 Enviando recurso:', safeFileName);
-        res.send(buffer);
-
-    } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+    if (resourceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recurso no encontrado' });
     }
+
+    const resource = resourceResult.rows[0];
+
+    // Verificar si tiene archivo en Base64
+    if (!resource.file_data) {
+      return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
+    }
+
+    console.log('✅ Enviando archivo desde Base64:', resource.file_name);
+
+    // Convertir base64 a buffer
+    const fileBuffer = Buffer.from(resource.file_data, 'base64');
+
+    // Nombre seguro para descarga
+    const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
+      (resource.file_name && resource.file_name.includes('.') ? 
+       resource.file_name.substring(resource.file_name.lastIndexOf('.')) : '');
+
+    res.setHeader('Content-Type', resource.file_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+
+    console.log('📤 Enviando recurso (Base64):', safeFileName);
+    res.send(fileBuffer);
+
+  } catch (error) {
+    console.error('❌ Error en descarga de biblioteca (Base64):', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Ruta para obtener un recurso específico de biblioteca
@@ -1411,121 +1398,106 @@ app.get('/api/library/:id', async (req, res) => {
     }
 });
 
+// Ruta ACTUALIZADA para biblioteca - USANDO BASE64 COMO EN PROYECTOS
 app.post('/api/library', authenticateToken, async (req, res) => {
-    try {
-        console.log('📚 === SUBIENDO RECURSO A BIBLIOTECA ===');
-        console.log('Headers:', req.headers);
-        console.log('Content-Type:', req.get('Content-Type'));
-        console.log('Body keys:', Object.keys(req.body));
-        console.log('User:', req.user);
+  try {
+    console.log('📚 === SUBIENDO RECURSO A BIBLIOTECA (BASE64) ===');
+    console.log('Headers:', req.headers);
+    console.log('Content-Type:', req.get('Content-Type'));
+    console.log('Body keys:', Object.keys(req.body));
+    console.log('User:', req.user);
 
-        const { title, description, resource_type, external_url, main_category, subcategory, fileData, fileName, fileType } = req.body;
+    const { 
+      title, 
+      description, 
+      resource_type, 
+      external_url, 
+      main_category, 
+      subcategory, 
+      fileData, 
+      fileName, 
+      fileType 
+    } = req.body;
 
-        console.log('📥 Datos recibidos:', {
-            title: title?.substring(0, 50),
-            description: description?.substring(0, 100),
-            resource_type: resource_type,
-            external_url: external_url?.substring(0, 100),
-            main_category: main_category,
-            subcategory: subcategory,
-            hasFileData: !!fileData,
-            fileName: fileName,
-            fileType: fileType,
-            fileDataLength: fileData?.length
-        });
+    console.log('📥 Datos recibidos:', { 
+      title: title?.substring(0, 50),
+      description: description?.substring(0, 100),
+      resource_type: resource_type,
+      external_url: external_url?.substring(0, 100),
+      main_category: main_category,
+      subcategory: subcategory,
+      hasFileData: !!fileData,
+      fileName: fileName,
+      fileType: fileType,
+      fileDataLength: fileData?.length 
+    });
 
-        // Validaciones básicas
-        if (!title || !description || !resource_type || !main_category) {
-            console.log('❌ Campos requeridos faltantes');
-            return res.status(400).json({ error: 'Todos los campos son requeridos' });
-        }
-
-        let file_url = null;
-
-        // Procesar archivo si se proporciona
-        if (fileData && fileName) {
-            console.log('📤 Procesando archivo para biblioteca...');
-            
-            try {
-                const fileBuffer = Buffer.from(fileData, 'base64');
-                console.log('📊 Tamaño del archivo:', fileBuffer.length, 'bytes');
-                
-                const uniqueFileName = `library-${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-                const filePath = `library/${uniqueFileName}`;
-                
-                console.log('📁 Subiendo a Supabase:', {
-                    fileName: uniqueFileName,
-                    filePath: filePath,
-                    fileSize: fileBuffer.length
-                });
-
-                // Subir a Supabase
-                const { data, error } = await supabase.storage
-                    .from('tecel-files-public')
-                    .upload(filePath, fileBuffer, {
-                        contentType: fileType || 'application/octet-stream',
-                        upsert: false
-                    });
-
-                if (error) {
-                    console.error('❌ Error subiendo a Supabase:', error);
-                    return res.status(500).json({ error: 'Error subiendo archivo: ' + error.message });
-                }
-
-                // Obtener URL pública
-                const { data: urlData } = supabase.storage
-                    .from('tecel-files-public')
-                    .getPublicUrl(filePath);
-                
-                file_url = urlData.publicUrl;
-                console.log('✅ Archivo subido exitosamente:', file_url);
-
-            } catch (fileError) {
-                console.error('❌ Error procesando archivo:', fileError);
-                return res.status(500).json({ error: 'Error procesando archivo: ' + fileError.message });
-            }
-        } else {
-            console.log('📝 No hay archivo para subir');
-        }
-
-        // Validar que si es tipo "enlace" tenga URL
-        if (resource_type === 'enlace' && !external_url) {
-            console.log('❌ URL requerida para tipo enlace');
-            return res.status(400).json({ error: 'La URL es requerida para recursos de tipo enlace' });
-        }
-
-        console.log('💾 Insertando en base de datos...');
-        
-        // Insertar en base de datos
-        const result = await pool.query(
-            'INSERT INTO library_resources (title, description, resource_type, file_url, external_url, uploaded_by, main_category, subcategory) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-            [title, description, resource_type, file_url, external_url, req.user.id, main_category, subcategory]
-        );
-
-        console.log('✅ Recurso insertado en BD, ID:', result.rows[0].id);
-
-        // Obtener recurso completo
-        const fullResource = await pool.query(`
-            SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
-            FROM library_resources lr 
-            LEFT JOIN users u ON lr.uploaded_by = u.id 
-            WHERE lr.id = $1
-        `, [result.rows[0].id]);
-
-        console.log('🎉 Recurso de biblioteca creado exitosamente');
-        res.status(201).json(fullResource.rows[0]);
-
-    } catch (error) {
-        console.error('❌ ERROR EN SUBIDA DE BIBLIOTECA:', {
-            message: error.message,
-            code: error.code,
-            detail: error.detail,
-            constraint: error.constraint,
-            table: error.table,
-            column: error.column
-        });
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    // Validaciones básicas
+    if (!title || !description || !resource_type || !main_category) {
+      console.log('❌ Campos requeridos faltantes');
+      return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
+
+    // Validar que si es tipo "manual" (con archivo) tenga fileData
+    if (resource_type === 'manual' && (!fileData || !fileName)) {
+      console.log('❌ Archivo requerido para tipo manual');
+      return res.status(400).json({ error: 'El archivo es requerido para recursos de tipo manual' });
+    }
+
+    // Validar que si es tipo "enlace" tenga URL
+    if (resource_type === 'enlace' && !external_url) {
+      console.log('❌ URL requerida para tipo enlace');
+      return res.status(400).json({ error: 'La URL es requerida para recursos de tipo enlace' });
+    }
+
+    console.log('💾 Insertando en base de datos (Base64)...');
+
+    // Insertar en base de datos - USANDO BASE64 COMO EN PROYECTOS
+    const result = await pool.query(
+      `INSERT INTO library_resources (
+        title, description, resource_type, 
+        file_data, file_name, file_type, file_size,
+        external_url, uploaded_by, main_category, subcategory
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        title, 
+        description, 
+        resource_type,
+        fileData || null,           // file_data (Base64)
+        fileName || null,           // file_name
+        fileType || null,           // file_type
+        fileData ? fileData.length : null, // file_size
+        external_url || null,
+        req.user.id, 
+        main_category, 
+        subcategory
+      ]
+    );
+
+    console.log('✅ Recurso insertado en BD, ID:', result.rows[0].id);
+
+    // Obtener recurso completo
+    const fullResource = await pool.query(`
+      SELECT lr.*, u.first_name || ' ' || u.last_name as uploader_name 
+      FROM library_resources lr 
+      LEFT JOIN users u ON lr.uploaded_by = u.id 
+      WHERE lr.id = $1
+    `, [result.rows[0].id]);
+
+    console.log('🎉 Recurso de biblioteca creado exitosamente (Base64)');
+    res.status(201).json(fullResource.rows[0]);
+
+  } catch (error) {
+    console.error('❌ ERROR EN SUBIDA DE BIBLIOTECA:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      table: error.table,
+      column: error.column
+    });
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+  }
 });
 
 // Rutas de administración

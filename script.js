@@ -7105,12 +7105,12 @@ async function uploadConversionFiles(projectId) {
     console.log(`📊 Resultado: ${successCount} exitosos, ${failCount} fallidos`);
 }
 
-// Función auxiliar para leer archivo como base64
+// Función auxiliar para leer archivo como Base64 (igual que en proyectos)
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            // Remover el prefixo "data:*/*;base64,"
+            // Obtener solo la parte base64 (sin el data URL prefix)
             const base64 = reader.result.split(',')[1];
             resolve(base64);
         };
@@ -7118,6 +7118,7 @@ function readFileAsBase64(file) {
         reader.readAsDataURL(file);
     });
 }
+
 
 // Función para cargar participantes en el modal de conversión
 function loadConversionParticipants(idea) {
@@ -8909,7 +8910,7 @@ function resetFileUpload() {
     console.log('✅ Sistema de archivos reseteado');
 }
 
-// Función para formatear tamaño de archivo
+// Función auxiliar para formatear tamaño de archivo
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -12446,9 +12447,9 @@ async function submitNewResource(e) {
         return;
     }
     
-    // Validación específica por tipo de recurso
+    // Validación específica por tipo de recurso - CORREGIDA
     if (resourceType !== 'enlace') {
-        // Para tipos que requieren archivo
+        // Para tipos que requieren archivo (manual, presentacion, etc.)
         if (!window.libraryUploadedFiles || window.libraryUploadedFiles.length === 0) {
             showNotification('Debes seleccionar al menos un archivo para este tipo de recurso', 'error');
             return;
@@ -12457,6 +12458,11 @@ async function submitNewResource(e) {
         // Para enlaces externos
         if (!externalUrl) {
             showNotification('La URL es requerida para recursos de tipo enlace', 'error');
+            return;
+        }
+        // Para enlaces, no debe haber archivos
+        if (window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0) {
+            showNotification('Los recursos de tipo enlace no pueden tener archivos adjuntos', 'error');
             return;
         }
     }
@@ -12470,7 +12476,7 @@ async function submitNewResource(e) {
     try {
         console.log('🚀 Preparando datos para enviar...');
         
-        // Preparar datos base
+        // Preparar datos base - FORMATO CORREGIDO (igual que proyectos)
         const formData = {
             title: title,
             description: description,
@@ -12482,24 +12488,44 @@ async function submitNewResource(e) {
         
         console.log('📤 Datos base preparados:', formData);
         
-        // Procesar archivos si existen
+        // Procesar archivos si existen - CORREGIDO (Base64 igual que proyectos)
         if (resourceType !== 'enlace' && window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0) {
             console.log(`📁 Procesando ${window.libraryUploadedFiles.length} archivos...`);
             
-            // Tomar solo el primer archivo (para simplificar)
+            // Tomar solo el primer archivo (para simplificar, igual que en proyectos)
             const file = window.libraryUploadedFiles[0];
             console.log('📄 Archivo a subir:', file.name, formatFileSize(file.size));
             
-            // Leer archivo como base64
+            // Leer archivo como base64 - MÉTODO IDÉNTICO A PROYECTOS
             const fileBase64 = await readFileAsBase64(file);
-            formData.fileData = fileBase64;
-            formData.fileName = file.name;
-            formData.fileType = file.type;
+            
+            // AGREGAR CAMPOS EN EL MISMO FORMATO QUE PROYECTOS
+            formData.fileData = fileBase64;        // Base64 string (igual que proyectos)
+            formData.fileName = file.name;         // Nombre original del archivo
+            formData.fileType = file.type;         // Tipo MIME del archivo
+            // fileSize se calcula automáticamente en el servidor
             
             console.log('✅ Archivo convertido a base64, longitud:', fileBase64.length);
+            console.log('📦 Datos de archivo preparados:', {
+                fileName: file.name,
+                fileType: file.type,
+                fileSize: file.size,
+                base64Length: fileBase64.length
+            });
+        } else if (resourceType === 'enlace') {
+            // Para enlaces, limpiar cualquier dato de archivo
+            formData.fileData = null;
+            formData.fileName = null;
+            formData.fileType = null;
+            console.log('🔗 Recurso de tipo enlace - sin archivos');
         }
         
-        console.log('📤 Enviando datos al servidor...');
+        console.log('📤 Enviando datos al servidor...', {
+            title: formData.title,
+            resource_type: formData.resource_type,
+            hasFileData: !!formData.fileData,
+            fileDataLength: formData.fileData ? formData.fileData.length : 0
+        });
         
         const response = await fetch(`${API_BASE}/library`, {
             method: 'POST',
@@ -12514,7 +12540,12 @@ async function submitNewResource(e) {
         
         if (response.ok) {
             const newResource = await response.json();
-            console.log('✅ Recurso creado exitosamente:', newResource);
+            console.log('✅ Recurso creado exitosamente:', {
+                id: newResource.id,
+                title: newResource.title,
+                resource_type: newResource.resource_type,
+                has_file: !!newResource.file_data
+            });
             
             showNotification(`Recurso "${title}" subido exitosamente`, 'success');
             
@@ -12535,7 +12566,16 @@ async function submitNewResource(e) {
         } else {
             const errorData = await response.json();
             console.error('❌ Error del servidor:', errorData);
-            throw new Error(errorData.error || 'Error al subir el recurso');
+            
+            // Mensajes de error más específicos
+            let errorMessage = errorData.error || 'Error al subir el recurso';
+            if (errorMessage.includes('row-level security policy')) {
+                errorMessage = 'Error de configuración en la base de datos. Contacta al administrador.';
+            } else if (errorMessage.includes('archivo')) {
+                errorMessage = 'Error al procesar el archivo. Verifica que no sea demasiado grande.';
+            }
+            
+            throw new Error(errorMessage);
         }
         
     } catch (error) {
@@ -12547,6 +12587,7 @@ async function submitNewResource(e) {
         submitBtn.disabled = false;
     }
 }
+
 
 function sortIdeasList(sortBy) {
     switch(sortBy) {
