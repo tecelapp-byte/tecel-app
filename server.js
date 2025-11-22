@@ -1916,28 +1916,41 @@ app.put('/api/projects/:id', authenticateToken, checkProjectPermissions, async (
         const { id } = req.params;
         
         console.log('=== ACTUALIZANDO PROYECTO ===');
-        console.log('Body recibido:', req.body);
+        console.log('Datos recibidos (req.body):', req.body);
+        console.log('¿Tiene files_to_remove?', 'files_to_remove' in req.body);
+        
+        // 🔥 PROCESAR FORM DATA CORRECTAMENTE
+        let title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove;
+        
+        // Si viene como FormData (multipart/form-data)
+        if (req.is('multipart/form-data')) {
+            console.log('📦 Procesando como FormData...');
+            title = req.body.title;
+            year = req.body.year;
+            description = req.body.description;
+            detailed_description = req.body.detailed_description;
+            objectives = req.body.objectives;
+            requirements = req.body.requirements;
+            problem = req.body.problem;
+            status = req.body.status;
+            students = req.body.students;
+            files_to_remove = req.body.files_to_remove;
+            
+            console.log('📋 Datos extraídos:', {
+                title: title?.substring(0, 30) + '...',
+                files_to_remove: files_to_remove
+            });
+        } else {
+            // Si viene como JSON
+            console.log('📦 Procesando como JSON...');
+            ({ title, year, description, detailed_description, objectives, requirements, problem, status, students, files_to_remove } = req.body);
+        }
 
-        // Extraer datos del body
-        const { 
-            title, 
-            year, 
-            description, 
-            detailed_description, 
-            objectives, 
-            requirements, 
-            problem, 
-            status, 
-            students, 
-            files_to_remove 
-        } = req.body;
-
-        console.log('🔍 files_to_remove recibido:', files_to_remove);
-        console.log('🔍 Tipo de files_to_remove:', typeof files_to_remove);
+        console.log('📊 files_to_remove después de extraer:', files_to_remove);
 
         // Validar campos requeridos
         if (!title || !year || !description || !problem) {
-            return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' });
+            return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos: Título, Año, Descripción, Problema' });
         }
 
         // Iniciar transacción
