@@ -11608,26 +11608,35 @@ function updateCategoryStats(category, count) {
     if (cardCountElement) cardCountElement.textContent = count;
 }
 
-// Función para enviar recurso mejorado
 async function submitEnhancedResource(formData) {
     try {
-        console.log('📚 === ENVIANDO RECURSO A BIBLIOTECA ===');
+        console.log('📚 === ENVIANDO RECURSO A BIBLIOTECA (COMO JSON) ===');
         
-        // Verificar que formData sea válido
-        if (!formData || typeof formData.entries !== 'function') {
-            throw new Error('FormData no es válido');
+        // Convertir FormData a objeto JSON
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            if (key === 'file' && value instanceof File) {
+                // Convertir archivo a base64
+                data.fileData = await readFileAsBase64(value);
+                data.fileName = value.name;
+                data.fileType = value.type;
+            } else {
+                data[key] = value;
+            }
         }
         
-        console.log('📦 FormData verificado, enviando...');
-        
+        console.log('📤 Datos a enviar (JSON):', {
+            ...data,
+            fileData: data.fileData ? `[Base64: ${data.fileData.length} chars]` : 'No file'
+        });
+
         const response = await fetch(`${API_BASE}/library`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                // NO agregar 'Content-Type' cuando usas FormData
-                // El navegador lo establece automáticamente con el boundary
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
 
         console.log('📥 Respuesta del servidor:', {
@@ -11657,6 +11666,20 @@ async function submitEnhancedResource(formData) {
         console.error('❌ Error subiendo recurso:', error);
         throw new Error('Error en la respuesta del servidor: ' + error.message);
     }
+}
+
+// Función para convertir archivo a base64
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Remover el prefijo "data:image/png;base64," si existe
+            const base64 = reader.result.split(',')[1] || reader.result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 // Actualizar cards de categorías
