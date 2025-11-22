@@ -10882,48 +10882,21 @@ function initEnhancedFilters() {
 
 // Inicializar sistema de biblioteca mejorado - VERSIÓN CON FORZADO
 function initEnhancedLibrary() {
-    console.log('🔄 Inicializando biblioteca mejorada...');
+    console.log('📚 Inicializando biblioteca mejorada...');
     
-    // Configurar cambio de categoría principal (SIN DUPLICAR)
-    const mainCategory = document.getElementById('resource-main-category');
-    if (mainCategory) {
-        // Remover event listeners existentes
-        const newMainCategory = mainCategory.cloneNode(true);
-        mainCategory.parentNode.replaceChild(newMainCategory, mainCategory);
-        
-        // Agregar nuevo event listener
-        document.getElementById('resource-main-category').addEventListener('change', function() {
-            const mainCategory = this.value;
-            const subcategorySelect = document.getElementById('resource-subcategory');
-            
-            subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
-            
-            if (mainCategory && librarySubcategories[mainCategory]) {
-                librarySubcategories[mainCategory].forEach(subcat => {
-                    const option = document.createElement('option');
-                    option.value = subcat.value;
-                    option.textContent = subcat.label;
-                    subcategorySelect.appendChild(option);
-                });
-            }
-        });
-    }
+    // Configurar event listeners para las cards de categoría
+    const categoryCards = document.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+        const category = card.getAttribute('data-category');
+        if (category) {
+            card.addEventListener('click', () => {
+                console.log('🎯 Categoría seleccionada:', category);
+                showCategoryView(category);
+            });
+        }
+    });
     
-    // Configurar cambio de tipo de recurso
-    const resourceType = document.getElementById('resource-type');
-    if (resourceType) {
-        resourceType.addEventListener('change', function() {
-            const isLink = this.value === 'enlace';
-            const fileGroup = document.getElementById('resource-file-group');
-            const urlGroup = document.getElementById('resource-url-group');
-            
-            if (fileGroup) fileGroup.style.display = isLink ? 'none' : 'block';
-            if (urlGroup) urlGroup.style.display = isLink ? 'block' : 'none';
-        });
-        
-        // Trigger change para estado inicial
-        resourceType.dispatchEvent(new Event('change'));
-    }
+    console.log('✅ Biblioteca mejorada inicializada');
 }
 
 // Función CORREGIDA para cargar recursos por categoría
@@ -11025,23 +10998,24 @@ function showFilteredResources(resources, category) {
 
 // Función para mostrar vista de categoría
 function showCategoryView(category) {
-    console.log('🔄 Mostrando vista para categoría:', category);
+    console.log('🎯 Categoría seleccionada:', category);
     
-    const mainView = document.getElementById('library-main-view');
-    const filteredView = document.getElementById('library-filtered-view');
+    // Mapear nombres de categoría a IDs de modal
+    const categoryModals = {
+        'programas': 'programas-modal',
+        'habilidades_tecnicas': 'habilidades-tecnicas-modal', 
+        'habilidades_blandas': 'habilidades-blandas-modal'
+    };
     
-    if (!mainView || !filteredView) {
-        console.error('❌ Vistas no encontradas');
-        showNotification('Error: La vista de categoría no está disponible', 'error');
+    const modalId = categoryModals[category];
+    
+    if (!modalId) {
+        console.error('❌ Modal no encontrado para categoría:', category);
         return;
     }
     
-    // Ocultar vista principal, mostrar vista filtrada
-    mainView.style.display = 'none';
-    filteredView.style.display = 'block';
-    
-    // Cargar recursos de la categoría
-    loadResourcesByCategory(category);
+    console.log('🔄 Abriendo modal:', modalId);
+    openCategoryModal(modalId, category);
 }
 
 
@@ -11117,47 +11091,184 @@ function openCategoryModalRobust(modalId, category) {
     }
 }
 
-// Función mejorada para abrir modales de categoría - VERSIÓN DEFINITIVA
-function openCategoryModal(modalId, categoryCardId) {
-    (`📖 Abriendo modal de categoría: ${modalId}`);
-    
-    // Buscar el modal de forma más robusta
-    let modal = document.getElementById(modalId);
-    
+function openCategoryModal(modalId, category) {
+    const modal = document.getElementById(modalId);
     if (!modal) {
-        console.error(`❌ Modal no encontrado: ${modalId}`);
-        ('🔍 Buscando en todo el documento...');
-        
-        // Buscar en todo el documento
-        modal = document.querySelector(`#${modalId}`);
-        if (!modal) {
-            console.error(`❌ Modal ${modalId} no existe en el DOM`);
+        console.error('❌ Modal no encontrado:', modalId);
+        return;
+    }
+    
+    // Cargar recursos de la categoría antes de abrir el modal
+    loadCategoryResourcesForModal(category, modalId);
+    
+    // Abrir el modal
+    openModal(modal);
+    
+    console.log(`✅ Modal ${modalId} abierto para categoría ${category}`);
+}
+
+function loadCategoryResourcesForModal(category, modalId) {
+    console.log(`📚 Cargando recursos para modal: ${modalId}, categoría: ${category}`);
+    
+    // Determinar el contenedor basado en el modal
+    const containerMap = {
+        'programas-modal': 'programas-container',
+        'habilidades-tecnicas-modal': 'habilidades-tecnicas-container',
+        'habilidades-blandas-modal': 'habilidades-blandas-container'
+    };
+    
+    const containerId = containerMap[modalId];
+    const countElementId = modalId === 'programas-modal' ? 'programas-modal-count' :
+                          modalId === 'habilidades-tecnicas-modal' ? 'tecnicas-modal-count' :
+                          'blandas-modal-count';
+    
+    if (!containerId) {
+        console.error('❌ Contenedor no encontrado para modal:', modalId);
+        return;
+    }
+    
+    const container = document.getElementById(containerId);
+    const countElement = document.getElementById(countElementId);
+    
+    if (!container) {
+        console.error('❌ Elemento contenedor no encontrado:', containerId);
+        return;
+    }
+    
+    // Filtrar recursos por categoría principal
+    const categoryResources = libraryResources.filter(resource => 
+        resource.main_category === category
+    );
+    
+    console.log(`✅ ${categoryResources.length} recursos encontrados para ${category}`);
+    
+    // Actualizar contador
+    if (countElement) {
+        countElement.textContent = categoryResources.length;
+    }
+    
+    // Renderizar recursos
+    if (categoryResources.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>No hay recursos en esta categoría</h3>
+                <p>¡Sé el primero en subir un recurso!</p>
+                ${currentUser ? `<button class="btn-primary" onclick="openNewResourceModal()">
+                    <i class="fas fa-plus"></i> Subir Recurso
+                </button>` : ''}
+            </div>
+        `;
+        return;
+    }
+    
+    // Renderizar recursos en el grid
+    container.innerHTML = categoryResources.map(resource => `
+        <div class="resource-card" data-resource-id="${resource.id}">
+            <div class="resource-header">
+                <h3 class="resource-title">${resource.title}</h3>
+                <span class="resource-type-badge ${resource.resource_type}">
+                    ${resource.resource_type === 'manual' ? '📚 Manual' : '🔗 Enlace'}
+                </span>
+            </div>
             
-            // Crear modal de emergencia
-            createEmergencyModal(modalId);
-            return;
+            <div class="resource-category">
+                <span class="category-tag">${getCategoryLabel(resource.main_category)}</span>
+                ${resource.subcategory ? `<span class="subcategory-tag">${getSubcategoryLabel(resource.main_category, resource.subcategory)}</span>` : ''}
+            </div>
+            
+            <p class="resource-description">${resource.description}</p>
+            
+            <div class="resource-meta">
+                <span class="uploader">
+                    <i class="fas fa-user"></i>
+                    ${resource.uploader_name || 'Usuario'}
+                </span>
+                <span class="date">
+                    <i class="fas fa-calendar"></i>
+                    ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+                </span>
+            </div>
+            
+            <div class="resource-actions">
+                ${resource.resource_type === 'manual' && resource.file_data ? 
+                    `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id})">
+                        <i class="fas fa-download"></i> Descargar
+                    </button>` : ''
+                }
+                
+                ${resource.resource_type === 'enlace' && resource.external_url ? 
+                    `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
+                        <i class="fas fa-external-link-alt"></i> Visitar
+                    </button>` : ''
+                }
+                
+                ${currentUser && (currentUser.user_type === 'teacher' || currentUser.user_type === 'admin') ? 
+                    `<button class="btn-danger btn-sm" onclick="deleteLibraryResource(${resource.id})">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>` : ''
+                }
+            </div>
+        </div>
+    `).join('');
+    
+    // Configurar event listeners para búsqueda y filtros
+    setupCategoryFilters(category, modalId);
+}
+
+function setupCategoryFilters(category, modalId) {
+    console.log(`🔧 Configurando filtros para: ${modalId}`);
+    
+    // Mapear elementos de filtro basado en el modal
+    const filterMap = {
+        'programas-modal': {
+            search: 'programas-search',
+            subcategory: 'programas-subcategory-filter',
+            type: 'programas-type-filter'
+        },
+        'habilidades-tecnicas-modal': {
+            search: 'tecnicas-search',
+            subcategory: 'tecnicas-subcategory-filter'
+        },
+        'habilidades-blandas-modal': {
+            search: 'blandas-search',
+            subcategory: 'blandas-subcategory-filter'
+        }
+    };
+    
+    const filters = filterMap[modalId];
+    if (!filters) return;
+    
+    // Configurar búsqueda
+    if (filters.search) {
+        const searchInput = document.getElementById(filters.search);
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                filterCategoryResources(category, modalId, e.target.value, filters);
+            });
         }
     }
     
-    // Determinar la categoría basada en el modalId
-    let category = '';
-    if (modalId === 'programas-modal') category = 'programas';
-    else if (modalId === 'habilidades-tecnicas-modal') category = 'habilidades-tecnicas';
-    else if (modalId === 'habilidades-blandas-modal') category = 'habilidades-blandas';
+    // Configurar filtro de subcategoría
+    if (filters.subcategory) {
+        const subcategoryFilter = document.getElementById(filters.subcategory);
+        if (subcategoryFilter) {
+            subcategoryFilter.addEventListener('change', (e) => {
+                filterCategoryResources(category, modalId, null, filters);
+            });
+        }
+    }
     
-    (`🎯 Categoría detectada: ${category}`);
-    
-    // Usar la función openModal mejorada
-    openModal(modal);
-    
-    // Cargar recursos de la categoría después de abrir el modal
-    if (category) {
-        setTimeout(() => {
-            loadCategoryResources(category);
-        }, 300);
+    // Configurar filtro de tipo (solo para programas)
+    if (filters.type) {
+        const typeFilter = document.getElementById(filters.type);
+        if (typeFilter) {
+            typeFilter.addEventListener('change', (e) => {
+                filterCategoryResources(category, modalId, null, filters);
+            });
+        }
     }
 }
-
 // Función de emergencia para crear modales
 function createEmergencyModal(modalId) {
     (`🚨 Creando modal de emergencia para: ${modalId}`);
@@ -11794,27 +11905,118 @@ function updateResourceSubcategories(mainCategory) {
 }
 
 // Función para filtrar recursos en modal de categoría
-function filterCategoryResources(category, searchTerm = '', subcategory = 'all') {
-    let filteredResources = libraryResources.filter(resource => 
+function filterCategoryResources(category, modalId, searchTerm = null, filters) {
+    const containerMap = {
+        'programas-modal': 'programas-container',
+        'habilidades-tecnicas-modal': 'habilidades-tecnicas-container',
+        'habilidades-blandas-modal': 'habilidades-blandas-container'
+    };
+    
+    const containerId = containerMap[modalId];
+    const container = document.getElementById(containerId);
+    
+    if (!container) return;
+    
+    // Obtener valores actuales de los filtros
+    let currentSearch = searchTerm;
+    let currentSubcategory = 'all';
+    let currentType = 'all';
+    
+    if (!currentSearch && filters.search) {
+        const searchInput = document.getElementById(filters.search);
+        currentSearch = searchInput ? searchInput.value.toLowerCase() : '';
+    }
+    
+    if (filters.subcategory) {
+        const subcategoryFilter = document.getElementById(filters.subcategory);
+        currentSubcategory = subcategoryFilter ? subcategoryFilter.value : 'all';
+    }
+    
+    if (filters.type) {
+        const typeFilter = document.getElementById(filters.type);
+        currentType = typeFilter ? typeFilter.value : 'all';
+    }
+    
+    // Filtrar recursos
+    const categoryResources = libraryResources.filter(resource => 
         resource.main_category === category
     );
     
-    // Aplicar filtro de búsqueda
-    if (searchTerm) {
-        filteredResources = filteredResources.filter(resource =>
-            resource.title.toLowerCase().includes(searchTerm) ||
-            resource.description.toLowerCase().includes(searchTerm)
-        );
-    }
+    const filteredResources = categoryResources.filter(resource => {
+        // Filtro de búsqueda
+        const matchesSearch = !currentSearch || 
+            resource.title.toLowerCase().includes(currentSearch) ||
+            resource.description.toLowerCase().includes(currentSearch);
+        
+        // Filtro de subcategoría
+        const matchesSubcategory = currentSubcategory === 'all' || 
+            resource.subcategory === currentSubcategory;
+        
+        // Filtro de tipo (solo para programas)
+        let matchesType = true;
+        if (filters.type && currentType !== 'all') {
+            // Aquí podrías agregar lógica específica para tipos si es necesario
+            matchesType = resource.resource_type === currentType;
+        }
+        
+        return matchesSearch && matchesSubcategory && matchesType;
+    });
     
-    // Aplicar filtro de subcategoría
-    if (subcategory !== 'all') {
-        filteredResources = filteredResources.filter(resource =>
-            resource.subcategory === subcategory
-        );
-    }
+    console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
     
-    renderCategoryResources(category, filteredResources);
+    // Re-renderizar recursos filtrados
+    if (filteredResources.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron recursos</h3>
+                <p>Intenta con otros términos de búsqueda o filtros</p>
+            </div>
+        `;
+    } else {
+        container.innerHTML = filteredResources.map(resource => `
+            <div class="resource-card" data-resource-id="${resource.id}">
+                <div class="resource-header">
+                    <h3 class="resource-title">${resource.title}</h3>
+                    <span class="resource-type-badge ${resource.resource_type}">
+                        ${resource.resource_type === 'manual' ? '📚 Manual' : '🔗 Enlace'}
+                    </span>
+                </div>
+                
+                <div class="resource-category">
+                    <span class="category-tag">${getCategoryLabel(resource.main_category)}</span>
+                    ${resource.subcategory ? `<span class="subcategory-tag">${getSubcategoryLabel(resource.main_category, resource.subcategory)}</span>` : ''}
+                </div>
+                
+                <p class="resource-description">${resource.description}</p>
+                
+                <div class="resource-meta">
+                    <span class="uploader">
+                        <i class="fas fa-user"></i>
+                        ${resource.uploader_name || 'Usuario'}
+                    </span>
+                    <span class="date">
+                        <i class="fas fa-calendar"></i>
+                        ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+                    </span>
+                </div>
+                
+                <div class="resource-actions">
+                    ${resource.resource_type === 'manual' && resource.file_data ? 
+                        `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id})">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>` : ''
+                    }
+                    
+                    ${resource.resource_type === 'enlace' && resource.external_url ? 
+                        `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
+                            <i class="fas fa-external-link-alt"></i> Visitar
+                        </button>` : ''
+                    }
+                </div>
+            </div>
+        `).join('');
+    }
 }
 
 // Actualizar estadísticas de categoría
@@ -12386,12 +12588,12 @@ function getResourceTypeLabel(type) {
 }
 
 function getCategoryLabel(category) {
-    const categories = {
-        'programas': 'Programas',
+    const labels = {
+        'programas': 'Programas y Software',
         'habilidades_tecnicas': 'Habilidades Técnicas', 
-        'habilidades_blandas': 'Habilidades Blandas',
+        'habilidades_blandas': 'Habilidades Blandas'
     };
-    return categories[category] || category || 'Sin categoría';
+    return labels[category] || category;
 }
 
 function getSubcategoryLabel(mainCategory, subcategory) {
