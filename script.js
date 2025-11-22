@@ -8796,7 +8796,7 @@ function createSuggestionElement(suggestion) {
     return suggestionDiv;
 }
 
-// Función auxiliar para escapar HTML (seguridad)
+// Función para escapar HTML (seguridad)
 function escapeHtml(unsafe) {
     if (!unsafe) return '';
     return unsafe
@@ -11536,50 +11536,86 @@ function createCategoryResourceCard(resource) {
     const card = document.createElement('div');
     card.className = 'category-resource-card';
     
-    const resourceType = getResourceTypeLabel(resource.resource_type);
-    const subcategory = getSubcategoryLabel(resource.main_category, resource.subcategory);
+    const isLink = resource.resource_type === 'enlace';
+    const hasFile = resource.file_data || resource.file_name;
     
-    card.innerHTML = `
-        <div class="resource-card-header">
-            <h4 class="resource-title">${resource.title}</h4>
-            <span class="resource-type-badge">${resourceType}</span>
-        </div>
-        
-        <div class="resource-card-body">
-            <p class="resource-description">${resource.description}</p>
+    console.log('🔄 Creando card para recurso:', {
+        id: resource.id,
+        type: resource.resource_type,
+        isLink: isLink,
+        hasFile: hasFile,
+        fileName: resource.file_name
+    });
+
+    return `
+        <div class="resource-card" data-resource-id="${resource.id}">
+            <div class="resource-header">
+                <h3 class="resource-title">${escapeHtml(resource.title)}</h3>
+                <span class="resource-type-badge ${resource.resource_type}">
+                    ${getResourceTypeLabel(resource.resource_type)}
+                </span>
+            </div>
+            
+            <div class="resource-description">
+                <p>${escapeHtml(resource.description)}</p>
+            </div>
             
             <div class="resource-meta">
-                <span class="resource-subcategory">${subcategory}</span>
-                <span class="resource-date">${new Date(resource.created_at).toLocaleDateString('es-ES')}</span>
+                <span class="resource-category">
+                    <i class="fas fa-folder"></i>
+                    ${escapeHtml(resource.main_category)} / ${escapeHtml(resource.subcategory)}
+                </span>
+                <span class="resource-uploader">
+                    <i class="fas fa-user"></i>
+                    ${escapeHtml(resource.uploader_name || 'Usuario')}
+                </span>
+                <span class="resource-date">
+                    <i class="fas fa-calendar"></i>
+                    ${formatDate(resource.created_at)}
+                </span>
+                ${resource.file_size ? `
+                <span class="resource-size">
+                    <i class="fas fa-weight-hanging"></i>
+                    ${formatFileSize(resource.file_size)}
+                </span>
+                ` : ''}
             </div>
             
-            <div class="resource-uploader">
-                <i class="fas fa-user"></i>
-                <span>${resource.uploader_name || 'Usuario'}</span>
-            </div>
-        </div>
-        
-        <div class="resource-card-actions">
-            ${resource.file_url ? `
-                <button class="btn-primary btn-sm" onclick="downloadLibraryResource(${resource.id}, '${resource.title}', '${resource.file_url}')">                   
-                <i class="fas fa-download"></i> Descargar
+            <div class="resource-actions">
+                <!-- Botón Ver Detalles (siempre visible) -->
+                <button class="btn btn-outline btn-sm view-resource-details" 
+                        data-resource-id="${resource.id}">
+                    <i class="fas fa-eye"></i> Ver Detalles
                 </button>
-            ` : ''}
-            
-            ${resource.external_url ? `
-                <button class="btn-outline btn-sm" onclick="window.open('${resource.external_url}', '_blank')">
+                
+                <!-- Botón Visitar (solo para enlaces) -->
+                ${isLink && resource.external_url ? `
+                <button class="btn btn-primary btn-sm visit-resource" 
+                        data-url="${escapeHtml(resource.external_url)}">
                     <i class="fas fa-external-link-alt"></i> Visitar
                 </button>
-            ` : ''}
-            
-            ${canManageLibrary() ? `
-                <button class="btn-outline btn-sm btn-danger" onclick="deleteLibraryResource(${resource.id})">
-                    <i class="fas fa-trash"></i>
+                ` : ''}
+                
+                <!-- Botón Descargar (solo para recursos con archivos) -->
+                ${!isLink && hasFile ? `
+                <button class="btn btn-success btn-sm download-resource" 
+                        data-resource-id="${resource.id}"
+                        data-file-name="${escapeHtml(resource.file_name || resource.title)}">
+                    <i class="fas fa-download"></i> Descargar
                 </button>
-            ` : ''}
+                ` : ''}
+                
+                <!-- Botón Eliminar (solo admin/uploader) -->
+                ${(currentUser.user_type === 'admin' || currentUser.id === resource.uploaded_by) ? `
+                <button class="btn btn-danger btn-sm delete-resource" 
+                        data-resource-id="${resource.id}">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+                ` : ''}
+            </div>
         </div>
     `;
-    
+
     return card;
 }
 
@@ -11775,19 +11811,156 @@ function canManageLibrary() {
 // Variable global para el recurso actual
 let currentResource = null;
 
-// Función para mostrar detalles del recurso
 // Función para mostrar detalles de recurso
 async function showResourceDetails(resourceId) {
     try {
-        const response = await fetch(`${API_BASE}/library/${resourceId}`);
+        console.log('🔍 Mostrando detalles del recurso:', resourceId);
+        
+        const response = await fetch(`${API_BASE}/library/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
         if (!response.ok) {
-            throw new Error('Recurso no encontrado');
+            throw new Error('Error al cargar los detalles del recurso');
         }
         
         const resource = await response.json();
-        displayResourceDetails(resource);
+        console.log('📋 Detalles del recurso:', resource);
+        
+        const isLink = resource.resource_type === 'enlace';
+        const hasFile = resource.file_data || resource.file_name;
+        
+        const modalContent = `
+            <div class="modal-header">
+                <h2>${escapeHtml(resource.title)}</h2>
+                <span class="resource-type-badge ${resource.resource_type}">
+                    ${getResourceTypeLabel(resource.resource_type)}
+                </span>
+                <button class="close-modal" onclick="closeModal(this.closest('.modal'))">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body resource-details">
+                <div class="resource-info">
+                    <div class="detail-section">
+                        <h3><i class="fas fa-align-left"></i> Descripción</h3>
+                        <p>${escapeHtml(resource.description)}</p>
+                    </div>
+                    
+                    <div class="resource-meta-grid">
+                        <div class="meta-item">
+                            <strong><i class="fas fa-folder"></i> Categoría:</strong>
+                            <span>${escapeHtml(resource.main_category)} / ${escapeHtml(resource.subcategory)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <strong><i class="fas fa-user"></i> Subido por:</strong>
+                            <span>${escapeHtml(resource.uploader_name || 'Usuario')}</span>
+                        </div>
+                        <div class="meta-item">
+                            <strong><i class="fas fa-calendar"></i> Fecha:</strong>
+                            <span>${formatDate(resource.created_at)}</span>
+                        </div>
+                        ${resource.file_size ? `
+                        <div class="meta-item">
+                            <strong><i class="fas fa-weight-hanging"></i> Tamaño:</strong>
+                            <span>${formatFileSize(resource.file_size)}</span>
+                        </div>
+                        ` : ''}
+                        ${resource.file_name ? `
+                        <div class="meta-item">
+                            <strong><i class="fas fa-file"></i> Archivo:</strong>
+                            <span>${escapeHtml(resource.file_name)}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${isLink && resource.external_url ? `
+                    <div class="detail-section">
+                        <h3><i class="fas fa-link"></i> Enlace Externo</h3>
+                        <div class="external-url">
+                            <a href="${escapeHtml(resource.external_url)}" target="_blank" rel="noopener">
+                                ${escapeHtml(resource.external_url)}
+                            </a>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="resource-actions-detailed">
+                    <!-- Botón Visitar (solo para enlaces) -->
+                    ${isLink && resource.external_url ? `
+                    <button class="btn btn-primary btn-lg visit-resource-detailed" 
+                            data-url="${escapeHtml(resource.external_url)}">
+                        <i class="fas fa-external-link-alt"></i> Visitar Enlace
+                    </button>
+                    ` : ''}
+                    
+                    <!-- Botón Descargar (solo para recursos con archivos) -->
+                    ${!isLink && hasFile ? `
+                    <button class="btn btn-success btn-lg download-resource-detailed" 
+                            data-resource-id="${resource.id}"
+                            data-file-name="${escapeHtml(resource.file_name || resource.title)}">
+                        <i class="fas fa-download"></i> Descargar Archivo
+                    </button>
+                    ` : ''}
+                    
+                    <!-- Mensaje si no hay archivo ni enlace -->
+                    ${!isLink && !hasFile ? `
+                    <div class="no-file-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Este recurso no tiene archivo asociado para descargar.</p>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- Botón Eliminar (solo admin/uploader) -->
+                    ${(currentUser.user_type === 'admin' || currentUser.id === resource.uploaded_by) ? `
+                    <button class="btn btn-danger delete-resource-detailed" 
+                            data-resource-id="${resource.id}">
+                        <i class="fas fa-trash"></i> Eliminar Recurso
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        showModal('Detalles del Recurso', modalContent, 'large');
+        
+        // Agregar event listeners para los botones en el modal
+        setTimeout(() => {
+            // Botón visitar en modal
+            const visitBtn = document.querySelector('.visit-resource-detailed');
+            if (visitBtn) {
+                visitBtn.addEventListener('click', function() {
+                    const url = this.getAttribute('data-url');
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                });
+            }
+            
+            // Botón descargar en modal
+            const downloadBtn = document.querySelector('.download-resource-detailed');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', function() {
+                    const resourceId = this.getAttribute('data-resource-id');
+                    const fileName = this.getAttribute('data-file-name');
+                    downloadResource(resourceId, fileName);
+                });
+            }
+            
+            // Botón eliminar en modal
+            const deleteBtn = document.querySelector('.delete-resource-detailed');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function() {
+                    const resourceId = this.getAttribute('data-resource-id');
+                    deleteResource(resourceId);
+                });
+            }
+        }, 100);
+        
     } catch (error) {
-        console.error('Error cargando detalles del recurso:', error);
+        console.error('❌ Error mostrando detalles:', error);
         showNotification('Error al cargar los detalles del recurso', 'error');
     }
 }
@@ -11855,59 +12028,86 @@ function createResourceFileItem(resource) {
 }
 
 // Función para descargar recurso
-async function downloadResource(resource) {
+async function downloadResource(resourceId, fileName = null) {
     try {
-        console.log('📥 Descargando recurso:', resource);
+        console.log('📥 Iniciando descarga del recurso:', resourceId);
         
-        if (resource.resource_type === 'enlace') {
-            // Redirigir a enlace externo
-            window.open(resource.external_url, '_blank');
-            return;
-        }
+        // Mostrar loading en el botón
+        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
+        downloadBtns.forEach(btn => {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando...';
+            btn.disabled = true;
+            
+            // Restaurar después de 3 segundos (por si falla)
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }, 3000);
+        });
         
-        if (!resource.file_url) {
-            throw new Error('No hay archivo para descargar');
-        }
-        
-        // Mostrar loading
-        showNotification('Preparando descarga...', 'info');
-        
-        const response = await fetch(`${API_BASE}/library/download/${resource.id}`, {
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
             headers: {
-                'Authorization': `Bearer ${authToken}`,
+                'Authorization': `Bearer ${authToken}`
             }
         });
         
         if (!response.ok) {
-            throw new Error('Error al descargar el archivo');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al descargar el recurso');
         }
         
-        // Convertir respuesta a blob
+        // Obtener el blob del archivo
         const blob = await response.blob();
         
-        // Crear enlace de descarga
+        // Crear URL temporal para descarga
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         
-        // Obtener nombre del archivo
-        const fileName = resource.file_url.split('/').pop() || `recurso-${resource.id}`;
-        a.download = fileName;
+        // Usar el nombre del archivo del recurso o generar uno
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let downloadFileName = fileName;
         
-        // Trigger descarga
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+                downloadFileName = filenameMatch[1].replace(/['"]/g, '');
+            }
+        }
+        
+        // Si no tenemos nombre, usar un nombre por defecto
+        if (!downloadFileName) {
+            downloadFileName = `recurso-${resourceId}.${blob.type.split('/')[1] || 'bin'}`;
+        }
+        
+        a.download = downloadFileName;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
+        
+        // Limpiar
         window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
-        // Actualizar contador de descargas (opcional)
-        updateDownloadCount(resource.id);
-        
+        console.log('✅ Descarga completada:', downloadFileName);
         showNotification('Descarga iniciada', 'success');
+        
+        // Restaurar botones
+        downloadBtns.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
+            btn.disabled = false;
+        });
         
     } catch (error) {
         console.error('❌ Error descargando recurso:', error);
         showNotification(`Error al descargar: ${error.message}`, 'error');
+        
+        // Restaurar botones en caso de error
+        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
+        downloadBtns.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
+            btn.disabled = false;
+        });
     }
 }
 
@@ -11931,18 +12131,18 @@ async function updateDownloadCount(resourceId) {
     }
 }
 
-// Función para obtener etiqueta de tipo de recurso
-function getResourceTypeLabel(resourceType) {
+// Función para obtener etiqueta del tipo de recurso
+function getResourceTypeLabel(type) {
     const types = {
-        'documento': 'Documento',
-        'video': 'Video', 
-        'enlace': 'Enlace',
-        'software': 'Software',
-        'presentacion': 'Presentación',
         'manual': 'Manual',
-        'carpeta': 'Carpeta'
+        'presentacion': 'Presentación',
+        'guia': 'Guía',
+        'enlace': 'Enlace Externo',
+        'documento': 'Documento',
+        'video': 'Video',
+        'audio': 'Audio'
     };
-    return types[resourceType] || resourceType;
+    return types[type] || type;
 }
 
 function getCategoryLabel(category) {
@@ -11997,11 +12197,12 @@ function getFileFormat(url) {
     return 'Archivo';
 }
 
+// Función para formatear fecha
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', {
         year: 'numeric',
-        month: 'long',
+        month: 'short',
         day: 'numeric'
     });
 }
@@ -12017,6 +12218,38 @@ async function loadLibraryResources() {
             console.log(`✅ ${libraryResources.length} recursos cargados`);
             renderLibraryResources();
             updateLibraryStats();
+
+            // Event listener para botones de descarga en las cards
+            document.addEventListener('click', function(e) {
+                // Botón descargar en cards
+                if (e.target.closest('.download-resource')) {
+                    const btn = e.target.closest('.download-resource');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    const fileName = btn.getAttribute('data-file-name');
+                    downloadResource(resourceId, fileName);
+                }
+                
+                // Botón visitar en cards
+                if (e.target.closest('.visit-resource')) {
+                    const btn = e.target.closest('.visit-resource');
+                    const url = btn.getAttribute('data-url');
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+                
+                // Botón ver detalles en cards
+                if (e.target.closest('.view-resource-details')) {
+                    const btn = e.target.closest('.view-resource-details');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    showResourceDetails(resourceId);
+                }
+                
+                // Botón eliminar en cards
+                if (e.target.closest('.delete-resource')) {
+                    const btn = e.target.closest('.delete-resource');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    deleteResource(resourceId);
+                }
+            });
         } else {
             throw new Error('Error cargando recursos');
         }
