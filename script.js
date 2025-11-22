@@ -11832,31 +11832,66 @@ async function showResourceDetails(resourceId) {
         const isLink = resource.resource_type === 'enlace';
         const hasFile = resource.file_data || resource.file_name;
         
-        // Actualizar el contenido del modal existente
-        document.getElementById('detail-resource-title').textContent = resource.title;
-        document.getElementById('detail-resource-type').textContent = getResourceTypeLabel(resource.resource_type);
-        document.getElementById('detail-resource-type').className = `resource-type-badge ${resource.resource_type}`;
-        document.getElementById('detail-resource-category').textContent = resource.main_category;
-        document.getElementById('detail-resource-uploader').textContent = `Subido por ${resource.uploader_name || 'Usuario'}`;
-        document.getElementById('detail-resource-date').textContent = formatDate(resource.created_at);
-        document.getElementById('detail-resource-description').textContent = resource.description;
+        // OBTENER REFERENCIAS A LOS ELEMENTOS - CON VERIFICACIÓN
+        const titleElement = document.getElementById('detail-resource-title');
+        const typeElement = document.getElementById('detail-resource-type');
+        const categoryElement = document.getElementById('detail-resource-category');
+        const uploaderElement = document.getElementById('detail-resource-uploader');
+        const dateElement = document.getElementById('detail-resource-date');
+        const descriptionElement = document.getElementById('detail-resource-description');
+        const infoTypeElement = document.getElementById('detail-info-type');
+        const infoCategoryElement = document.getElementById('detail-info-category');
+        const infoSubcategoryElement = document.getElementById('detail-info-subcategory');
+        const infoSizeElement = document.getElementById('detail-info-size');
+        const infoFormatElement = document.getElementById('detail-info-format');
+        
+        // VERIFICAR QUE TODOS LOS ELEMENTOS EXISTAN
+        const elements = [
+            titleElement, typeElement, categoryElement, uploaderElement, 
+            dateElement, descriptionElement, infoTypeElement, infoCategoryElement,
+            infoSubcategoryElement, infoSizeElement, infoFormatElement
+        ];
+        
+        const missingElements = elements.filter(el => !el);
+        if (missingElements.length > 0) {
+            console.error('❌ Elementos del modal no encontrados:', missingElements);
+            throw new Error('Error: El modal no está correctamente cargado');
+        }
+        
+        // ACTUALIZAR CONTENIDO DEL MODAL
+        titleElement.textContent = resource.title;
+        typeElement.textContent = getResourceTypeLabel(resource.resource_type);
+        typeElement.className = `resource-type-badge ${resource.resource_type}`;
+        categoryElement.textContent = resource.main_category;
+        uploaderElement.textContent = `Subido por ${resource.uploader_name || 'Usuario'}`;
+        dateElement.textContent = formatDate(resource.created_at);
+        descriptionElement.textContent = resource.description;
         
         // Información adicional
-        document.getElementById('detail-info-type').textContent = getResourceTypeLabel(resource.resource_type);
-        document.getElementById('detail-info-category').textContent = resource.main_category;
-        document.getElementById('detail-info-subcategory').textContent = resource.subcategory || 'N/A';
-        document.getElementById('detail-info-size').textContent = resource.file_size ? formatFileSize(resource.file_size) : 'N/A';
-        document.getElementById('detail-info-format').textContent = resource.file_type ? resource.file_type.split('/')[1]?.toUpperCase() || 'N/A' : 'N/A';
+        infoTypeElement.textContent = getResourceTypeLabel(resource.resource_type);
+        infoCategoryElement.textContent = resource.main_category;
+        infoSubcategoryElement.textContent = resource.subcategory || 'N/A';
+        infoSizeElement.textContent = resource.file_size ? formatFileSize(resource.file_size) : 'N/A';
+        infoFormatElement.textContent = resource.file_type ? 
+            (resource.file_type.split('/')[1]?.toUpperCase() || resource.file_type) : 'N/A';
         
-        // Mostrar/ocultar y configurar botones
+        // CONFIGURAR BOTONES CON VERIFICACIÓN
         const downloadBtn = document.getElementById('resource-download-btn');
         const linkBtn = document.getElementById('resource-link-btn');
         const filesSection = document.getElementById('resource-files-section');
         
+        if (!downloadBtn || !linkBtn || !filesSection) {
+            console.error('❌ Botones del modal no encontrados');
+            throw new Error('Error: Los botones del modal no están disponibles');
+        }
+        
         // Configurar botón de descarga
         if (!isLink && hasFile) {
             downloadBtn.style.display = 'flex';
-            downloadBtn.onclick = () => downloadResource(resource.id, resource.file_name || resource.title);
+            // Limpiar event listeners anteriores
+            downloadBtn.replaceWith(downloadBtn.cloneNode(true));
+            const newDownloadBtn = document.getElementById('resource-download-btn');
+            newDownloadBtn.onclick = () => downloadResource(resource.id, resource.file_name || resource.title);
         } else {
             downloadBtn.style.display = 'none';
         }
@@ -11864,7 +11899,10 @@ async function showResourceDetails(resourceId) {
         // Configurar botón de enlace
         if (isLink && resource.external_url) {
             linkBtn.style.display = 'flex';
-            linkBtn.onclick = () => window.open(resource.external_url, '_blank', 'noopener,noreferrer');
+            // Limpiar event listeners anteriores
+            linkBtn.replaceWith(linkBtn.cloneNode(true));
+            const newLinkBtn = document.getElementById('resource-link-btn');
+            newLinkBtn.onclick = () => window.open(resource.external_url, '_blank', 'noopener,noreferrer');
         } else {
             linkBtn.style.display = 'none';
         }
@@ -11873,25 +11911,31 @@ async function showResourceDetails(resourceId) {
         if (hasFile && !isLink) {
             filesSection.style.display = 'block';
             const filesList = document.getElementById('detail-resource-files');
-            filesList.innerHTML = `
-                <div class="resource-file-item">
-                    <i class="fas fa-file ${getFileIcon(resource.file_type)}"></i>
-                    <div class="file-info">
-                        <span class="file-name">${escapeHtml(resource.file_name)}</span>
-                        <span class="file-size">${resource.file_size ? formatFileSize(resource.file_size) : 'Tamaño desconocido'}</span>
+            if (filesList) {
+                filesList.innerHTML = `
+                    <div class="resource-file-item">
+                        <i class="fas fa-file ${getFileIcon(resource.file_type)}"></i>
+                        <div class="file-info">
+                            <span class="file-name">${escapeHtml(resource.file_name)}</span>
+                            <span class="file-size">${resource.file_size ? formatFileSize(resource.file_size) : 'Tamaño desconocido'}</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline download-file-btn" 
+                                onclick="downloadResource(${resource.id}, '${escapeHtml(resource.file_name || resource.title)}')">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>
                     </div>
-                    <button class="btn btn-sm btn-outline download-file-btn" 
-                            onclick="downloadResource(${resource.id}, '${escapeHtml(resource.file_name || resource.title)}')">
-                        <i class="fas fa-download"></i> Descargar
-                    </button>
-                </div>
-            `;
+                `;
+            }
         } else {
             filesSection.style.display = 'none';
         }
         
-        // Mostrar el modal
+        // MOSTRAR EL MODAL
         const modal = document.getElementById('resource-detail-modal');
+        if (!modal) {
+            throw new Error('Modal no encontrado en el DOM');
+        }
+        
         modal.style.display = 'block';
         setTimeout(() => {
             modal.classList.add('active');
@@ -11899,8 +11943,93 @@ async function showResourceDetails(resourceId) {
         
     } catch (error) {
         console.error('❌ Error mostrando detalles:', error);
-        showNotification('Error al cargar los detalles del recurso', 'error');
+        showNotification('Error al cargar los detalles del recurso: ' + error.message, 'error');
     }
+}
+
+// Función mejorada para cerrar el modal
+function closeResourceDetailModal() {
+    const modal = document.getElementById('resource-detail-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        
+        // Limpiar event listeners para evitar duplicados
+        const downloadBtn = document.getElementById('resource-download-btn');
+        const linkBtn = document.getElementById('resource-link-btn');
+        
+        if (downloadBtn) {
+            downloadBtn.onclick = null;
+        }
+        if (linkBtn) {
+            linkBtn.onclick = null;
+        }
+    }, 300);
+}
+
+// Configurar event listeners para cerrar el modal (solo una vez)
+function setupModalEventListeners() {
+    // Cerrar con la X
+    const closeBtn = document.querySelector('#resource-detail-modal .close');
+    if (closeBtn) {
+        closeBtn.onclick = closeResourceDetailModal;
+    }
+    
+    // Cerrar al hacer clic fuera del modal
+    const modal = document.getElementById('resource-detail-modal');
+    if (modal) {
+        modal.onclick = function(e) {
+            if (e.target === this) {
+                closeResourceDetailModal();
+            }
+        };
+    }
+    
+    // Cerrar con ESC
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('resource-detail-modal');
+        if (e.key === 'Escape' && modal && modal.style.display === 'block') {
+            closeResourceDetailModal();
+        }
+    });
+}
+
+// Ejecutar la configuración cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    setupModalEventListeners();
+});
+
+// También ejecutar si la página ya está cargada
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupModalEventListeners);
+} else {
+    setupModalEventListeners();
+}
+
+// Función de diagnóstico para el modal
+function checkModalState() {
+    const modal = document.getElementById('resource-detail-modal');
+    const elements = [
+        'detail-resource-title',
+        'detail-resource-type', 
+        'detail-resource-category',
+        'detail-resource-uploader',
+        'detail-resource-date',
+        'detail-resource-description',
+        'resource-download-btn',
+        'resource-link-btn'
+    ];
+    
+    console.log('🔍 Estado del modal:');
+    console.log('Modal encontrado:', !!modal);
+    console.log('Display style:', modal ? modal.style.display : 'N/A');
+    
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        console.log(`- ${id}:`, element ? 'ENCONTRADO' : 'NO ENCONTRADO');
+    });
 }
 
 function showModal(title, content, size = 'medium') {
@@ -11949,19 +12078,6 @@ function showModal(title, content, size = 'medium') {
         }
     };
     document.addEventListener('keydown', closeOnEsc);
-}
-
-// Función para cerrar modales - AGREGAR ESTA FUNCIÓN TAMBIÉN
-function closeModal(modalElement) {
-    if (!modalElement) return;
-    
-    modalElement.classList.remove('active');
-    
-    setTimeout(() => {
-        if (modalElement.parentNode) {
-            modalElement.parentNode.removeChild(modalElement);
-        }
-    }, 300);
 }
 
 // Función para mostrar detalles en el modal
@@ -12258,6 +12374,15 @@ async function loadLibraryResources() {
                 if (e.target.closest('.view-resource-details')) {
                     const btn = e.target.closest('.view-resource-details');
                     const resourceId = btn.getAttribute('data-resource-id');
+                    
+                    // Verificar que el modal esté listo
+                    const modal = document.getElementById('resource-detail-modal');
+                    if (!modal) {
+                        console.error('❌ Modal no encontrado al hacer clic');
+                        showNotification('Error: El modal no está disponible', 'error');
+                        return;
+                    }
+                    
                     showResourceDetails(resourceId);
                 }
                 
