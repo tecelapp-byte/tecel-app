@@ -7105,16 +7105,16 @@ async function uploadConversionFiles(projectId) {
     console.log(`📊 Resultado: ${successCount} exitosos, ${failCount} fallidos`);
 }
 
-// Función para leer archivo como base64
+// Función auxiliar para leer archivo como base64
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            // Remover el prefijo data:application/...;base64,
+            // Remover el prefixo "data:*/*;base64,"
             const base64 = reader.result.split(',')[1];
             resolve(base64);
         };
-        reader.onerror = reject;
+        reader.onerror = error => reject(error);
         reader.readAsDataURL(file);
     });
 }
@@ -10868,30 +10868,46 @@ function initEnhancedFilters() {
 function initEnhancedLibrary() {
     console.log('🔄 Inicializando biblioteca mejorada...');
     
-    // Remover event listeners existentes para evitar duplicación
+    // Configurar cambio de categoría principal (SIN DUPLICAR)
     const mainCategory = document.getElementById('resource-main-category');
-    const newMainCategory = mainCategory.cloneNode(true);
-    mainCategory.parentNode.replaceChild(newMainCategory, mainCategory);
-    
-    // Configurar el cambio de categoría principal
-    document.getElementById('resource-main-category').addEventListener('change', function() {
-        const mainCategory = this.value;
-        const subcategorySelect = document.getElementById('resource-subcategory');
+    if (mainCategory) {
+        // Remover event listeners existentes
+        const newMainCategory = mainCategory.cloneNode(true);
+        mainCategory.parentNode.replaceChild(newMainCategory, mainCategory);
         
-        subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
-        
-        if (mainCategory && librarySubcategories[mainCategory]) {
-            librarySubcategories[mainCategory].forEach(subcat => {
-                const option = document.createElement('option');
-                option.value = subcat.value;
-                option.textContent = subcat.label;
-                subcategorySelect.appendChild(option);
-            });
-        }
-    });
+        // Agregar nuevo event listener
+        document.getElementById('resource-main-category').addEventListener('change', function() {
+            const mainCategory = this.value;
+            const subcategorySelect = document.getElementById('resource-subcategory');
+            
+            subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
+            
+            if (mainCategory && librarySubcategories[mainCategory]) {
+                librarySubcategories[mainCategory].forEach(subcat => {
+                    const option = document.createElement('option');
+                    option.value = subcat.value;
+                    option.textContent = subcat.label;
+                    subcategorySelect.appendChild(option);
+                });
+            }
+        });
+    }
     
-    // Inicializar sistema de archivos para biblioteca
-    initLibraryFileUpload();
+    // Configurar cambio de tipo de recurso
+    const resourceType = document.getElementById('resource-type');
+    if (resourceType) {
+        resourceType.addEventListener('change', function() {
+            const isLink = this.value === 'enlace';
+            const fileGroup = document.getElementById('resource-file-group');
+            const urlGroup = document.getElementById('resource-url-group');
+            
+            if (fileGroup) fileGroup.style.display = isLink ? 'none' : 'block';
+            if (urlGroup) urlGroup.style.display = isLink ? 'block' : 'none';
+        });
+        
+        // Trigger change para estado inicial
+        resourceType.dispatchEvent(new Event('change'));
+    }
 }
 
 // Configurar cards de categorías - VERSIÓN ULTRA ROBUSTA
@@ -11708,15 +11724,16 @@ async function submitEnhancedResource(formData) {
     }
 }
 
+// Función de debug para file input
 function debugFileInput() {
-    const fileInput = document.getElementById('resource-file');
     console.log('🔍 DEBUG FILE INPUT:');
+    const fileInput = document.getElementById('resource-file');
     console.log('Elemento:', fileInput);
-    console.log('Files:', fileInput?.files);
-    console.log('Files length:', fileInput?.files?.length);
-    console.log('Files array:', Array.from(fileInput?.files || []));
+    console.log('Files:', fileInput.files);
+    console.log('Files length:', fileInput.files.length);
+    console.log('Files array:', Array.from(fileInput.files));
     
-    if (fileInput && fileInput.files.length > 0) {
+    if (fileInput.files.length > 0) {
         Array.from(fileInput.files).forEach((file, index) => {
             console.log(`📄 Archivo ${index + 1}:`, {
                 name: file.name,
@@ -11725,24 +11742,13 @@ function debugFileInput() {
                 lastModified: file.lastModified
             });
         });
-    } else {
-        console.log('❌ No hay archivos seleccionados');
     }
+    
+    console.log('libraryUploadedFiles:', window.libraryUploadedFiles);
 }
 
-// Función para convertir archivo a base64
-function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            // Remover el prefijo "data:image/png;base64," si existe
-            const base64 = reader.result.split(',')[1] || reader.result;
-            resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
+// Hacerla global
+window.debugFiles = debugFileInput;
 
 // Actualizar cards de categorías
 function updateCategoryCards() {
@@ -12113,39 +12119,76 @@ function renderLibraryResources() {
     console.log(`✅ ${filteredResources.length} recursos renderizados`);
 }
 
-// Función para inicializar upload de archivos en biblioteca
+// SISTEMA DE ARCHIVOS PARA BIBLIOTECA - VERSIÓN CORREGIDA
 function initLibraryFileUpload() {
     const fileInput = document.getElementById('resource-file');
     const fileUploadArea = document.getElementById('resource-file-upload-area');
     const filePreview = document.getElementById('resource-file-preview');
     
-    if (!fileInput || !fileUploadArea) return;
+    if (!fileInput || !fileUploadArea) {
+        console.error('❌ Elementos de upload no encontrados');
+        return;
+    }
     
     console.log('📚 Inicializando upload de archivos para biblioteca');
     
-    // Configurar event listeners
-    fileUploadArea.addEventListener('click', () => fileInput.click());
+    // Inicializar array global para archivos de biblioteca
+    if (!window.libraryUploadedFiles) {
+        window.libraryUploadedFiles = [];
+    }
     
-    fileInput.addEventListener('change', function(e) {
+    // LIMPIAR event listeners existentes
+    const newFileInput = fileInput.cloneNode(true);
+    fileInput.parentNode.replaceChild(newFileInput, fileInput);
+    const freshFileInput = document.getElementById('resource-file');
+    
+    const newUploadArea = fileUploadArea.cloneNode(true);
+    fileUploadArea.parentNode.replaceChild(newUploadArea, fileUploadArea);
+    const freshUploadArea = document.getElementById('resource-file-upload-area');
+    
+    // CONFIGURAR NUEVOS EVENT LISTENERS
+    
+    // Click en área de upload
+    freshUploadArea.addEventListener('click', function(e) {
+        console.log('🎯 Click en área de upload');
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(() => {
+            freshFileInput.click();
+        }, 10);
+        return false;
+    });
+    
+    // Change en input de archivos
+    freshFileInput.addEventListener('change', function(e) {
+        console.log('📁 Change event - Archivos:', e.target.files);
         if (e.target.files && e.target.files.length > 0) {
             handleLibraryFiles(e.target.files);
         }
+        // Limpiar input para permitir seleccionar los mismos archivos otra vez
+        setTimeout(() => {
+            this.value = '';
+        }, 100);
     });
     
     // Drag and drop
-    fileUploadArea.addEventListener('dragover', function(e) {
+    freshUploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
-        fileUploadArea.classList.add('dragover');
+        e.stopPropagation();
+        this.classList.add('dragover');
     });
     
-    fileUploadArea.addEventListener('dragleave', function(e) {
+    freshUploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
-        fileUploadArea.classList.remove('dragover');
+        e.stopPropagation();
+        this.classList.remove('dragover');
     });
     
-    fileUploadArea.addEventListener('drop', function(e) {
+    freshUploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
-        fileUploadArea.classList.remove('dragover');
+        e.stopPropagation();
+        this.classList.remove('dragover');
+        console.log('📁 Drop event - Archivos:', e.dataTransfer.files);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             handleLibraryFiles(e.dataTransfer.files);
         }
@@ -12154,28 +12197,98 @@ function initLibraryFileUpload() {
     function handleLibraryFiles(files) {
         if (!files || files.length === 0) return;
         
-        filePreview.innerHTML = '';
+        console.log(`📁 Procesando ${files.length} archivos para biblioteca`);
+        
+        let filesAdded = 0;
         
         for (let file of files) {
-            const fileItem = document.createElement('div');
-            fileItem.className = 'file-preview-item';
-            fileItem.innerHTML = `
-                <div class="file-info">
-                    <div class="file-icon">
-                        <i class="${getFileIcon(file.name)}"></i>
-                    </div>
-                    <div class="file-details">
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                    </div>
+            // Validar que no sea duplicado
+            const isDuplicate = window.libraryUploadedFiles.some(
+                existingFile => existingFile.name === file.name && existingFile.size === file.size
+            );
+            
+            if (isDuplicate) {
+                console.log('⚠️ Archivo duplicado ignorado:', file.name);
+                showNotification(`"${file.name}" ya está en la lista`, 'warning');
+                continue;
+            }
+            
+            // Validar tamaño (50MB máximo)
+            if (file.size > 50 * 1024 * 1024) {
+                showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+                continue;
+            }
+            
+            // Agregar archivo
+            window.libraryUploadedFiles.push(file);
+            filesAdded++;
+            addLibraryFileToPreview(file);
+            console.log('✅ Archivo agregado:', file.name);
+        }
+        
+        if (filesAdded > 0) {
+            showNotification(`${filesAdded} archivo(s) agregado(s)`, 'success');
+        }
+    }
+    
+    function addLibraryFileToPreview(file) {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-preview-item';
+        fileItem.setAttribute('data-file-name', file.name);
+        
+        const fileSize = formatFileSize(file.size);
+        const fileIcon = getFileIcon(file.name);
+        
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <div class="file-icon">
+                    <i class="${fileIcon}"></i>
                 </div>
-                <button type="button" class="file-remove" onclick="this.parentElement.remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
+                <div class="file-details">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${fileSize}</div>
+                </div>
+            </div>
+            <button type="button" class="file-remove" onclick="removeLibraryFileFromPreview('${file.name}')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        if (filePreview) {
+            const emptyMessage = filePreview.querySelector('.empty-preview');
+            if (emptyMessage) {
+                emptyMessage.remove();
+            }
             filePreview.appendChild(fileItem);
         }
     }
+    
+    // Inicializar preview vacío
+    if (filePreview && window.libraryUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+}
+
+// Función para remover archivo de biblioteca
+function removeLibraryFileFromPreview(fileName) {
+    console.log('🗑️ Eliminando archivo:', fileName);
+    
+    // Remover del array
+    window.libraryUploadedFiles = window.libraryUploadedFiles.filter(file => file.name !== fileName);
+    
+    // Remover del DOM
+    const fileItem = document.querySelector(`.file-preview-item[data-file-name="${fileName}"]`);
+    if (fileItem) {
+        fileItem.remove();
+    }
+    
+    // Mostrar mensaje vacío si no hay archivos
+    const filePreview = document.getElementById('resource-file-preview');
+    if (filePreview && window.libraryUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    showNotification(`Archivo "${fileName}" eliminado`, 'info');
 }
 
 // Crear card mejorada para la vista general
@@ -12303,118 +12416,137 @@ function handleResourceTypeChange() {
 async function submitNewResource(e) {
     e.preventDefault();
     
-    if (!checkAuth()) return;
-    
     console.log('📚 Iniciando subida de recurso...');
     
+    if (!checkAuth()) return;
+    
+    // Obtener datos del formulario
+    const title = document.getElementById('resource-title').value.trim();
+    const description = document.getElementById('resource-description').value.trim();
+    const resourceType = document.getElementById('resource-type').value;
+    const externalUrl = document.getElementById('resource-url').value.trim();
+    const mainCategory = document.getElementById('resource-main-category').value;
+    const subcategory = document.getElementById('resource-subcategory').value;
+    
+    // DEBUG: Verificar todos los datos
+    console.log('🔍 Datos del formulario:', {
+        title: title,
+        description: description,
+        resourceType: resourceType,
+        externalUrl: externalUrl,
+        mainCategory: mainCategory,
+        subcategory: subcategory,
+        filesCount: window.libraryUploadedFiles ? window.libraryUploadedFiles.length : 0,
+        hasFiles: !!(window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0)
+    });
+    
+    // Validaciones básicas
+    if (!title || !description || !resourceType || !mainCategory) {
+        showNotification('Por favor completa todos los campos obligatorios', 'error');
+        return;
+    }
+    
+    // Validación específica por tipo de recurso
+    if (resourceType !== 'enlace') {
+        // Para tipos que requieren archivo
+        if (!window.libraryUploadedFiles || window.libraryUploadedFiles.length === 0) {
+            showNotification('Debes seleccionar al menos un archivo para este tipo de recurso', 'error');
+            return;
+        }
+    } else {
+        // Para enlaces externos
+        if (!externalUrl) {
+            showNotification('La URL es requerida para recursos de tipo enlace', 'error');
+            return;
+        }
+    }
+    
+    // Mostrar loading
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+    submitBtn.disabled = true;
+    
     try {
-        // Obtener valores del formulario
-        const title = document.getElementById('resource-title')?.value;
-        const description = document.getElementById('resource-description')?.value;
-        const resourceType = document.getElementById('resource-type')?.value;
-        const externalUrl = document.getElementById('resource-url')?.value;
-        const mainCategory = document.getElementById('resource-main-category')?.value;
-        const subcategory = document.getElementById('resource-subcategory')?.value;
+        console.log('🚀 Preparando datos para enviar...');
         
-        // 🔥 USAR EL ARRAY GLOBAL EN LUGAR DEL INPUT FILE
-        const hasFiles = window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0;
+        // Preparar datos base
+        const formData = {
+            title: title,
+            description: description,
+            resource_type: resourceType,
+            external_url: resourceType === 'enlace' ? externalUrl : '',
+            main_category: mainCategory,
+            subcategory: subcategory
+        };
         
-        console.log('🔍 Elementos encontrados:', {
-            title: !!title,
-            description: !!description,
-            resourceType: resourceType,
-            externalUrl: externalUrl,
-            mainCategory: mainCategory,
-            subcategory: subcategory,
-            hasFiles: hasFiles,
-            filesCount: window.resourceUploadedFiles?.length || 0
-        });
+        console.log('📤 Datos base preparados:', formData);
         
-        // Debug del input file
-        debugFileInput();
-        
-        // Validar campos requeridos
-        if (!title || !description || !resourceType || !mainCategory) {
-            throw new Error('Todos los campos marcados con * son requeridos');
+        // Procesar archivos si existen
+        if (resourceType !== 'enlace' && window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0) {
+            console.log(`📁 Procesando ${window.libraryUploadedFiles.length} archivos...`);
+            
+            // Tomar solo el primer archivo (para simplificar)
+            const file = window.libraryUploadedFiles[0];
+            console.log('📄 Archivo a subir:', file.name, formatFileSize(file.size));
+            
+            // Leer archivo como base64
+            const fileBase64 = await readFileAsBase64(file);
+            formData.fileData = fileBase64;
+            formData.fileName = file.name;
+            formData.fileType = file.type;
+            
+            console.log('✅ Archivo convertido a base64, longitud:', fileBase64.length);
         }
         
-        // 🔥 VALIDACIÓN CORREGIDA - Usar el array global
-        if (resourceType !== 'enlace') {
-            if (!hasFiles) {
-                throw new Error('El archivo es requerido para este tipo de recurso');
+        console.log('📤 Enviando datos al servidor...');
+        
+        const response = await fetch(`${API_BASE}/library`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        console.log('📥 Respuesta del servidor:', response.status, response.statusText);
+        
+        if (response.ok) {
+            const newResource = await response.json();
+            console.log('✅ Recurso creado exitosamente:', newResource);
+            
+            showNotification(`Recurso "${title}" subido exitosamente`, 'success');
+            
+            // Cerrar modal y limpiar formulario
+            closeModal(document.getElementById('new-resource-modal'));
+            document.getElementById('resource-form').reset();
+            
+            // Limpiar archivos
+            window.libraryUploadedFiles = [];
+            const filePreview = document.getElementById('resource-file-preview');
+            if (filePreview) {
+                filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
             }
-            console.log('📁 Validación de archivo pasada:', window.resourceUploadedFiles.length, 'archivos');
+            
+            // Recargar recursos
+            await loadLibraryResources();
+            
+        } else {
+            const errorData = await response.json();
+            console.error('❌ Error del servidor:', errorData);
+            throw new Error(errorData.error || 'Error al subir el recurso');
         }
-        
-        // Validar URL para enlaces
-        if (resourceType === 'enlace' && !externalUrl) {
-            throw new Error('La URL es requerida para recursos de tipo enlace');
-        }
-        
-        console.log('📋 Datos del formulario:', {
-            title,
-            description,
-            resourceType,
-            externalUrl,
-            mainCategory,
-            subcategory,
-            filesCount: window.resourceUploadedFiles?.length || 0
-        });
-        
-        // Crear FormData manualmente
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('description', description);
-        formData.append('resource_type', resourceType);
-        formData.append('main_category', mainCategory);
-        
-        // Agregar campos opcionales si existen
-        if (externalUrl) formData.append('external_url', externalUrl);
-        if (subcategory) formData.append('subcategory', subcategory);
-        
-        // 🔥 AGREGAR ARCHIVOS DEL ARRAY GLOBAL
-        if (resourceType !== 'enlace' && window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0) {
-            window.resourceUploadedFiles.forEach((file, index) => {
-                formData.append('files', file);
-            });
-            console.log('📁 Archivos agregados al FormData:', window.resourceUploadedFiles.length);
-        }
-        
-        console.log('📦 FormData creado manualmente');
-        
-        // Mostrar loading
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
-        submitBtn.disabled = true;
-        
-        console.log('🚀 Enviando recurso a la biblioteca...');
-        const result = await submitEnhancedResource(formData);
-        
-        console.log('✅ Recurso subido exitosamente:', result);
-        showNotification('Recurso subido exitosamente a la biblioteca', 'success');
-        
-        // Cerrar modal y limpiar TODO
-        closeModal(document.getElementById('new-resource-modal'));
-        e.target.reset();
-        window.resourceUploadedFiles = []; // 🔥 LIMPIAR ARRAY
-        
-        // Recargar la biblioteca
-        loadLibraryResources();
         
     } catch (error) {
         console.error('❌ Error subiendo recurso:', error);
         showNotification(`Error: ${error.message}`, 'error');
     } finally {
         // Restaurar botón
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Recurso';
-            submitBtn.disabled = false;
-        }
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
     }
 }
-
 
 function sortIdeasList(sortBy) {
     switch(sortBy) {
