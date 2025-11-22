@@ -11832,129 +11832,70 @@ async function showResourceDetails(resourceId) {
         const isLink = resource.resource_type === 'enlace';
         const hasFile = resource.file_data || resource.file_name;
         
-        const modalContent = `
-            <div class="resource-details">
-                <div class="resource-info">
-                    <div class="detail-section">
-                        <h3><i class="fas fa-align-left"></i> Descripción</h3>
-                        <p>${escapeHtml(resource.description)}</p>
-                    </div>
-                    
-                    <div class="resource-meta-grid">
-                        <div class="meta-item">
-                            <strong><i class="fas fa-folder"></i> Categoría:</strong>
-                            <span>${escapeHtml(resource.main_category)} / ${escapeHtml(resource.subcategory)}</span>
-                        </div>
-                        <div class="meta-item">
-                            <strong><i class="fas fa-user"></i> Subido por:</strong>
-                            <span>${escapeHtml(resource.uploader_name || 'Usuario')}</span>
-                        </div>
-                        <div class="meta-item">
-                            <strong><i class="fas fa-calendar"></i> Fecha:</strong>
-                            <span>${formatDate(resource.created_at)}</span>
-                        </div>
-                        ${resource.file_size ? `
-                        <div class="meta-item">
-                            <strong><i class="fas fa-weight-hanging"></i> Tamaño:</strong>
-                            <span>${formatFileSize(resource.file_size)}</span>
-                        </div>
-                        ` : ''}
-                        ${resource.file_name ? `
-                        <div class="meta-item">
-                            <strong><i class="fas fa-file"></i> Archivo:</strong>
-                            <span>${escapeHtml(resource.file_name)}</span>
-                        </div>
-                        ` : ''}
-                        ${isLink && resource.external_url ? `
-                        <div class="meta-item">
-                            <strong><i class="fas fa-link"></i> Tipo:</strong>
-                            <span>Enlace Externo</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    ${isLink && resource.external_url ? `
-                    <div class="detail-section">
-                        <h3><i class="fas fa-link"></i> Enlace Externo</h3>
-                        <div class="external-url">
-                            <a href="${escapeHtml(resource.external_url)}" target="_blank" rel="noopener">
-                                ${escapeHtml(resource.external_url)}
-                            </a>
-                        </div>
-                    </div>
-                    ` : ''}
-                </div>
-                
-                <div class="resource-actions-detailed">
-                    <!-- Botón Visitar (solo para enlaces) -->
-                    ${isLink && resource.external_url ? `
-                    <button class="btn btn-primary btn-lg visit-resource-detailed" 
-                            data-url="${escapeHtml(resource.external_url)}">
-                        <i class="fas fa-external-link-alt"></i> Visitar Enlace
-                    </button>
-                    ` : ''}
-                    
-                    <!-- Botón Descargar (solo para recursos con archivos) -->
-                    ${!isLink && hasFile ? `
-                    <button class="btn btn-success btn-lg download-resource-detailed" 
-                            data-resource-id="${resource.id}"
-                            data-file-name="${escapeHtml(resource.file_name || resource.title)}">
-                        <i class="fas fa-download"></i> Descargar Archivo
-                    </button>
-                    ` : ''}
-                    
-                    <!-- Mensaje si no hay archivo ni enlace -->
-                    ${!isLink && !hasFile ? `
-                    <div class="no-file-message">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Este recurso no tiene archivo asociado para descargar.</p>
-                    </div>
-                    ` : ''}
-                    
-                    <!-- Botón Eliminar (solo admin/uploader) -->
-                    ${(currentUser.user_type === 'admin' || currentUser.id === resource.uploaded_by) ? `
-                    <button class="btn btn-danger delete-resource-detailed" 
-                            data-resource-id="${resource.id}">
-                        <i class="fas fa-trash"></i> Eliminar Recurso
-                    </button>
-                    ` : ''}
-                </div>
-            </div>
-        `;
+        // Actualizar el contenido del modal existente
+        document.getElementById('detail-resource-title').textContent = resource.title;
+        document.getElementById('detail-resource-type').textContent = getResourceTypeLabel(resource.resource_type);
+        document.getElementById('detail-resource-type').className = `resource-type-badge ${resource.resource_type}`;
+        document.getElementById('detail-resource-category').textContent = resource.main_category;
+        document.getElementById('detail-resource-uploader').textContent = `Subido por ${resource.uploader_name || 'Usuario'}`;
+        document.getElementById('detail-resource-date').textContent = formatDate(resource.created_at);
+        document.getElementById('detail-resource-description').textContent = resource.description;
         
-        // MOSTRAR EL MODAL CORRECTAMENTE
-        showModal(`Detalles: ${escapeHtml(resource.title)}`, modalContent, 'large');
+        // Información adicional
+        document.getElementById('detail-info-type').textContent = getResourceTypeLabel(resource.resource_type);
+        document.getElementById('detail-info-category').textContent = resource.main_category;
+        document.getElementById('detail-info-subcategory').textContent = resource.subcategory || 'N/A';
+        document.getElementById('detail-info-size').textContent = resource.file_size ? formatFileSize(resource.file_size) : 'N/A';
+        document.getElementById('detail-info-format').textContent = resource.file_type ? resource.file_type.split('/')[1]?.toUpperCase() || 'N/A' : 'N/A';
         
-        // Agregar event listeners para los botones en el modal
+        // Mostrar/ocultar y configurar botones
+        const downloadBtn = document.getElementById('resource-download-btn');
+        const linkBtn = document.getElementById('resource-link-btn');
+        const filesSection = document.getElementById('resource-files-section');
+        
+        // Configurar botón de descarga
+        if (!isLink && hasFile) {
+            downloadBtn.style.display = 'flex';
+            downloadBtn.onclick = () => downloadResource(resource.id, resource.file_name || resource.title);
+        } else {
+            downloadBtn.style.display = 'none';
+        }
+        
+        // Configurar botón de enlace
+        if (isLink && resource.external_url) {
+            linkBtn.style.display = 'flex';
+            linkBtn.onclick = () => window.open(resource.external_url, '_blank', 'noopener,noreferrer');
+        } else {
+            linkBtn.style.display = 'none';
+        }
+        
+        // Mostrar sección de archivos si hay
+        if (hasFile && !isLink) {
+            filesSection.style.display = 'block';
+            const filesList = document.getElementById('detail-resource-files');
+            filesList.innerHTML = `
+                <div class="resource-file-item">
+                    <i class="fas fa-file ${getFileIcon(resource.file_type)}"></i>
+                    <div class="file-info">
+                        <span class="file-name">${escapeHtml(resource.file_name)}</span>
+                        <span class="file-size">${resource.file_size ? formatFileSize(resource.file_size) : 'Tamaño desconocido'}</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline download-file-btn" 
+                            onclick="downloadResource(${resource.id}, '${escapeHtml(resource.file_name || resource.title)}')">
+                        <i class="fas fa-download"></i> Descargar
+                    </button>
+                </div>
+            `;
+        } else {
+            filesSection.style.display = 'none';
+        }
+        
+        // Mostrar el modal
+        const modal = document.getElementById('resource-detail-modal');
+        modal.style.display = 'block';
         setTimeout(() => {
-            // Botón visitar en modal
-            const visitBtn = document.querySelector('.visit-resource-detailed');
-            if (visitBtn) {
-                visitBtn.addEventListener('click', function() {
-                    const url = this.getAttribute('data-url');
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                });
-            }
-            
-            // Botón descargar en modal
-            const downloadBtn = document.querySelector('.download-resource-detailed');
-            if (downloadBtn) {
-                downloadBtn.addEventListener('click', function() {
-                    const resourceId = this.getAttribute('data-resource-id');
-                    const fileName = this.getAttribute('data-file-name');
-                    downloadResource(resourceId, fileName);
-                });
-            }
-            
-            // Botón eliminar en modal
-            const deleteBtn = document.querySelector('.delete-resource-detailed');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', function() {
-                    const resourceId = this.getAttribute('data-resource-id');
-                    deleteResource(resourceId);
-                });
-            }
-        }, 100);
+            modal.classList.add('active');
+        }, 10);
         
     } catch (error) {
         console.error('❌ Error mostrando detalles:', error);
@@ -12264,6 +12205,25 @@ function formatDate(dateString) {
         day: 'numeric'
     });
 }
+
+// Event listener para cerrar el modal
+document.querySelector('#resource-detail-modal .close').addEventListener('click', function() {
+    const modal = document.getElementById('resource-detail-modal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+});
+
+// Cerrar al hacer clic fuera del modal
+document.getElementById('resource-detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.classList.remove('active');
+        setTimeout(() => {
+            this.style.display = 'none';
+        }, 300);
+    }
+});
 
 // Modificar la función existente loadLibraryResources para incluir las nuevas categorías
 async function loadLibraryResources() {
