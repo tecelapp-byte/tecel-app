@@ -677,7 +677,6 @@ function setupEventListeners() {
     // Búsquedas - Solo si existen
     const searchProjects = document.getElementById('search-projects');
     const searchIdeas = document.getElementById('search-ideas');
-    const searchLibrary = document.getElementById('search-library');
     
     if (searchProjects) searchProjects.addEventListener('input', function() {
         currentSearchTerm = this.value.toLowerCase();
@@ -689,23 +688,39 @@ function setupEventListeners() {
         filterIdeas();
     });
 
-    if (searchLibrary) searchLibrary.addEventListener('input', function() {
+    // Buscador de biblioteca
+const searchLibrary = document.getElementById('search-library');
+if (searchLibrary) {
+    searchLibrary.addEventListener('input', function() {
         currentSearchTerm = this.value.toLowerCase();
-        filterLibrary();
+        renderLibraryResources();
     });
+}
+
+    // Filtros de biblioteca
+    const libraryCategoryFilter = document.getElementById('library-category-filter');
+    const libraryTypeFilter = document.getElementById('library-type-filter');
+
+    if (libraryCategoryFilter) {
+        libraryCategoryFilter.addEventListener('change', function() {
+            currentCategoryFilter = this.value;
+            renderLibraryResources();
+        });
+    }
+
+    if (libraryTypeFilter) {
+        libraryTypeFilter.addEventListener('change', function() {
+            currentCategoryFilter = this.value;
+            renderLibraryResources();
+        });
+    }
 
     // Filtros - Solo si existen
     const categoryFilter = document.getElementById('category-filter');
-    const libraryCategoryFilter = document.getElementById('library-category-filter');
     
     if (categoryFilter) categoryFilter.addEventListener('change', function() {
         currentCategoryFilter = this.value;
         filterIdeas();
-    });
-
-    if (libraryCategoryFilter) libraryCategoryFilter.addEventListener('change', function() {
-        currentCategoryFilter = this.value;
-        filterLibrary();
     });
 
     // Cards de ideas - Solo si existen
@@ -2912,32 +2927,65 @@ function verifyDetailModalElements() {
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
+    card.setAttribute('data-resource-id', resource.id);
     
-    // Determinar si es archivo o enlace
+    // Determinar tipo de recurso y acciones disponibles
     const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
     const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
     
+    // Obtener etiquetas
+    const typeLabel = getResourceTypeLabel(resource.resource_type);
+    const categoryLabel = getCategoryLabel(resource.main_category);
+    
     card.innerHTML = `
-        <div class="library-header">
-            <h3 class="library-title">${resource.title}</h3>
-            <span class="library-type">${getResourceTypeLabel(resource.resource_type)}</span>
+        <div class="library-card-header">
+            <h3 class="library-card-title">${resource.title}</h3>
+            <span class="library-type-badge">${typeLabel}</span>
         </div>
-        <div class="library-category">${getCategoryLabel(resource.main_category)}${resource.subcategory ? ` • ${resource.subcategory}` : ''}</div>
-        <p class="library-description">${resource.description}</p>
-        <div class="library-actions">
+        
+        <div class="library-card-category">
+            <i class="fas fa-folder"></i>
+            ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
+        </div>
+        
+        <p class="library-card-description">${resource.description}</p>
+        
+        <div class="library-card-meta">
+            <span class="library-uploader">
+                <i class="fas fa-user"></i>
+                ${resource.uploader_name || 'Usuario'}
+            </span>
+            <span class="library-date">
+                <i class="fas fa-calendar"></i>
+                ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+            </span>
+        </div>
+        
+        <div class="library-card-actions">
             ${isFileResource ? 
-                `<button class="btn-primary" onclick="downloadLibraryResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
+                `<button class="btn-primary btn-sm" onclick="downloadLibraryResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
                     <i class="fas fa-download"></i> Descargar
                 </button>` : ''}
+                
             ${isLinkResource ? 
-                `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
-                    <i class="fas fa-external-link-alt"></i> Visitar Enlace
+                `<button class="btn-outline btn-sm" onclick="window.open('${resource.external_url}', '_blank')">
+                    <i class="fas fa-external-link-alt"></i> Visitar
                 </button>` : ''}
-            <button class="btn-outline" onclick="showResourceDetails(${resource.id})">
-                <i class="fas fa-eye"></i> Ver Detalles
+                
+            <button class="btn-outline btn-sm" onclick="showResourceDetails(${resource.id})">
+                <i class="fas fa-eye"></i> Detalles
             </button>
         </div>
     `;
+    
+    // Hacer toda la tarjeta clickeable para detalles
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', function(e) {
+        // Solo abrir detalles si no se hizo click en un botón
+        if (!e.target.closest('button')) {
+            showResourceDetails(resource.id);
+        }
+    });
     
     return card;
 }
@@ -3379,6 +3427,7 @@ function showSection(sectionId) {
             case 'biblioteca':
                 loadLibraryResources();
                     setTimeout(() => {
+                    initLibrarySystem();
                     updateLibraryCategoryCounters();
                     }, 500); // Pequeño delay para asegurar que los recursos estén cargados
                 break;
@@ -9918,19 +9967,25 @@ function getSampleLibraryResources() {
     return [
         {
             id: 1,
-            title: "Guía de Arduino para Principiantes",
-            description: "Manual completo para empezar con Arduino y electrónica básica.",
-            resource_type: "documento",
-            category: "electronica",
-            file_url: "/uploads/guia-arduino.pdf"
+            title: 'Manual de Arduino Básico',
+            description: 'Guía completa para empezar con Arduino',
+            resource_type: 'documento',
+            main_category: 'programas',
+            subcategory: 'programacion',
+            file_url: '/files/arduino-manual.pdf',
+            uploader_name: 'Profesor Electrónica',
+            created_at: new Date().toISOString()
         },
         {
             id: 2,
-            title: "Introducción a IoT",
-            description: "Conceptos básicos de Internet de las Cosas y aplicaciones prácticas.",
-            resource_type: "enlace",
-            category: "iot",
-            external_url: "https://example.com/iot-intro"
+            title: 'Tutorial de PCB Design',
+            description: 'Aprende a diseñar circuitos impresos',
+            resource_type: 'video', 
+            main_category: 'habilidades_tecnicas',
+            subcategory: 'electronica',
+            external_url: 'https://youtube.com/tutorial-pcb',
+            uploader_name: 'Ing. Circuitos',
+            created_at: new Date().toISOString()
         }
     ];
 }
@@ -11880,9 +11935,15 @@ function getCategoryLabel(category) {
     const categories = {
         'programas': 'Programas',
         'habilidades_tecnicas': 'Habilidades Técnicas',
-        'habilidades_blandas': 'Habilidades Blandas'
+        'habilidades_blandas': 'Habilidades Blandas',
+        'electronica': 'Electrónica',
+        'programacion': 'Programación', 
+        'robotica': 'Robótica',
+        'iot': 'IoT',
+        'proyectos': 'Proyectos',
+        'manuales': 'Manuales'
     };
-    return categories[category] || category;
+    return categories[category] || category || 'Sin categoría';
 }
 
 function getSubcategoryLabel(mainCategory, subcategory) {
@@ -11934,97 +11995,180 @@ function formatDate(dateString) {
 // Modificar la función existente loadLibraryResources para incluir las nuevas categorías
 async function loadLibraryResources() {
     try {
-        libraryResources = await apiCall('/library');
-        renderLibraryResources();
-        updateLibraryStats();
-        updateCategoryCards();
+        console.log('📚 Cargando recursos de biblioteca...');
+        const response = await fetch(`${API_BASE}/library`);
+        
+        if (response.ok) {
+            libraryResources = await response.json();
+            console.log(`✅ ${libraryResources.length} recursos cargados`);
+            renderLibraryResources();
+            updateLibraryStats();
+        } else {
+            throw new Error('Error cargando recursos');
+        }
     } catch (error) {
-        console.error('Error cargando recursos de biblioteca:', error);
+        console.error('❌ Error cargando recursos de biblioteca:', error);
+        // Usar datos de ejemplo si hay error
         libraryResources = getSampleLibraryResources();
         renderLibraryResources();
         updateLibraryStats();
-        updateCategoryCards();
     }
 }
 
 // Función para actualizar los contadores de categorías de biblioteca
-async function updateLibraryCategoryCounters() {
-    console.log('📊 Actualizando contadores de categorías de biblioteca...');
+function updateLibraryCategoryCounters() {
+    if (!libraryResources || libraryResources.length === 0) return;
+    
+    const categories = {
+        'programas': 'programas-count',
+        'habilidades_tecnicas': 'tecnicas-count', 
+        'habilidades_blandas': 'blandas-count'
+    };
+    
+    Object.entries(categories).forEach(([category, elementId]) => {
+        const count = libraryResources.filter(r => r.main_category === category).length;
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = count;
+        }
+    });
+}
+
+// Inicializar biblioteca mejorada - CON RETRY MEJORADO
+function initLibrarySystem() {
+    console.log('🔄 Inicializando sistema de biblioteca...');
     
     try {
-        // Si no hay recursos cargados, cargarlos primero
-        if (!libraryResources || libraryResources.length === 0) {
-            await loadLibraryResources();
-        }
-        
-        // Contar recursos por categoría principal
-        const programasCount = libraryResources.filter(resource => 
-            resource.main_category === 'programas' || resource.category === 'programas'
-        ).length;
-        
-        const tecnicasCount = libraryResources.filter(resource => 
-            resource.main_category === 'habilidades_tecnicas' || resource.category === 'habilidades_tecnicas'
-        ).length;
-        
-        const blandasCount = libraryResources.filter(resource => 
-            resource.main_category === 'habilidades_blandas' || resource.category === 'habilidades_blandas'
-        ).length;
-        
-        // Actualizar los contadores en las cards
-        const programasElement = document.getElementById('programas-count');
-        const tecnicasElement = document.getElementById('tecnicas-count');
-        const blandasElement = document.getElementById('blandas-count');
-        
-        if (programasElement) {
-            programasElement.textContent = programasCount;
-            console.log(`✅ Programas: ${programasCount} recursos`);
-        }
-        
-        if (tecnicasElement) {
-            tecnicasElement.textContent = tecnicasCount;
-            console.log(`✅ Habilidades Técnicas: ${tecnicasCount} recursos`);
-        }
-        
-        if (blandasElement) {
-            blandasElement.textContent = blandasCount;
-            console.log(`✅ Habilidades Blandas: ${blandasCount} recursos`);
-        }
-        
-        // También actualizar estadísticas generales
-        updateLibraryStats();
-        
+        initEnhancedLibrary();
+        initLibraryFileUpload();
+        console.log('✅ Sistema de biblioteca inicializado correctamente');
     } catch (error) {
-        console.error('❌ Error actualizando contadores de biblioteca:', error);
+        console.error('❌ Error inicializando biblioteca:', error);
+        // Reintentar después de un tiempo
+        setTimeout(initLibrarySystem, 1000);
     }
 }
 
 // Actualizar la función renderLibraryResources existente
 function renderLibraryResources() {
     const container = document.getElementById('library-container');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Contenedor de biblioteca no encontrado');
+        return;
+    }
     
     container.innerHTML = '';
     
     if (libraryResources.length === 0) {
+        document.getElementById('library-empty').style.display = 'block';
+        return;
+    }
+    
+    document.getElementById('library-empty').style.display = 'none';
+    
+    // Aplicar filtros
+    const searchTerm = document.getElementById('search-library')?.value.toLowerCase() || '';
+    const categoryFilter = document.getElementById('library-category-filter')?.value || 'all';
+    const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
+    
+    const filteredResources = libraryResources.filter(resource => {
+        const matchesSearch = !searchTerm || 
+            resource.title.toLowerCase().includes(searchTerm) ||
+            resource.description.toLowerCase().includes(searchTerm) ||
+            (resource.main_category && resource.main_category.toLowerCase().includes(searchTerm));
+        
+        const matchesCategory = categoryFilter === 'all' || 
+            (resource.main_category && resource.main_category === categoryFilter);
+        
+        const matchesType = typeFilter === 'all' || 
+            (resource.resource_type && resource.resource_type === typeFilter);
+        
+        return matchesSearch && matchesCategory && matchesType;
+    });
+    
+    if (filteredResources.length === 0) {
         container.innerHTML = `
-            <div class="empty-state" id="library-empty">
-                <div class="empty-icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <h3>No hay recursos disponibles</h3>
-                <p>¡Sé el primero en compartir un recurso educativo!</p>
-                <button class="btn-primary" id="create-first-resource">
-                    <i class="fas fa-plus"></i> Subir Primer Recurso
-                </button>
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron recursos</h3>
+                <p>Intenta con otros términos de búsqueda</p>
             </div>
         `;
         return;
     }
     
-    libraryResources.forEach(resource => {
-        const resourceCard = createEnhancedLibraryCard(resource);
-        container.appendChild(resourceCard);
+    // Renderizar recursos filtrados
+    filteredResources.forEach(resource => {
+        const card = createLibraryCard(resource);
+        container.appendChild(card);
     });
+    
+    console.log(`✅ ${filteredResources.length} recursos renderizados`);
+}
+
+// Función para inicializar upload de archivos en biblioteca
+function initLibraryFileUpload() {
+    const fileInput = document.getElementById('resource-file');
+    const fileUploadArea = document.getElementById('resource-file-upload-area');
+    const filePreview = document.getElementById('resource-file-preview');
+    
+    if (!fileInput || !fileUploadArea) return;
+    
+    console.log('📚 Inicializando upload de archivos para biblioteca');
+    
+    // Configurar event listeners
+    fileUploadArea.addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files && e.target.files.length > 0) {
+            handleLibraryFiles(e.target.files);
+        }
+    });
+    
+    // Drag and drop
+    fileUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
+    });
+    
+    fileUploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+    });
+    
+    fileUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleLibraryFiles(e.dataTransfer.files);
+        }
+    });
+    
+    function handleLibraryFiles(files) {
+        if (!files || files.length === 0) return;
+        
+        filePreview.innerHTML = '';
+        
+        for (let file of files) {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-preview-item';
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <div class="file-icon">
+                        <i class="${getFileIcon(file.name)}"></i>
+                    </div>
+                    <div class="file-details">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                </div>
+                <button type="button" class="file-remove" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            filePreview.appendChild(fileItem);
+        }
+    }
 }
 
 // Crear card mejorada para la vista general
@@ -12300,17 +12444,41 @@ function updateSuggestionStats() {
 }
 
 function updateLibraryStats() {
-    if (!libraryResources.length) return;
+    if (!libraryResources || libraryResources.length === 0) {
+        // Resetear contadores si no hay recursos
+        ['stats-resources-total', 'stats-resources-docs', 'stats-resources-videos', 'stats-resources-links'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = '0';
+        });
+        return;
+    }
     
-    const total = libraryResources.length;
-    const docs = libraryResources.filter(r => r.resource_type === 'documento').length;
-    const videos = libraryResources.filter(r => r.resource_type === 'video').length;
-    const links = libraryResources.filter(r => r.resource_type === 'enlace').length;
+    // Contar por tipo
+    const docsCount = libraryResources.filter(r => 
+        ['documento', 'presentacion', 'manual'].includes(r.resource_type)
+    ).length;
     
-    document.getElementById('stats-resources-total').textContent = total;
-    document.getElementById('stats-resources-docs').textContent = docs;
-    document.getElementById('stats-resources-videos').textContent = videos;
-    document.getElementById('stats-resources-links').textContent = links;
+    const videosCount = libraryResources.filter(r => 
+        r.resource_type === 'video'
+    ).length;
+    
+    const linksCount = libraryResources.filter(r => 
+        r.resource_type === 'enlace'
+    ).length;
+    
+    // Actualizar UI
+    const totalElement = document.getElementById('stats-resources-total');
+    const docsElement = document.getElementById('stats-resources-docs');
+    const videosElement = document.getElementById('stats-resources-videos');
+    const linksElement = document.getElementById('stats-resources-links');
+    
+    if (totalElement) totalElement.textContent = libraryResources.length;
+    if (docsElement) docsElement.textContent = docsCount;
+    if (videosElement) videosElement.textContent = videosCount;
+    if (linksElement) linksElement.textContent = linksCount;
+    
+    // Actualizar contadores de categorías
+    updateLibraryCategoryCounters();
 }
 
 // En la función renderSuggestions(), asegurar que se muestren a todos
