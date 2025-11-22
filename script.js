@@ -11816,35 +11816,78 @@ async function submitNewResource(e) {
     
     console.log('📚 Iniciando subida de recurso...');
     
-    // Obtener el formulario
-    const form = e.target;
-    const formData = new FormData(form);
-    
-    console.log('📝 Formulario obtenido:', form);
-    console.log('📦 FormData creado:', formData);
-    
-    // Agregar datos adicionales si es necesario
-    const resourceType = document.getElementById('resource-type').value;
-    const mainCategory = document.getElementById('resource-category').value;
-    const subcategory = document.getElementById('resource-subcategory').value;
-    
-    // Agregar estos valores al FormData
-    formData.append('resource_type', resourceType);
-    formData.append('main_category', mainCategory);
-    formData.append('subcategory', subcategory);
-    
-    console.log('🔍 Contenido de FormData:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`   ${key}:`, value);
-    }
-    
-    // Mostrar loading
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
-    submitBtn.disabled = true;
-    
     try {
+        // 🔥 USAR LOS IDs CORRECTOS DEL HTML
+        const title = document.getElementById('resource-title')?.value;
+        const description = document.getElementById('resource-description')?.value;
+        const resourceType = document.getElementById('resource-type')?.value;
+        const externalUrl = document.getElementById('resource-url')?.value;
+        const mainCategory = document.getElementById('resource-main-category')?.value; // 🔥 CORREGIDO
+        const subcategory = document.getElementById('resource-subcategory')?.value;
+        const fileInput = document.getElementById('resource-file');
+        
+        console.log('🔍 Elementos encontrados:', {
+            title: !!title,
+            description: !!description,
+            resourceType: !!resourceType,
+            externalUrl: !!externalUrl,
+            mainCategory: !!mainCategory,
+            subcategory: !!subcategory,
+            fileInput: !!fileInput
+        });
+        
+        // Validar campos requeridos
+        if (!title || !description || !resourceType || !mainCategory) {
+            throw new Error('Todos los campos marcados con * son requeridos');
+        }
+        
+        // Validar según el tipo de recurso
+        if (resourceType === 'enlace' && !externalUrl) {
+            throw new Error('La URL es requerida para recursos de tipo enlace');
+        }
+        
+        if (resourceType !== 'enlace' && (!fileInput || fileInput.files.length === 0)) {
+            throw new Error('El archivo es requerido para este tipo de recurso');
+        }
+        
+        console.log('📋 Datos del formulario:', {
+            title,
+            description,
+            resourceType,
+            externalUrl,
+            mainCategory,
+            subcategory,
+            hasFile: fileInput?.files?.length > 0
+        });
+        
+        // Crear FormData manualmente
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('resource_type', resourceType);
+        formData.append('main_category', mainCategory);
+        
+        // Agregar campos opcionales si existen
+        if (externalUrl) formData.append('external_url', externalUrl);
+        if (subcategory) formData.append('subcategory', subcategory);
+        
+        // Agregar archivo(s) si existen
+        if (fileInput && fileInput.files.length > 0) {
+            // Si son múltiples archivos
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('files', fileInput.files[i]);
+            }
+            console.log('📁 Archivos agregados:', fileInput.files.length);
+        }
+        
+        console.log('📦 FormData creado manualmente');
+        
+        // Mostrar loading
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+        submitBtn.disabled = true;
+        
         console.log('🚀 Enviando recurso a la biblioteca...');
         const result = await submitEnhancedResource(formData);
         
@@ -11853,18 +11896,21 @@ async function submitNewResource(e) {
         
         // Cerrar modal y limpiar formulario
         closeModal(document.getElementById('new-resource-modal'));
-        form.reset();
+        e.target.reset();
         
         // Recargar la biblioteca
         loadLibraryResources();
         
     } catch (error) {
         console.error('❌ Error subiendo recurso:', error);
-        showNotification(`Error subiendo recurso: ${error.message}`, 'error');
+        showNotification(`Error: ${error.message}`, 'error');
     } finally {
         // Restaurar botón
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Recurso';
+            submitBtn.disabled = false;
+        }
     }
 }
 
