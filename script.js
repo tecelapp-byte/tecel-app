@@ -9226,12 +9226,34 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
+// FUNCIÓN ACTUALIZADA - Reemplaza la función downloadProjectFile existente
 async function downloadProjectFile(projectId, fileId, fileName) {
+    // Usar la nueva función con notificaciones del sistema
+    await downloadWithSystemNotification(projectId, fileId, fileName);
+}
+
+// FUNCIÓN ACTUALIZADA - Reemplaza la función downloadLibraryResource existente
+async function downloadLibraryResource(resourceId, resourceName) {
+    // Usar la nueva función con notificaciones del sistema
+    await downloadLibraryResourceWithNotification(resourceId, resourceName);
+}
+
+// ==================== FUNCIONES MEJORADAS PARA DESCARGAS MÓVILES ====================
+
+// Función para detectar si es dispositivo móvil
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.innerWidth <= 768) ||
+           ('ontouchstart' in window);
+}
+
+// Función MEJORADA para activar notificaciones del sistema Android
+async function downloadWithSystemNotification(projectId, fileId, fileName) {
     try {
-        console.log('📱 INICIANDO DESCARGA DESDE MÓVIL:', { projectId, fileId, fileName });
+        console.log('🚀 INICIANDO DESCARGA CON NOTIFICACIÓN SISTEMA:', fileName);
         
-        // Mostrar notificación de inicio de descarga
-        showNotification(`Iniciando descarga: ${fileName}`, 'info');
+        // Mostrar notificación de la app primero
+        showNotification(`📥 Descargando: ${fileName}`, 'info');
         
         const response = await fetch(`${API_BASE}/files/download/${fileId}`, {
             method: 'GET',
@@ -9245,46 +9267,55 @@ async function downloadProjectFile(projectId, fileId, fileName) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
 
-        // Obtener el blob del archivo
         const blob = await response.blob();
-        
-        // Crear URL temporal para el blob
         const url = window.URL.createObjectURL(blob);
         
-        // Crear elemento anchor para descarga
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
+        // Estrategia para Android
+        await androidSystemDownload(url, fileName);
         
-        // Usar el nombre original del archivo
-        a.download = fileName;
-        
-        // Agregar al DOM y hacer click
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('✅ Descarga completada en móvil:', fileName);
-        
-        // Mostrar notificación de éxito con el nombre del archivo
-        showNotification(`✅ Descarga completada: ${fileName}`, 'success');
+        console.log('✅ Descarga del sistema activada para:', fileName);
         
     } catch (error) {
-        console.error('❌ Error en descarga móvil:', error);
-        showNotification(`Error al descargar: ${fileName}`, 'error');
+        console.error('❌ Error en descarga:', error);
+        showNotification(`❌ Error al descargar: ${fileName}`, 'error');
     }
 }
 
-// Función MEJORADA para descargar recursos de biblioteca - COMPATIBLE CON MÓVIL
-async function downloadLibraryResource(resourceId, resourceName) {
-    try {
-        console.log('📱 DESCARGANDO RECURSO DESDE MÓVIL:', { resourceId, resourceName });
+// Estrategia específica para Android
+function androidSystemDownload(url, fileName) {
+    return new Promise((resolve) => {
+        // Crear enlace de descarga
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
         
-        // Mostrar notificación de inicio
-        showNotification(`Descargando: ${resourceName}`, 'info');
+        // Atributos importantes para Android
+        a.setAttribute('download', fileName);
+        a.setAttribute('type', 'application/octet-stream');
+        
+        document.body.appendChild(a);
+        
+        // Disparar descarga
+        a.click();
+        
+        // Limpiar después de un tiempo
+        setTimeout(() => {
+            if (document.body.contains(a)) {
+                document.body.removeChild(a);
+            }
+            window.URL.revokeObjectURL(url);
+            resolve();
+        }, 5000);
+    });
+}
+
+// Función MEJORADA para recursos de biblioteca
+async function downloadLibraryResourceWithNotification(resourceId, resourceName) {
+    try {
+        console.log('📱 DESCARGANDO RECURSO CON NOTIFICACIÓN:', resourceName);
+        
+        showNotification(`📥 Descargando: ${resourceName}`, 'info');
         
         const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
             method: 'GET',
@@ -9298,41 +9329,17 @@ async function downloadLibraryResource(resourceId, resourceName) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
 
-        // Obtener el blob
         const blob = await response.blob();
-        
-        // Crear URL temporal
         const url = window.URL.createObjectURL(blob);
         
-        // Crear elemento de descarga
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = resourceName;
+        await androidSystemDownload(url, resourceName);
         
-        // Ejecutar descarga
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('✅ Recurso descargado en móvil:', resourceName);
-        
-        // Notificación de éxito
-        showNotification(`✅ Descarga completada: ${resourceName}`, 'success');
+        console.log('✅ Recurso descargado con notificación:', resourceName);
         
     } catch (error) {
         console.error('❌ Error descargando recurso:', error);
-        showNotification(`Error al descargar: ${resourceName}`, 'error');
+        showNotification(`❌ Error al descargar: ${resourceName}`, 'error');
     }
-}
-
-// Función para detectar si es dispositivo móvil
-function isMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           (window.innerWidth <= 768);
 }
 
 // Función para mejorar las notificaciones en móvil
