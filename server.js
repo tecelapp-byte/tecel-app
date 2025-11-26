@@ -110,11 +110,6 @@ app.use(express.static(path.join(__dirname), {
     }
 }));
 
-// Ruta principal que sirve el index.html
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // Middleware de autenticación
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -2722,6 +2717,11 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
 
 // Ruta para servir la aplicación
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Ruta principal que sirve el index.html
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
