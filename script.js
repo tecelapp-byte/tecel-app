@@ -9230,82 +9230,60 @@ function debugSuggestionCounters() {
 
 // Función PRINCIPAL para descargar archivos de proyectos
 async function downloadProjectFile(projectId, fileId, fileName) {
-    try {
-        console.log('📱 DESCARGANDO ARCHIVO:', fileName);
-        
-        // Mostrar notificación de la app
-        showNotification(`⬇️ Iniciando descarga: ${fileName}`, 'info');
-        
-        // URL DIRECTA para descarga móvil
-        const downloadUrl = `${API_BASE}/mobile/download/file/${fileId}`;
-        
-        console.log('🔗 URL de descarga:', downloadUrl);
-        
-        // Método 100% efectivo para Android: Redirección directa
-        await triggerMobileDownload(downloadUrl, fileName);
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        showNotification(`❌ Error al descargar: ${fileName}`, 'error');
-    }
+    console.log('📱 INICIANDO DESCARGA:', fileName);
+    
+    // Mostrar notificación
+    showNotification(`⬇️ Descargando: ${fileName}`, 'info');
+    
+    // URL CORRECTA para descarga (usando la ruta que SÍ funciona)
+    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+    
+    console.log('🔗 URL de descarga:', downloadUrl);
+    
+    // Método que SÍ funciona en Android
+    triggerAndroidDownload(downloadUrl, fileName);
 }
 
-// Función PRINCIPAL para descargar recursos de biblioteca
+
+// Función PRINCIPAL para descargar recursos de biblioteca  
 async function downloadLibraryResource(resourceId, resourceName) {
-    try {
-        console.log('📱 DESCARGANDO RECURSO:', resourceName);
-        
-        showNotification(`⬇️ Iniciando descarga: ${resourceName}`, 'info');
-        
-        // URL DIRECTA para descarga móvil
-        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-        
-        console.log('🔗 URL de descarga:', downloadUrl);
-        
-        await triggerMobileDownload(downloadUrl, resourceName);
-        
-    } catch (error) {
-        console.error('❌ Error descargando recurso:', error);
-        showNotification(`❌ Error al descargar: ${resourceName}`, 'error');
-    }
+    console.log('📱 DESCARGANDO RECURSO:', resourceName);
+    
+    showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
+    
+    // URL CORRECTA para descarga
+    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+    
+    console.log('🔗 URL de descarga:', downloadUrl);
+    
+    triggerAndroidDownload(downloadUrl, resourceName);
 }
 
-// Función que SÍ funciona en Android
-function triggerMobileDownload(downloadUrl, fileName) {
-    return new Promise((resolve) => {
-        console.log('🚀 Activando descarga móvil para:', fileName);
-        
-        // Estrategia 1: Redirección directa (MÁS EFECTIVA)
-        console.log('📍 Redirigiendo a:', downloadUrl);
-        window.location.href = downloadUrl;
-        
-        // Estrategia 2: Abrir en nueva pestaña como fallback
-        setTimeout(() => {
-            try {
-                const newWindow = window.open(downloadUrl, '_blank');
-                if (newWindow) {
-                    console.log('✅ Descarga abierta en nueva pestaña');
-                    // No cerramos la pestaña para que el usuario vea el progreso
-                }
-            } catch (e) {
-                console.log('❌ No se pudo abrir nueva pestaña:', e);
-            }
-            resolve();
-        }, 1000);
-        
-        // Estrategia 3: Iframe invisible como último recurso
-        setTimeout(() => {
-            try {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = downloadUrl;
-                document.body.appendChild(iframe);
-                console.log('✅ Descarga via iframe');
-            } catch (e) {
-                console.log('❌ Error con iframe:', e);
-            }
-        }, 2000);
-    });
+// Función que SÍ activa las notificaciones del sistema
+function triggerAndroidDownload(downloadUrl, fileName) {
+    console.log('🚀 ACTIVANDO DESCARGA ANDROID:', fileName);
+    
+    // Estrategia 1: Redirección DIRECTA (la que SÍ funciona)
+    // Esta es la clave - usar window.location.href en lugar de métodos complejos
+    window.location.href = downloadUrl;
+    
+    // Estrategia 2: Abrir en nueva pestaña como backup
+    setTimeout(() => {
+        try {
+            window.open(downloadUrl, '_blank');
+        } catch (e) {
+            console.log('No se pudo abrir nueva pestaña');
+        }
+    }, 100);
+    
+    // Estrategia 3: Mostrar ayuda por si acaso
+    setTimeout(() => {
+        showNotification(
+            `✅ ${fileName} se está descargando. Revisa tus notificaciones.`,
+            'success',
+            5000
+        );
+    }, 2000);
 }
 
 // Función para mostrar ayuda de ubicación de archivos
