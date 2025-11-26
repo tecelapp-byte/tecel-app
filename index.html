@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- En el head de tu index.html -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; 
+        script-src * 'unsafe-inline' 'unsafe-eval' blob:; 
+        connect-src * 'unsafe-inline'; 
+        img-src * data: blob: 'unsafe-inline'; 
+        frame-src *; 
+        style-src * 'unsafe-inline';
+    ">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 <body>
 
@@ -3239,6 +3249,54 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js">
+// Diagnóstico específico para Capacitor
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📱 TECEL - Capacitor App iniciada');
+    
+    // Verificar si estamos en Capacitor
+    const isCapacitor = typeof Capacitor !== 'undefined';
+    console.log('Capacitor detectado:', isCapacitor);
+    
+    // Configuración específica para Capacitor
+    if (isCapacitor) {
+        console.log('🔧 Configurando para entorno Capacitor...');
+        
+        // Forzar redimensionamiento para WebView
+        setTimeout(() => {
+            document.body.style.opacity = '1';
+            document.body.style.transform = 'translateZ(0)';
+        }, 100);
+    }
+    
+    // Mostrar estado de la app
+    const appState = {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        capacitor: isCapacitor,
+        online: navigator.onLine
+    };
+    
+    console.log('📊 Estado de la app:', appState);
+});
+
+// Manejar errores de recursos
+window.addEventListener('error', function(e) {
+    console.error('❌ Error loading resource:', e);
+});
+
+// Verificar carga completa
+window.addEventListener('load', function() {
+    console.log('✅ App completamente cargada en Capacitor');
+    
+    // Ocultar splash screen automáticamente después de 3 segundos
+    setTimeout(() => {
+        if (typeof Capacitor !== 'undefined' && Capacitor.Plugins && Capacitor.Plugins.SplashScreen) {
+            Capacitor.Plugins.SplashScreen.hide();
+        }
+    }, 3000);
+});
+</script>
 </body>
 </html>

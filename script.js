@@ -81,8 +81,31 @@ window.conversionUploadedFiles = [];
 // INICIALIZAR ARRAY GLOBAL DE ARCHIVOS
 window.uploadedFiles = [];
 
-// CONFIGURACIÓN PARA PRODUCCIÓN
-const API_BASE = 'https://tecel-app.onrender.com/api';
+// CONFIGURACIÓN PARA PRODUCCIÓN/ANDROID
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isLocalhost = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' ||
+                    window.location.hostname === '192.168.1.34';
+
+// URL base dinámica
+const API_BASE = isAndroid ? 'https://tecel-app.onrender.com/api' : 
+                 isLocalhost ? 'http://localhost:3000/api' : 
+                 '/api';
+
+console.log('🚀 Entorno detectado:', {
+    userAgent: navigator.userAgent,
+    hostname: window.location.hostname,
+    isAndroid: isAndroid,
+    isLocalhost: isLocalhost,
+    API_BASE: API_BASE
+});
+
+// Variable global para debug
+window.APP_CONFIG = {
+    API_BASE: API_BASE,
+    isAndroid: isAndroid,
+    isProduction: !isLocalhost
+};
 
 const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
@@ -119,6 +142,7 @@ async function apiFetch(endpoint, options = {}) {
         throw error;
     }
 }
+
 
 // Override global fetch para corregir automáticamente
 window.fetch = function(resource, options = {}) {
@@ -9202,151 +9226,132 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
+// Función MEJORADA para descargar archivos de proyectos - COMPATIBLE CON MÓVIL
 async function downloadProjectFile(projectId, fileId, fileName) {
     try {
-        (`📥 Descargando archivo - Proyecto: ${projectId}, Archivo ID: ${fileId}`);
+        console.log('📱 INICIANDO DESCARGA DESDE MÓVIL:', { projectId, fileId, fileName });
         
-        // Obtener información del archivo
-        const projectResponse = await fetch(`${API_BASE}/projects/${projectId}`, {
-            headers: authToken ? {
-                'Authorization': `Bearer ${authToken}`
-            } : {}
-        });
+        // Mostrar notificación de inicio de descarga
+        showNotification(`Iniciando descarga: ${fileName}`, 'info');
         
-        if (!projectResponse.ok) {
-            throw new Error('No se pudo obtener información del proyecto');
-        }
-        
-        const project = await projectResponse.json();
-        const file = project.files.find(f => f.id === fileId);
-        
-        if (!file) {
-            throw new Error('Archivo no encontrado en el proyecto');
-        }
-        
-        ('📄 Información del archivo:', file);
-        
-        // Crear URL de descarga con timestamp para evitar cache
-        const timestamp = new Date().getTime();
-        const downloadUrl = `${API_BASE}/files/download/${fileId}?t=${timestamp}`;
-        const originalName = file.original_name || fileName || 'archivo_descargado';
-        
-        ('🔗 URL de descarga:', downloadUrl);
-        
-        // MÉTODO 1: Usar fetch y Blob (más confiable)
-        try {
-            const response = await fetch(downloadUrl, {
-                method: 'GET',
-                headers: authToken ? {
-                    'Authorization': `Bearer ${authToken}`
-                } : {}
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-            const blob = await response.blob();
-            
-            if (blob.size === 0) {
-                throw new Error('El archivo recibido está vacío');
-            }
-            
-            // Crear URL del blob
-            const blobUrl = URL.createObjectURL(blob);
-            
-            // Crear enlace de descarga
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = originalName;
-            a.style.display = 'none';
-            
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            // Liberar la URL después de un tiempo
-            setTimeout(() => {
-                URL.revokeObjectURL(blobUrl);
-                ('✅ URL del blob liberada');
-            }, 1000);
-            
-            ('✅ Descarga mediante Blob exitosa');
-            showNotification(`Descargando: ${originalName}`, 'success');
-            return;
-            
-        } catch (fetchError) {
-            ('❌ Método Blob falló, intentando método directo:', fetchError);
-        }
-        
-        // MÉTODO 2: Enlace directo (fallback)
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = originalName;
-        a.target = '_blank'; // Abrir en nueva pestaña si falla la descarga
-        a.style.display = 'none';
-        
-        // Agregar headers de autorización para el enlace
-        if (authToken) {
-            a.setAttribute('data-token', authToken);
-        }
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        ('✅ Descarga mediante enlace directo iniciada');
-        showNotification(`Iniciando descarga: ${originalName}`, 'success');
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        showNotification(`Error al descargar: ${error.message}`, 'error');
-    }
-}
-
-// Función para descargar recursos de biblioteca
-async function downloadLibraryResource(resourceId, fileName) {
-    try {
-        showNotification(`Iniciando descarga de ${fileName}...`, 'info');
-        
-        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+        const response = await fetch(`${API_BASE}/files/download/${fileId}`, {
+            method: 'GET',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
-            throw new Error('Error al descargar el recurso');
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
-        
+
+        // Obtener el blob del archivo
         const blob = await response.blob();
+        
+        // Crear URL temporal para el blob
         const url = window.URL.createObjectURL(blob);
+        
+        // Crear elemento anchor para descarga
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
         
-        // Obtener nombre de archivo del header o usar el título
-        const contentDisposition = response.headers.get('content-disposition');
-        let downloadFileName = fileName;
+        // Usar el nombre original del archivo
+        a.download = fileName;
         
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-            if (filenameMatch && filenameMatch[1]) {
-                downloadFileName = filenameMatch[1];
-            }
-        }
-        
-        a.download = downloadFileName;
+        // Agregar al DOM y hacer click
         document.body.appendChild(a);
         a.click();
+        
+        // Limpiar
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         
-        showNotification(`"${fileName}" descargado exitosamente`, 'success');
+        console.log('✅ Descarga completada en móvil:', fileName);
+        
+        // Mostrar notificación de éxito con el nombre del archivo
+        showNotification(`✅ Descarga completada: ${fileName}`, 'success');
         
     } catch (error) {
-        console.error('Error descargando recurso:', error);
-        showNotification(`Error al descargar: ${error.message}`, 'error');
+        console.error('❌ Error en descarga móvil:', error);
+        showNotification(`Error al descargar: ${fileName}`, 'error');
+    }
+}
+
+// Función MEJORADA para descargar recursos de biblioteca - COMPATIBLE CON MÓVIL
+async function downloadLibraryResource(resourceId, resourceName) {
+    try {
+        console.log('📱 DESCARGANDO RECURSO DESDE MÓVIL:', { resourceId, resourceName });
+        
+        // Mostrar notificación de inicio
+        showNotification(`Descargando: ${resourceName}`, 'info');
+        
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        // Obtener el blob
+        const blob = await response.blob();
+        
+        // Crear URL temporal
+        const url = window.URL.createObjectURL(blob);
+        
+        // Crear elemento de descarga
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = resourceName;
+        
+        // Ejecutar descarga
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ Recurso descargado en móvil:', resourceName);
+        
+        // Notificación de éxito
+        showNotification(`✅ Descarga completada: ${resourceName}`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${resourceName}`, 'error');
+    }
+}
+
+// Función para detectar si es dispositivo móvil
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.innerWidth <= 768);
+}
+
+// Función para mejorar las notificaciones en móvil
+function showMobileDownloadNotification(fileName, type = 'success') {
+    if (isMobileDevice()) {
+        // En móviles, hacer las notificaciones más persistentes
+        const message = type === 'success' 
+            ? `✅ ${fileName} descargado` 
+            : `❌ Error al descargar ${fileName}`;
+            
+        showNotification(message, type, 5000); // 5 segundos en móvil
+    } else {
+        // En desktop, comportamiento normal
+        const message = type === 'success'
+            ? `Descarga completada: ${fileName}`
+            : `Error al descargar: ${fileName}`;
+            
+        showNotification(message, type);
     }
 }
 
