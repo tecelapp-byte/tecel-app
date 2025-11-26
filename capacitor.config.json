@@ -1,14 +1,9 @@
 {
   "appId": "com.tuelectronica.tecel",
-  "appName": "TECEL",
-  "webDir": "www", 
+  "appName": "APP TECEL",
+  "webDir": "www",
   "server": {
-    "url": "https://tecel-app.onrender.com",
-    "cleartext": true,
-    "allowNavigation": [
-      "https://tecel-app.onrender.com/*",
-      "https://*.render.com/*"
-    ]
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {

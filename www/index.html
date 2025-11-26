@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- En el head de tu index.html -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; 
+        script-src * 'unsafe-inline' 'unsafe-eval' blob:; 
+        connect-src * 'unsafe-inline'; 
+        img-src * data: blob: 'unsafe-inline'; 
+        frame-src *; 
+        style-src * 'unsafe-inline';
+    ">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 <body>
 
@@ -209,76 +219,188 @@
     </div>
 </div>
 
-     <!-- Header/Navbar -->
-    <header class="header">
-        <div class="container">
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-microchip"></i>
-                </div>
-                <div class="logo-text">
-                    <h1>TECEL</h1>
-                    <span>Especialidad Electrónica</span>
-                </div>
+<!-- Header/Navbar Rediseñado -->
+<header class="header">
+    <div class="container">
+        <!-- Botón Menú Hamburguesa -->
+        <button class="mobile-menu-btn" id="mobile-menu-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <!-- Logo Centrado -->
+        <a href="#" class="logo" data-section="home">
+            <div class="logo-icon">
+                <i class="fas fa-microchip"></i>
             </div>
-            <nav class="navbar">
-                <ul>
-                    <li><a href="#" class="nav-link active" data-section="home">
-                        <i class="fas fa-home"></i>
-                        <span>Inicio</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="semillero">
-                        <i class="fas fa-seedling"></i>
-                        <span>Semillero</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="ideas">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>Ideas Locas</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="sugerencias">
-                        <i class="fas fa-comments"></i>
-                        <span>Sugerencias</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="biblioteca">
-                        <i class="fas fa-book"></i>
-                        <span>Biblioteca</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="usuario" id="user-nav" style="display: none;">
-                        <i class="fas fa-user"></i>
-                        <span>Mi Cuenta</span>
-                    </a></li>
-                    <li><a href="#" class="nav-link" data-section="admin" id="admin-nav" style="display: none;">
-                        <i class="fas fa-cog"></i>
-                        <span>Administración</span>
-                    </a></li>
-                </ul>
-            </nav>
-            <div class="header-actions">
-                <div class="auth-buttons" id="auth-buttons">
-                    <button class="btn-outline" id="login-btn">
-                        <i class="fas fa-sign-in-alt"></i>
-                        <span>Ingresar</span>
-                    </button>
-                    <button class="btn-primary" id="register-btn">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Registrarse</span>
-                    </button>
-                </div>
-                <div class="user-menu" id="user-menu" style="display: none;">
-                    <div class="user-info">
-                        <span id="user-greeting"></span>
-                    </div>
-                    <button class="btn-outline" id="logout-btn">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Cerrar Sesión</span>
-                    </button>
-                </div>
+            <div class="logo-text">
+                <h1>TECEL</h1>
+                <span>Especialidad Electrónica</span>
             </div>
-            <div class="mobile-menu">
-                <i class="fas fa-bars"></i>
+        </a>
+
+        <!-- Navegación Desktop (oculta en móviles) -->
+        <nav class="navbar">
+            <ul>
+                <li><a href="#" class="nav-link active" data-section="home">
+                    <i class="fas fa-home"></i>
+                    <span>Inicio</span>
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="semillero">
+                    <i class="fas fa-seedling"></i>
+                    <span>Semillero</span>
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="ideas">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>Ideas Locas</span>
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="sugerencias">
+                    <i class="fas fa-comments"></i>
+                    <span>Sugerencias</span>
+                </a></li>
+                <li><a href="#" class="nav-link" data-section="biblioteca">
+                    <i class="fas fa-book"></i>
+                    <span>Biblioteca</span>
+                </a></li>
+            </ul>
+        </nav>
+
+        <!-- Acciones Desktop (ocultas en móviles) -->
+        <div class="header-actions">
+            <div class="auth-buttons" id="auth-buttons">
+                <button class="btn-outline" id="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Ingresar</span>
+                </button>
+                <button class="btn-primary" id="register-btn">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Registrarse</span>
+                </button>
+            </div>
+            <div class="user-menu" id="user-menu" style="display: none;">
+                <div class="user-info">
+                    <span id="user-greeting"></span>
+                </div>
+                <button class="btn-outline" id="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </button>
             </div>
         </div>
-    </header>
+    </div>
+</header>
+
+<!-- Menú Móvil (oculto por defecto) -->
+<div class="mobile-nav-overlay" id="mobile-nav-overlay"></div>
+<nav class="mobile-nav" id="mobile-nav">
+    <!-- Header del Menú Móvil -->
+    <div class="mobile-nav-header">
+        <div class="mobile-nav-logo">
+            <i class="fas fa-microchip"></i>
+        </div>
+        <div class="mobile-nav-title">
+            <h3>TECEL</h3>
+            <p>Especialidad Electrónica</p>
+        </div>
+    </div>
+
+    <!-- Contenido del Menú Móvil -->
+    <div class="mobile-nav-content">
+        <!-- Sección Principal -->
+        <div class="mobile-nav-section">
+            <div class="mobile-nav-section-title">Navegación</div>
+            <ul class="mobile-nav-links">
+                <li>
+                    <a href="#" class="mobile-nav-link active" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Inicio</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="semillero">
+                        <i class="fas fa-seedling"></i>
+                        <span>Semillero de Proyectos</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="ideas">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Ideas Locas</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="sugerencias">
+                        <i class="fas fa-comments"></i>
+                        <span>Sugerencias</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="biblioteca">
+                        <i class="fas fa-book"></i>
+                        <span>Biblioteca</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Sección Usuario (se muestra cuando está logueado) -->
+        <div class="mobile-nav-section" id="mobile-user-section" style="display: none;">
+            <div class="mobile-nav-section-title">Mi Cuenta</div>
+            <ul class="mobile-nav-links">
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="usuario">
+                        <i class="fas fa-user"></i>
+                        <span>Mi Perfil</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="mobile-nav-link" data-section="admin" id="mobile-admin-nav" style="display: none;">
+                        <i class="fas fa-cog"></i>
+                        <span>Administración</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Footer del Menú Móvil -->
+    <div class="mobile-nav-footer">
+        <!-- Info usuario cuando está logueado -->
+        <div class="mobile-user-info" id="mobile-user-info" style="display: none;">
+            <div class="mobile-user-avatar">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="mobile-user-details">
+                <strong id="mobile-user-name">Cargando...</strong>
+                <small id="mobile-user-email">Cargando...</small>
+            </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="mobile-nav-actions">
+            <!-- Botones cuando NO está logueado -->
+            <div id="mobile-auth-buttons">
+                <button class="btn-primary full-width" id="mobile-login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Ingresar a TECEL
+                </button>
+                <button class="btn-outline full-width" id="mobile-register-btn">
+                    <i class="fas fa-user-plus"></i>
+                    Crear Cuenta
+                </button>
+            </div>
+
+            <!-- Botón cerrar sesión cuando SÍ está logueado -->
+            <div id="mobile-logout-section" style="display: none;">
+                <button class="btn-outline full-width" id="mobile-logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+</nav>
     
     <!-- Main Content -->
     <main class="main-content">
@@ -563,7 +685,7 @@
                     <i class="fas fa-comments"></i>
                 </div>
                 <div class="stat-content">
-                    <h3 id="stats-suggestions-total">0</h3>
+                    <h3 id="suggestions-total">0</h3>
                     <p>Total Sugerencias</p>
                 </div>
             </div>
@@ -572,7 +694,7 @@
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="stat-content">
-                    <h3 id="stats-suggestions-pending">0</h3>
+                    <h3 id="suggestions-pendientes">0</h3>
                     <p>Pendientes</p>
                 </div>
             </div>
@@ -581,7 +703,7 @@
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="stat-content">
-                    <h3 id="stats-suggestions-done">0</h3>
+                    <h3 id="suggestions-realizadas">0</h3>
                     <p>Realizadas</p>
                 </div>
             </div>
@@ -723,7 +845,7 @@
         </div>
       </div>
 
-      <div class="library-category-card" id="habilidades-tecnicas-card">
+      <div class="library-category-card" id="habilidades_tecnicas-card">
         <div class="category-card-content">
           <div class="category-icon">
             <i class="fas fa-cogs"></i>
@@ -740,7 +862,7 @@
         </div>
       </div>
 
-      <div class="library-category-card" id="habilidades-blandas-card">
+      <div class="library-category-card" id="habilidades_blandas-card">
         <div class="category-card-content">
           <div class="category-icon">
             <i class="fas fa-users"></i>
@@ -2850,6 +2972,97 @@
   </div>
 </div>
 
+<!-- Modal de detalles de recurso -->
+<div id="resource-detail-modal" class="modal resource-detail-modal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2>Detalles del Recurso</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="resource-detail-header">
+                <div class="resource-detail-title">
+                    <h2 id="detail-resource-title">Título del Recurso</h2>
+                    <div>
+                        <span class="resource-type-badge" id="detail-resource-type">Documento</span>
+                        <span class="resource-category-badge" id="detail-resource-category">Programas</span>
+                    </div>
+                    <div class="resource-detail-meta">
+                        <div class="resource-meta-item">
+                            <i class="fas fa-user"></i>
+                            <span id="detail-resource-uploader">Subido por Admin</span>
+                        </div>
+                        <div class="resource-meta-item">
+                            <i class="fas fa-calendar"></i>
+                            <span id="detail-resource-date">15 Nov 2023</span>
+                        </div>
+                        <div class="resource-meta-item">
+                            <i class="fas fa-download"></i>
+                            <span id="detail-resource-downloads">0 descargas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resource-detail-content">
+                <div class="resource-detail-main">
+                    <div class="resource-detail-section">
+                        <h3><i class="fas fa-align-left"></i> Descripción</h3>
+                        <div class="resource-description" id="detail-resource-description">
+                            Descripción del recurso...
+                        </div>
+                    </div>
+
+                    <div class="resource-detail-section" id="resource-files-section" style="display: none;">
+                        <h3><i class="fas fa-file"></i> Archivos</h3>
+                        <div class="resource-files-list" id="detail-resource-files">
+                            <!-- Archivos se cargan dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resource-detail-sidebar">
+                    <div class="resource-actions">
+                        <button class="resource-action-btn primary" id="resource-download-btn">
+                            <i class="fas fa-download"></i> Descargar Recurso
+                        </button>
+                        <button class="resource-action-btn secondary" id="resource-link-btn" style="display: none;">
+                            <i class="fas fa-external-link-alt"></i> Visitar Enlace
+                        </button>
+                    <button class="resource-action-btn secondary" onclick="closeResourceDetailModal()">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+
+                    <div class="resource-info-card">
+                        <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Información</h3>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Tipo:</span>
+                            <span class="resource-info-value" id="detail-info-type">Documento</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Categoría:</span>
+                            <span class="resource-info-value" id="detail-info-category">Programas</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Subcategoría:</span>
+                            <span class="resource-info-value" id="detail-info-subcategory">Programación</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Tamaño:</span>
+                            <span class="resource-info-value" id="detail-info-size">2.5 MB</span>
+                        </div>
+                        <div class="resource-info-item">
+                            <span class="resource-info-label">Formato:</span>
+                            <span class="resource-info-value" id="detail-info-format">PDF</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Confirmación para Activar/Desactivar Usuario -->
 <div id="confirm-user-status-modal" class="modal">
     <div class="modal-content" style="max-width: 500px;">
@@ -3036,6 +3249,54 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js">
+// Diagnóstico específico para Capacitor
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📱 TECEL - Capacitor App iniciada');
+    
+    // Verificar si estamos en Capacitor
+    const isCapacitor = typeof Capacitor !== 'undefined';
+    console.log('Capacitor detectado:', isCapacitor);
+    
+    // Configuración específica para Capacitor
+    if (isCapacitor) {
+        console.log('🔧 Configurando para entorno Capacitor...');
+        
+        // Forzar redimensionamiento para WebView
+        setTimeout(() => {
+            document.body.style.opacity = '1';
+            document.body.style.transform = 'translateZ(0)';
+        }, 100);
+    }
+    
+    // Mostrar estado de la app
+    const appState = {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        capacitor: isCapacitor,
+        online: navigator.onLine
+    };
+    
+    console.log('📊 Estado de la app:', appState);
+});
+
+// Manejar errores de recursos
+window.addEventListener('error', function(e) {
+    console.error('❌ Error loading resource:', e);
+});
+
+// Verificar carga completa
+window.addEventListener('load', function() {
+    console.log('✅ App completamente cargada en Capacitor');
+    
+    // Ocultar splash screen automáticamente después de 3 segundos
+    setTimeout(() => {
+        if (typeof Capacitor !== 'undefined' && Capacitor.Plugins && Capacitor.Plugins.SplashScreen) {
+            Capacitor.Plugins.SplashScreen.hide();
+        }
+    }, 3000);
+});
+</script>
 </body>
 </html>

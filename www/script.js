@@ -41,6 +41,7 @@ let currentSuggestionId = null;
 let currentLibraryCategory = 'all';
 let libraryResources = [];
 
+
 // Subcategorías para cada categoría principal
 const librarySubcategories = {
   programas: [
@@ -72,11 +73,275 @@ let pendingUserStatusChange = null;
 let pendingUserDelete = null;
 let pendingUserEdit = null;
 
+// 1. INICIALIZAR VARIABLES GLOBALES (poner al inicio del archivo)
+window.fileUploadInitialized = false;
+window.uploadedFiles = [];
+window.conversionUploadedFiles = [];
+
 // INICIALIZAR ARRAY GLOBAL DE ARCHIVOS
 window.uploadedFiles = [];
 
-// API Base URL
-const API_BASE = 'http://localhost:3000/api';
+// CONFIGURACIÓN PARA PRODUCCIÓN/ANDROID
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isLocalhost = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' ||
+                    window.location.hostname === '192.168.1.34';
+
+// URL base dinámica
+const API_BASE = isAndroid ? 'https://tecel-app.onrender.com/api' : 
+                 isLocalhost ? 'http://localhost:3000/api' : 
+                 '/api';
+
+console.log('🚀 Entorno detectado:', {
+    userAgent: navigator.userAgent,
+    hostname: window.location.hostname,
+    isAndroid: isAndroid,
+    isLocalhost: isLocalhost,
+    API_BASE: API_BASE
+});
+
+// Variable global para debug
+window.APP_CONFIG = {
+    API_BASE: API_BASE,
+    isAndroid: isAndroid,
+    isProduction: !isLocalhost
+};
+
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : 'https://tecel-app.onrender/api.com';
+
+// Override global para manejar FormData correctamente
+const originalFetch = window.fetch;
+
+// Función corregida para fetch
+async function apiFetch(endpoint, options = {}) {
+    // Asegurar que el endpoint empiece con /
+    const url = endpoint.startsWith('/') 
+        ? `${API_BASE}${endpoint}`
+        : `${API_BASE}/${endpoint}`;
+    
+    console.log(`🌐 API Call: ${url}`);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('❌ API Error:', error);
+        throw error;
+    }
+}
+
+
+// Override global fetch para corregir automáticamente
+window.fetch = function(resource, options = {}) {
+    let url = resource;
+    let modifiedOptions = { ...options };
+    
+    // 1. CORREGIR URLS LOCALES
+    if (typeof resource === 'string') {
+        const localUrls = [
+            'http://192.168.1.34:3000',
+            'http://localhost:3000', 
+            'http://127.0.0.1:3000'
+        ];
+        
+        for (const localUrl of localUrls) {
+            if (resource.startsWith(localUrl)) {
+                url = resource.replace(localUrl, 'https://tecel-app.onrender.com');
+                console.log('🔄 URL corregida:', resource, '→', url);
+                break;
+            }
+        }
+        
+        // Asegurar que las URLs relativas tengan el base correcto
+        if (url.startsWith('/') && !url.startsWith('//')) {
+            url = `https://tecel-app.onrender.com${url}`;
+            console.log('📍 URL relativa convertida a absoluta:', url);
+        }
+    }
+
+    // 2. CORREGIR HEADERS PARA FORMDATA
+    if (modifiedOptions.body instanceof FormData) {
+        console.log('📦 Detectado FormData - Configurando headers automáticamente');
+        
+        // Crear nuevos headers (no modificar directamente)
+        modifiedOptions.headers = modifiedOptions.headers || {};
+        
+        // NO establecer Content-Type (el browser lo hace automáticamente con boundary)
+        // Pero eliminar cualquier Content-Type incorrecto que pueda estar seteado
+        if (modifiedOptions.headers['Content-Type']) {
+            delete modifiedOptions.headers['Content-Type'];
+        }
+        
+        // Agregar Authorization si no está presente
+        const authToken = localStorage.getItem('authToken') || 
+                         localStorage.getItem('token') ||
+                         sessionStorage.getItem('authToken');
+                         
+        if (authToken && !modifiedOptions.headers['Authorization']) {
+            modifiedOptions.headers['Authorization'] = `Bearer ${authToken}`;
+            console.log('🔐 Token de autorización agregado automáticamente');
+        }
+    }
+
+    // 3. CORREGIR HEADERS PARA JSON
+    else if (modifiedOptions.body && typeof modifiedOptions.body === 'string') {
+        try {
+            JSON.parse(modifiedOptions.body);
+            if (!modifiedOptions.headers?.['Content-Type']) {
+                modifiedOptions.headers = {
+                    ...modifiedOptions.headers,
+                    'Content-Type': 'application/json'
+                };
+                console.log('📝 Content-Type JSON agregado automáticamente');
+            }
+        } catch (e) {
+            // No es JSON, no hacer nada
+        }
+    }
+
+    // 4. LOG PARA DEBUG
+    const method = modifiedOptions.method || 'GET';
+    console.log(`🌐 [Fetch Interceptor] ${method} ${url}`);
+    
+    if (modifiedOptions.body instanceof FormData) {
+        console.log('   📦 Body: FormData con', Array.from(modifiedOptions.body.entries()).length, 'elementos');
+    }
+
+    // 5. EJECUTAR FETCH ORIGINAL
+    return originalFetch.call(this, url, modifiedOptions)
+        .then(response => {
+            console.log(`✅ [Fetch Interceptor] ${method} ${url} - Status: ${response.status}`);
+            return response;
+        })
+        .catch(error => {
+            console.error(`❌ [Fetch Interceptor] ${method} ${url} - Error:`, error);
+            throw error;
+        });
+};
+
+console.log('🎯 Patch universal de fetch aplicado - Todas las llamadas serán corregidas automáticamente');
+
+// ==================== PATCH PARA FORM DATA ====================
+
+window.fetch = async function(resource, options = {}) {
+    let url = resource;
+    
+    // Corregir URLs para producción
+    if (typeof resource === 'string') {
+        if (resource.includes('localhost:3000') || resource.includes('192.168.1.34:3000')) {
+            url = resource.replace(/http:\/\/[^/]+/, 'https://tecel-app.onrender.com');
+        }
+    }
+    
+    // Si es FormData, manejar especialmente
+    if (options.body instanceof FormData) {
+        console.log('📦 Detectado FormData - Convirtiendo a JSON...');
+        
+        // Convertir FormData a objeto JSON
+        const formDataObj = {};
+        for (let [key, value] of options.body.entries()) {
+            if (key === 'files') {
+                // Manejar archivos por separado
+                if (!formDataObj.files) formDataObj.files = [];
+                formDataObj.files.push(value);
+            } else {
+                formDataObj[key] = value;
+            }
+        }
+        
+        // Para proyectos, enviar como JSON normal
+        if (url.includes('/projects') && (options.method === 'POST' || options.method === 'PUT')) {
+            console.log('🔄 Convirtiendo FormData de proyecto a JSON...');
+            
+            // Preparar datos para el servidor
+            const projectData = {
+                title: formDataObj.title,
+                year: formDataObj.year,
+                description: formDataObj.description,
+                detailed_description: formDataObj.detailed_description,
+                objectives: formDataObj.objectives,
+                requirements: formDataObj.requirements,
+                problem: formDataObj.problem,
+                status: formDataObj.status,
+                students: formDataObj.students
+            };
+            
+            // Agregar archivos si existen
+            if (formDataObj.files && formDataObj.files.length > 0) {
+                console.log(`📁 Enviando ${formDataObj.files.length} archivos como base64`);
+                // Aquí podrías convertir archivos a base64 si el servidor lo requiere
+            }
+            
+            return originalFetch.call(this, url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': options.headers?.Authorization || `Bearer ${authToken}`
+                },
+                body: JSON.stringify(projectData)
+            });
+        }
+    }
+    
+    return originalFetch.call(this, url, options);
+};
+
+// Función para crear FormData de manera segura sin modificar prototypes
+function createSafeFormData(data, files = []) {
+    const formData = new FormData();
+    
+    console.log('🛡️ Creando FormData seguro...');
+    
+    // Agregar campos de texto de manera segura
+    Object.keys(data).forEach(key => {
+        const value = data[key];
+        if (value !== null && value !== undefined) {
+            // Convertir a string de manera segura
+            const stringValue = String(value);
+            console.log(`📝 Agregando campo: ${key} = ${stringValue.substring(0, 30)}...`);
+            formData.append(key, stringValue);
+        }
+    });
+    
+    // Agregar archivos de manera segura
+    if (files && files.length > 0) {
+        files.forEach((file, index) => {
+            if (file && typeof file === 'object' && (file instanceof File || file instanceof Blob)) {
+                console.log(`📎 Agregando archivo ${index + 1}: ${file.name}`);
+                formData.append('files', file, file.name);
+            } else {
+                console.warn(`⚠️ Archivo inválido omitido:`, file);
+            }
+        });
+    }
+    
+    return formData;
+}
+
+// Función auxiliar para debug
+function debugFormData(formData) {
+    console.log('🔍 DEBUG FormData:');
+    for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+            console.log(`   ${key}: [File] ${value.name} (${value.size} bytes)`);
+        } else {
+            console.log(`   ${key}: ${value}`);
+        }
+    }
+}
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', function() {
@@ -84,7 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAuthStatus();
 });
 
-// En la función initializeApp, asegúrate de que el modal se muestre correctamente
 function initializeApp() {
     try {
         ('🚀 Inicializando aplicación...');
@@ -102,6 +366,9 @@ function initializeApp() {
         // Iniciar verificador de token
         startTokenChecker();
         
+        // ACTUALIZAR MENÚ MÓVIL CON EL ESTADO ACTUAL
+        updateMobileMenu(currentUser);
+
         if (currentUser) {
             hideFullscreenAuthModal();
             showSection('home');
@@ -133,7 +400,7 @@ function showFullscreenAuthModal() {
         document.body.style.overflow = 'hidden';
         
         // Mostrar formulario de login por defecto
-        showAuthForm('login');
+        showRegisterModal();
         
         // Asegurar que los formularios estén limpios
         document.getElementById('fullscreen-login-form')?.reset();
@@ -206,10 +473,17 @@ async function handleFullscreenLogin(e) {
             
             // Actualizar UI y cargar datos
             updateUIForAuth();
+            
+            // ACTUALIZAR MENÚ MÓVIL INMEDIATAMENTE
+            updateMobileMenu(currentUser);
+            
             showSection('home');
             loadInitialData();
             
             showNotification('¡Bienvenido!', 'success');
+            
+            // CERRAR MENÚ MÓVIL SI ESTÁ ABIERTO
+            closeMobileMenu();
             
         } else {
             showNotification(data.error || 'Error en el login', 'error');
@@ -323,9 +597,6 @@ function setupEventListeners() {
     // Inicializar event listeners del nuevo diseño
     initNewEventListeners();
 
-    // Inicializar sistema de archivos
-    initFileUpload();
-
     // Definir variables para botones que pueden no existir
     const addSuggestionBtn = document.getElementById('add-suggestion-btn');
     const addResourceBtn = document.getElementById('add-resource-btn');
@@ -430,7 +701,6 @@ function setupEventListeners() {
     // Búsquedas - Solo si existen
     const searchProjects = document.getElementById('search-projects');
     const searchIdeas = document.getElementById('search-ideas');
-    const searchLibrary = document.getElementById('search-library');
     
     if (searchProjects) searchProjects.addEventListener('input', function() {
         currentSearchTerm = this.value.toLowerCase();
@@ -442,23 +712,39 @@ function setupEventListeners() {
         filterIdeas();
     });
 
-    if (searchLibrary) searchLibrary.addEventListener('input', function() {
+    // Buscador de biblioteca
+const searchLibrary = document.getElementById('search-library');
+if (searchLibrary) {
+    searchLibrary.addEventListener('input', function() {
         currentSearchTerm = this.value.toLowerCase();
-        filterLibrary();
+        renderLibraryResources();
     });
+}
+
+    // Filtros de biblioteca
+    const libraryCategoryFilter = document.getElementById('library-category-filter');
+    const libraryTypeFilter = document.getElementById('library-type-filter');
+
+    if (libraryCategoryFilter) {
+        libraryCategoryFilter.addEventListener('change', function() {
+            currentCategoryFilter = this.value;
+            renderLibraryResources();
+        });
+    }
+
+    if (libraryTypeFilter) {
+        libraryTypeFilter.addEventListener('change', function() {
+            currentCategoryFilter = this.value;
+            renderLibraryResources();
+        });
+    }
 
     // Filtros - Solo si existen
     const categoryFilter = document.getElementById('category-filter');
-    const libraryCategoryFilter = document.getElementById('library-category-filter');
     
     if (categoryFilter) categoryFilter.addEventListener('change', function() {
         currentCategoryFilter = this.value;
         filterIdeas();
-    });
-
-    if (libraryCategoryFilter) libraryCategoryFilter.addEventListener('change', function() {
-        currentCategoryFilter = this.value;
-        filterLibrary();
     });
 
     // Cards de ideas - Solo si existen
@@ -478,14 +764,67 @@ function setupEventListeners() {
         if (!checkAuth()) return;
         openNewSuggestionModal();
     });
-}
-
-    if (addResourceBtn) {
-        addResourceBtn.addEventListener('click', function() {
-            if (!checkAuth()) return;
-            openModal('new-resource-modal');
-        });
     }
+
+    // BOTÓN DE BIBLIOTECA - USANDO ONCLICK DIRECTO
+    function initLibraryButton() {
+        const addResourceBtn = document.getElementById('add-resource-btn');
+
+        // Establecer estado inicial de los campos
+        handleResourceTypeChange();
+
+        if (!addResourceBtn) {
+            console.log('⏳ Botón de biblioteca no encontrado, reintentando...');
+            setTimeout(initLibraryButton, 500);
+            return;
+        }
+
+        console.log('✅ Botón de biblioteca encontrado, configurando onclick directo...');
+        
+        // USAR ONCLICK DIRECTO (siempre funciona)
+        addResourceBtn.onclick = function(e) {
+            console.log('🎯 CLICK CAPTURADO - onclick directo funcionando');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (!currentUser) {
+                console.log('❌ Usuario no autenticado');
+                showNotification('Debes iniciar sesión para subir recursos', 'warning');
+                return false;
+            }
+            
+            console.log('✅ Usuario autenticado, abriendo modal...');
+            
+            // Abrir modal directamente
+            const modal = document.getElementById('new-resource-modal');
+            if (modal) {
+                console.log('✅ Modal encontrado, mostrando...');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                setTimeout(() => {
+                    modal.classList.add('active');
+                    console.log('✅ Modal activado completamente');
+                }, 10);
+            } else {
+                console.error('❌ Modal new-resource-modal no encontrado');
+            }
+            
+            return false;
+        };
+        
+        // Establecer subcategorías iniciales si hay una categoría seleccionada
+        const mainCategory = document.getElementById('resource-main-category')?.value;
+        if (mainCategory) {
+            updateResourceSubcategories(mainCategory);
+        }
+
+        console.log('✅ onclick configurado exitosamente');
+    }
+
+    // Inicializar después de un pequeño delay
+    setTimeout(initLibraryButton, 1000);
+
 
     // Mostrar/ocultar campos de recurso - Solo si existe
     const resourceType = document.getElementById('resource-type');
@@ -631,6 +970,33 @@ function setupEventListeners() {
         mobileMenu.addEventListener('click', toggleMobileMenu);
     }
 
+    // Botones del menú móvil
+    const mobileLoginBtn = document.getElementById('mobile-login-btn');
+    const mobileRegisterBtn = document.getElementById('mobile-register-btn');
+    const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+
+    if (mobileLoginBtn) {
+        mobileLoginBtn.addEventListener('click', function() {
+            closeMobileMenu();
+            showFullscreenAuthModal();
+        });
+    }
+
+    if (mobileRegisterBtn) {
+        mobileRegisterBtn.addEventListener('click', function() {
+            closeMobileMenu();
+            showFullscreenAuthModal();
+            showAuthForm('register');
+        });
+    }
+
+    if (mobileLogoutBtn) {
+        mobileLogoutBtn.addEventListener('click', function() {
+            closeMobileMenu();
+            logout();
+        });
+    }
+
     // Tabs de administración - Solo si existen
     const adminTabs = document.querySelectorAll('.admin-tab');
     if (adminTabs.length > 0) {
@@ -671,12 +1037,9 @@ function setupEventListeners() {
         pendingRemoveParticipant = { element: null, name: '' };
     });
     
-    // Quitar archivo
+    /// Configurar event listeners para el modal de eliminar archivo
     document.getElementById('confirm-remove-file')?.addEventListener('click', executeRemoveFile);
-    document.getElementById('cancel-remove-file')?.addEventListener('click', function() {
-        closeModal(document.getElementById('confirm-remove-file-modal'));
-        pendingRemoveFile = { id: null, name: '', element: null };
-    });
+    document.getElementById('cancel-remove-file')?.addEventListener('click', cancelRemoveFile);
     
     // Eliminar archivo físicamente
     document.getElementById('confirm-delete-file')?.addEventListener('click', executeDeleteFile);
@@ -712,6 +1075,24 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Configurar cambio de tipo de recurso
+const resourceTypeSelect = document.getElementById('resource-type');
+if (resourceTypeSelect) {
+    resourceTypeSelect.addEventListener('change', handleResourceTypeChange);
+    console.log('✅ Event listener de tipo de recurso configurado');
+    
+    // Ejecutar una vez al cargar para establecer el estado inicial
+    setTimeout(handleResourceTypeChange, 100);
+}
+
+// Configurar cambio de categoría principal para subcategorías
+const mainCategorySelect = document.getElementById('resource-main-category');
+if (mainCategorySelect) {
+    mainCategorySelect.addEventListener('change', function() {
+        updateResourceSubcategories(this.value);
+    });
+}
 }
 
     // Event listeners para ideas
@@ -798,6 +1179,27 @@ function setupEventListeners() {
     
     ('✅ Event listeners de sugerencias configurados');
 
+    // Configurar modales de categorías de biblioteca
+    const programasCard = document.getElementById('programas-card');
+    const habilidadesTecnicasCard = document.getElementById('habilidades-tecnicas-card');
+    const habilidadesBlandasCard = document.getElementById('habilidades-blandas-card');
+
+    if (programasCard) {
+        programasCard.addEventListener('click', openProgramasModal);
+    }
+
+    if (habilidadesTecnicasCard) {
+        habilidadesTecnicasCard.addEventListener('click', openHabilidadesTecnicasModal);
+    }
+
+    if (habilidadesBlandasCard) {
+        habilidadesBlandasCard.addEventListener('click', openHabilidadesBlandasModal);
+    }
+
+    // Configurar buscadores en modales de categorías
+    setupCategorySearch('programas');
+    setupCategorySearch('habilidades_tecnicas');
+    setupCategorySearch('habilidades_blandas');
 
     // Configurar sistema de conversión con retry
     setupConversionFormListener();
@@ -819,10 +1221,34 @@ function setupEventListeners() {
         initEnhancedLibrary();
         
         // Verificar configuración después de un tiempo
-        setTimeout(debugLibrarySetup, 1000);
     }, 1000);
 
     ('Event listeners configurados correctamente');
+}
+
+// Función para configurar buscadores en modales de categorías
+function setupCategorySearch(category) {
+    const searchId = `${category.replace('_', '-')}-search`;
+    const searchInput = document.getElementById(searchId);
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterCategoryResources(category, this.value.toLowerCase());
+        });
+    }
+    
+    // Configurar filtro de subcategorías si existe
+    const subcategoryFilterId = `${category.replace('_', '-')}-subcategory-filter`;
+    const subcategoryFilter = document.getElementById(subcategoryFilterId);
+    
+    if (subcategoryFilter) {
+        subcategoryFilter.addEventListener('change', function() {
+            filterCategoryResources(category, 
+                document.getElementById(`${category.replace('_', '-')}-search`)?.value.toLowerCase() || '',
+                this.value
+            );
+        });
+    }
 }
 
 // Función mejorada para búsqueda de ideas
@@ -1010,52 +1436,127 @@ highlightStyle.textContent = `
 `;
 document.head.appendChild(highlightStyle);
 
-// Configurar event listener para el formulario de conversión - VERSIÓN MEJORADA
 function setupConversionFormListener() {
-    ('🔧 Configurando event listener para formulario de conversión...');
+    console.log('🔧 CONFIGURANDO EVENT LISTENER PARA CONVERSIÓN...');
     
     const convertForm = document.getElementById('convert-idea-form');
     const submitBtn = document.getElementById('convert-idea-submit-btn');
     
-    // Limpiar solo los event listeners de submit, no reemplazar el formulario completo
+    // Limpiar event listeners existentes
     if (convertForm) {
-        // Remover event listeners existentes
-        convertForm.removeEventListener('submit', handleConvertIdeaToProject);
+        // Clonar y reemplazar el formulario para eliminar listeners viejos
+        const newForm = convertForm.cloneNode(true);
+        convertForm.parentNode.replaceChild(newForm, convertForm);
         
-        // Agregar nuevo event listener
-        convertForm.addEventListener('submit', function(e) {
+        // Agregar nuevo listener
+        newForm.addEventListener('submit', function(e) {
+            console.log('🎯 FORMULARIO DE CONVERSIÓN ENVIADO');
             e.preventDefault();
             if (!conversionInProgress) {
-                ('🎯 Formulario de conversión enviado');
                 handleConvertIdeaToProject(e);
             }
         });
-        
-        ('✅ Event listener del formulario configurado');
     }
     
     if (submitBtn) {
-        // Remover event listeners existentes
-        submitBtn.removeEventListener('click', handleConvertIdeaToProject);
-        
-        // Agregar nuevo event listener
-        submitBtn.addEventListener('click', function(e) {
+        // También configurar el botón directamente por si acaso
+        submitBtn.onclick = function(e) {
+            console.log('🎯 BOTÓN DE CONVERSIÓN CLICKEADO DIRECTAMENTE');
             e.preventDefault();
             if (!conversionInProgress) {
-                ('🎯 Botón de conversión clickeado');
                 handleConvertIdeaToProject(e);
             }
-        });
-        
-        ('✅ Event listener del botón configurado');
+        };
     }
     
-    // RE-INICIALIZAR los sistemas de búsqueda y archivos
-    setTimeout(() => {
-        initConversionStudentSearch();
-        initConversionFileUpload();
-        ('✅ Sistemas de búsqueda y archivos reinicializados');
-    }, 100);
+    console.log('✅ EVENT LISTENERS DE CONVERSIÓN CONFIGURADOS');
+}
+
+// SOLUCIÓN DEFINITIVA PARA EL BOTÓN DE CONVERSIÓN
+function setupConversionButton() {
+  console.log('🎯 CONFIGURANDO BOTÓN DE CONVERSIÓN...');
+  
+  // Buscar el botón por múltiples métodos
+  let convertBtn = document.getElementById('convert-idea-submit-btn');
+  
+  if (!convertBtn) {
+    console.log('🔍 Buscando botón alternativamente...');
+    // Buscar por texto
+    const buttons = document.querySelectorAll('#convert-idea-modal button');
+    buttons.forEach(btn => {
+      const text = btn.textContent.toLowerCase();
+      if (text.includes('crear proyecto') || text.includes('convertir')) {
+        convertBtn = btn;
+        console.log('✅ Botón encontrado por texto:', text);
+      }
+    });
+  }
+  
+  if (!convertBtn) {
+    console.error('❌ No se pudo encontrar el botón de conversión');
+    return;
+  }
+  
+  console.log('✅ Botón encontrado:', convertBtn);
+  
+  // ELIMINAR CUALQUIER EVENT LISTENER EXISTENTE
+  const newBtn = convertBtn.cloneNode(true);
+  convertBtn.parentNode.replaceChild(newBtn, convertBtn);
+  
+  // CONFIGURAR EL NUEVO LISTENER - MÉTODO MÁS ROBUSTO
+  newBtn.onclick = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🚀 BOTÓN CONVERTIR CLICKEADO - EJECUTANDO...');
+    handleConvertIdeaToProject(e);
+    return false;
+  };
+  
+  // También agregar event listener normal
+  newBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🎯 EVENT LISTENER ADICIONAL ACTIVADO');
+    handleConvertIdeaToProject(e);
+    return false;
+  });
+  
+  console.log('✅ Botón de conversión configurado correctamente');
+}
+
+// Función alternativa para buscar el botón
+function findAndFixConversionButton() {
+  console.log('🔍 Buscando botón de conversión alternativamente...');
+  
+  const modal = document.getElementById('convert-idea-modal');
+  if (!modal) return;
+  
+  // Buscar botones por texto sin afectar otros elementos
+  const buttons = modal.querySelectorAll('button');
+  let targetButton = null;
+  
+  buttons.forEach(btn => {
+    const btnText = btn.textContent.trim().toLowerCase();
+    if ((btnText.includes('crear') && btnText.includes('proyecto')) || 
+        btnText.includes('convertir')) {
+      targetButton = btn;
+      console.log('✅ Botón encontrado por texto:', btnText);
+    }
+  });
+  
+  if (targetButton && !targetButton.id) {
+    // Solo agregar listener si no tiene ID específico (para no duplicar)
+    targetButton.addEventListener('click', function(e) {
+      if (!e.target.closest('.student-result-item') && 
+          !e.target.closest('.file-remove') &&
+          !e.target.closest('.btn-outline')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Botón alternativo clickeado');
+        handleConvertIdeaToProject(e);
+      }
+    });
+  }
 }
 
 // Función para debug del sistema de conversión
@@ -1093,6 +1594,99 @@ window.debugConversion = debugConversionSystem;
 document.addEventListener('DOMContentLoaded', function() {
     setupConversionFormListener();
 });
+
+// FUNCIÓN DE DEBUG COMPLETA PARA EL BOTÓN DE BIBLIOTECA
+function debugLibraryButton() {
+    console.log('🔍 === DEBUG BOTÓN BIBLIOTECA ===');
+    
+    // 1. Verificar que el botón existe
+    const btn = document.getElementById('add-resource-btn');
+    console.log('1. Botón encontrado:', !!btn);
+    if (!btn) return;
+    
+    console.log('2. Propiedades del botón:', {
+        id: btn.id,
+        text: btn.textContent.trim(),
+        disabled: btn.disabled,
+        style: {
+            display: btn.style.display,
+            visibility: btn.style.visibility,
+            pointerEvents: btn.style.pointerEvents,
+            opacity: btn.style.opacity
+        },
+        classes: btn.className,
+        parent: btn.parentElement?.tagName
+    });
+    
+    // 2. Verificar event listeners
+    console.log('3. Verificando event listeners...');
+    const listeners = getEventListeners(btn);
+    console.log('Event listeners registrados:', listeners);
+    
+    // 3. Verificar la función checkAuth()
+    console.log('4. Estado de autenticación:', {
+        currentUser: currentUser,
+        authToken: authToken ? '✅ Presente' : '❌ Ausente'
+    });
+    
+    // 4. Verificar que el modal existe
+    const modal = document.getElementById('new-resource-modal');
+    console.log('5. Modal new-resource-modal:', {
+        existe: !!modal,
+        display: modal?.style.display,
+        clases: modal?.className
+    });
+    
+    // 5. Verificar la función openModal()
+    console.log('6. Función openModal disponible:', typeof openModal);
+    
+    // 6. Test manual - agregar un listener temporal
+    console.log('7. Agregando listener temporal de test...');
+    btn.addEventListener('click', function testHandler(e) {
+        console.log('🎯 TEST: Click recibido en botón');
+        console.log('Evento:', e);
+        console.log('Target:', e.target);
+        
+        // Testear checkAuth()
+        const authResult = checkAuth();
+        console.log('✅ checkAuth() result:', authResult);
+        
+        // Testear openModal() directamente
+        console.log('🔧 Ejecutando openModal directamente...');
+        openModal('new-resource-modal');
+    });
+    
+    console.log('8. === DEBUG COMPLETADO ===');
+}
+
+// Ejecutar el debug después de que cargue la página
+setTimeout(debugLibraryButton, 2000);
+
+// También ejecutar cuando se haga click en el botón (para debug en tiempo real)
+document.addEventListener('click', function(e) {
+    if (e.target.closest('#add-resource-btn')) {
+        console.log('🕵️ CLICK CAPTURADO (event listener global)');
+        console.log('¿Está el modal visible?', document.getElementById('new-resource-modal')?.style.display);
+    }
+});
+
+// Si getEventListeners no está disponible, usa esta versión
+if (typeof getEventListeners === 'undefined') {
+    window.getEventListeners = function(element) {
+        const listeners = {};
+        const events = ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend'];
+        
+        events.forEach(eventType => {
+            listeners[eventType] = [];
+            // No podemos acceder a los listeners reales, pero podemos verificar si hay handlers
+            if (element['on' + eventType]) {
+                listeners[eventType].push({ listener: element['on' + eventType] });
+            }
+        });
+        
+        return listeners;
+    };
+}
 
 // Función para inicializar el sistema de participantes en ideas - MEJORADA
 async function initIdeaFormWithParticipants() {
@@ -1526,6 +2120,8 @@ function checkAuthStatus() {
             if (authToken && authToken.split('.').length === 3) {
                 ('✅ Usuario autenticado encontrado:', currentUser.email);
                 updateUIForAuth();
+                // ACTUALIZAR MENÚ MÓVIL TAMBIÉN
+                updateMobileMenu(currentUser);
                 return true;
             } else {
                 ('❌ Token con formato inválido, limpiando...');
@@ -1542,6 +2138,8 @@ function checkAuthStatus() {
         currentUser = null;
         authToken = null;
         updateUIForAuth();
+        // ACTUALIZAR MENÚ MÓVIL TAMBIÉN
+        updateMobileMenu(null);
         return false;
     }
 }
@@ -1797,6 +2395,9 @@ function logout() {
     // Actualizar UI inmediatamente
     updateUIForAuth();
     
+    // ACTUALIZAR MENÚ MÓVIL INMEDIATAMENTE
+    updateMobileMenu(null);
+    
     // Cerrar todos los modales abiertos
     document.querySelectorAll('.modal.active').forEach(modal => {
         closeModal(modal);
@@ -1805,7 +2406,6 @@ function logout() {
     // Mostrar modal de auth automáticamente
     setTimeout(() => {
         showFullscreenAuthModal();
-        
         if (wasAuthenticated) {
             showNotification('Sesión cerrada correctamente', 'info');
         }
@@ -1813,8 +2413,11 @@ function logout() {
     
     // Recargar datos públicos
     loadInitialData();
-    showFullscreenAuthModal();
+    
+    // CERRAR MENÚ MÓVIL SI ESTÁ ABIERTO
+    closeMobileMenu();
 
+    showLoginModal();
 }
 
 function updateUIForAuth() {
@@ -2035,101 +2638,116 @@ async function reloadProject(projectId) {
 }
 
 async function loadIdeas() {
-    const container = document.getElementById('ideas-container');
-    if (!container) return;
+  const container = document.getElementById('ideas-container');
+  if (!container) return;
+  
+  try {
+    // Mostrar estado de carga
+    container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando ideas...</p></div>';
     
-    try {
-        // Mostrar estado de carga
-        container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando ideas...</p></div>';
-        
-        ('🔄 Cargando ideas desde la API...');
-        const response = await fetch(`${API_BASE}/ideas`);
-        
+    console.log('🔄 Cargando ideas desde la API...');
+    const response = await fetch(`${API_BASE}/ideas`);
+    
         if (response.ok) {
             ideas = await response.json();
-            (`✅ ${ideas.length} ideas cargadas desde la API`);
+            console.log(`✅ ${ideas.length} ideas cargadas desde servidor`);
             
-            // DEBUG DETALLADO: Mostrar estado de cada idea
-            ('=== ESTADO DE IDEAS CARGADAS ===');
+            // 🔥 DEBUG: Mostrar estado de todas las ideas
+            console.log('=== ESTADO DE TODAS LAS IDEAS ===');
             ideas.forEach((idea, index) => {
-                (`Idea ${index + 1}:`, {
+                console.log(`Idea ${index + 1}:`, {
                     id: idea.id,
                     name: idea.name,
                     project_status: idea.project_status,
-                    hasProject: !!(idea.project_status && idea.project_status !== 'idea')
+                    canConvert: canConvertIdeaToProject(idea)
                 });
             });
-            ('================================');
-            
-            // Después de cargar las ideas, actualizar contadores
-            updateIdeaCounters();
-        } else {
-            throw new Error('API no disponible');
-        }
-    } catch (error) {
-        console.error('Error cargando ideas desde API:', error);
-        ideas = getSampleIdeas();
-        showNotification('Usando datos de demostración', 'info');
+            console.log('================================');
+      
+      // Después de cargar las ideas, actualizar contadores
+      updateIdeaCounters();
+    } else {
+      console.error('❌ Error cargando ideas:', response.status, response.statusText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
-    
-    renderIdeas();
+  } catch (error) {
+    console.error('❌ Error cargando ideas desde API:', error);
+    ideas = getSampleIdeas();
+    showNotification('Usando datos de demostración', 'info');
+  }
+  
+  renderIdeas();
+}
+
+// Función para generar nombres de archivo seguros y cortos
+function generateSafeShortName(originalName) {
+  const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')) : '';
+  const nameWithoutExt = originalName.replace(ext, '');
+  
+  // Limitar a 20 caracteres para el nombre
+  const shortName = nameWithoutExt
+    .substring(0, 20)
+    .replace(/[^a-zA-Z0-9]/g, '_');
+  
+  const uniqueId = Date.now().toString(36).substring(2, 8);
+  
+  return shortName + '_' + uniqueId + ext;
 }
 
 async function loadSuggestions() {
-  try {
-    ('🔄 Cargando sugerencias...');
-    
-    if (!authToken) {
-      ('❌ No hay token de autenticación');
-      showNotification('Debes iniciar sesión para ver las sugerencias', 'error');
-      suggestions = [];
-      renderSuggestions();
-      return;
-    }
+    try {
+        console.log('🔄 Cargando sugerencias...');
+        
+        if (!authToken) {
+            console.log('❌ No hay token de autenticación');
+            showNotification('Debes iniciar sesión para ver las sugerencias', 'error');
+            suggestions = [];
+            renderSuggestions();
+            return;
+        }
 
-    const response = await fetch(`${API_BASE}/suggestions`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    ('📨 Respuesta de sugerencias:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
+        const response = await fetch(`${API_BASE}/suggestions`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('📨 Respuesta de sugerencias:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+        });
 
-    if (response.ok) {
-      suggestions = await response.json();
-      (`✅ ${suggestions.length} sugerencias cargadas exitosamente`);
-      renderSuggestions();
-      
-      // INICIALIZAR EL BUSCADOR DE SUGERENCIAS - AGREGAR ESTA LÍNEA
-      setTimeout(() => {
-        initSuggestionsSearch();
-      }, 100);
-      
-    } else if (response.status === 401) {
-      ('🔐 Error 401 - Token inválido o expirado');
-      showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
-      logout();
-      
-    } else {
-      const errorText = await response.text();
-      console.error('❌ Error del servidor:', errorText);
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+        if (response.ok) {
+            suggestions = await response.json();
+            console.log(`✅ ${suggestions.length} sugerencias cargadas exitosamente`);
+            
+            // 🔥 ACTUALIZAR CONTADORES DESPUÉS DE CARGAR
+            updateSuggestionCounters();
+            
+            renderSuggestions();
+            
+        } else if (response.status === 401) {
+            console.log('🔐 Error 401 - Token inválido o expirado');
+            showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
+            logout();
+            
+        } else {
+            const errorText = await response.text();
+            console.error('❌ Error del servidor:', errorText);
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando sugerencias:', error);
+        suggestions = [];
+        renderSuggestions();
+        
+        if (!error.message.includes('Sesión expirada')) {
+            showNotification('Error cargando sugerencias', 'error');
+        }
     }
-    
-  } catch (error) {
-    console.error('❌ Error cargando sugerencias:', error);
-    suggestions = [];
-    renderSuggestions();
-    
-    if (!error.message.includes('Sesión expirada')) {
-      showNotification('Error cargando sugerencias', 'error');
-    }
-  }
 }
 
 async function loadStats() {
@@ -2374,30 +2992,100 @@ function verifyDetailModalElements() {
     ('============================================');
 }
 
+// En la función que renderiza los recursos, haz las tarjetas clickeables
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
+    card.setAttribute('data-resource-id', resource.id);
+    
+    // Determinar tipo de recurso y acciones disponibles
+    const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
+    const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
+    
+    // Obtener etiquetas
+    const typeLabel = getResourceTypeLabel(resource.resource_type);
+    const categoryLabel = getCategoryLabel(resource.main_category);
     
     card.innerHTML = `
-        <div class="library-header">
-            <h3 class="library-title">${resource.title}</h3>
-            <span class="library-type">${getResourceTypeLabel(resource.resource_type)}</span>
+        <div class="library-card-header">
+            <h3 class="library-card-title">${resource.title}</h3>
+            <span class="library-type-badge">${typeLabel}</span>
         </div>
-        <div class="library-category">Categoría: ${getCategoryLabel(resource.category)}</div>
-        <p class="library-description">${resource.description}</p>
-        <div class="library-actions">
-            ${resource.file_url ? 
-                `<button class="btn-primary" onclick="downloadResource('${resource.file_url}')">
+        
+        <div class="library-card-category">
+            <i class="fas fa-folder"></i>
+            ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
+        </div>
+        
+        <p class="library-card-description">${resource.description}</p>
+        
+        <div class="library-card-meta">
+            <span class="library-uploader">
+                <i class="fas fa-user"></i>
+                ${resource.uploader_name || 'Usuario'}
+            </span>
+            <span class="library-date">
+                <i class="fas fa-calendar"></i>
+                ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+            </span>
+        </div>
+        
+        <div class="library-card-actions">
+            ${isFileResource ? 
+                `<button class="btn-primary btn-sm" onclick="downloadLibraryResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
                     <i class="fas fa-download"></i> Descargar
                 </button>` : ''}
-            ${resource.external_url ? 
-                `<button class="btn-outline" onclick="window.open('${resource.external_url}', '_blank')">
-                    <i class="fas fa-external-link-alt"></i> Ver Enlace
+                
+            ${isLinkResource ? 
+                `<button class="btn-outline btn-sm" onclick="window.open('${resource.external_url}', '_blank')">
+                    <i class="fas fa-external-link-alt"></i> Visitar
                 </button>` : ''}
+                
+            <button class="btn-outline btn-sm" onclick="showResourceDetails(${resource.id})">
+                <i class="fas fa-eye"></i> Detalles
+            </button>
         </div>
     `;
     
+    // Hacer toda la tarjeta clickeable para detalles
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', function(e) {
+        // Solo abrir detalles si no se hizo click en un botón
+        if (!e.target.closest('button')) {
+            showResourceDetails(resource.id);
+        }
+    });
+    
     return card;
+}
+
+// Función para eliminar recurso de biblioteca
+async function deleteLibraryResource(resourceId, resourceName) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el recurso "${resourceName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/library/${resourceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            showNotification(`Recurso "${resourceName}" eliminado exitosamente`, 'success');
+            // Recargar recursos
+            loadLibraryResources();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al eliminar el recurso');
+        }
+    } catch (error) {
+        console.error('Error eliminando recurso:', error);
+        showNotification(`Error: ${error.message}`, 'error');
+    }
 }
 
 function renderAdminUsers() {
@@ -2807,6 +3495,10 @@ function showSection(sectionId) {
                 break;
             case 'biblioteca':
                 loadLibraryResources();
+                    setTimeout(() => {
+                    initLibrarySystem();
+                    updateLibraryCategoryCounters();
+                    }, 500); // Pequeño delay para asegurar que los recursos estén cargados
                 break;
             case 'usuario':
                 loadUserData();
@@ -3447,22 +4139,38 @@ function selectStudent(studentId, studentName) {
 function showProjectForm(project = null) {
     currentProject = project;
     
-    ('🎯 Abriendo formulario de proyecto:', project ? 'EDITAR' : 'NUEVO');
+    console.log('🎯 Abriendo formulario de proyecto:', project ? 'EDITAR' : 'NUEVO');
+    
+    // 🔥 INICIALIZAR ARRAYS DE ARCHIVOS
+    window.uploadedFiles = [];
+    window.filesToRemove = [];
+    
+    console.log('📁 Arrays inicializados:', {
+        uploadedFiles: window.uploadedFiles,
+        filesToRemove: window.filesToRemove
+    });
     
     // Limpiar formulario
     const form = document.getElementById('project-form');
     if (form) form.reset();
     
-    // Limpiar array global de archivos
-    window.uploadedFiles = [];
+    // 🔥 INICIALIZAR ARRAY DE ARCHIVOS A ELIMINAR
+    window.filesToRemove = [];
     
-    // Inicializar subida de archivos
-    initFileUpload();
+    // LIMPIAR SISTEMA DE ARCHIVOS
+    resetFileUpload();
     
-    // Cargar lista de estudiantes y configurar buscador
+    // Cargar lista de estudiantes
     loadStudentsForProject().then(() => {
         setupStudentSearch();
     });
+    
+    // *** CORRECCIÓN: Inicializar archivos INMEDIATAMENTE, no con timeout ***
+    console.log('🔄 Inicializando sistema de archivos...');
+    initFileUpload();
+
+    // Limpiar array global de archivos
+    window.uploadedFiles = [];
     
     // Configurar título del modal
     const modalTitle = document.getElementById('project-modal-title');
@@ -3512,7 +4220,6 @@ function showProjectForm(project = null) {
     openModal('project-modal');
 }
 
-// Función para mostrar archivos existentes en el preview
 function displayExistingFiles(files) {
     const filePreview = document.getElementById('file-preview');
     if (!filePreview) return;
@@ -3524,7 +4231,7 @@ function displayExistingFiles(files) {
         return;
     }
     
-    (`📁 Mostrando ${files.length} archivos existentes en preview`);
+    console.log(`📁 Mostrando ${files.length} archivos existentes en preview`);
     
     files.forEach(file => {
         const fileItem = document.createElement('div');
@@ -3558,25 +4265,33 @@ function displayExistingFiles(files) {
     });
 }
 
-// Función para quitar archivo existente (solo de la vista de edición, no del servidor)
+// Función MEJORADA para quitar archivo existente
 function removeExistingFile(fileId, button) {
-    const fileItem = button.closest('.file-preview-item');
+    const fileItem = button.closest('.existing-file');
     const fileName = fileItem.querySelector('.file-name').textContent;
     
-    if (confirm(`¿Quitar el archivo "${fileName}" del proyecto? Esto no eliminará el archivo del servidor.`)) {
+    if (confirm(`¿Eliminar el archivo "${fileName}" del proyecto?`)) {
+        // Remover del DOM
         fileItem.remove();
         
-        // Agregar el fileId a una lista de archivos a eliminar
+        // 🔥 AGREGAR EL FILEID A LA LISTA DE ARCHIVOS A ELIMINAR
         if (!window.filesToRemove) {
             window.filesToRemove = [];
         }
-        window.filesToRemove.push(fileId);
         
-        showNotification(`Archivo marcado para quitar: ${fileName}`, 'info');
+        // Verificar que no esté ya en la lista
+        if (!window.filesToRemove.includes(fileId)) {
+            window.filesToRemove.push(fileId);
+            console.log(`🗑️ Archivo existente marcado para eliminar: ${fileName} (ID: ${fileId})`);
+            console.log(`📋 filesToRemove actual:`, window.filesToRemove);
+        }
+        
+        showNotification(`Archivo "${fileName}" marcado para eliminar`, 'info');
         
         // Si no quedan archivos, mostrar mensaje vacío
         const filePreview = document.getElementById('file-preview');
-        if (filePreview.children.length === 0) {
+        const remainingFiles = filePreview.querySelectorAll('.file-preview-item');
+        if (remainingFiles.length === 0) {
             filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
         }
     }
@@ -3743,17 +4458,17 @@ async function handleProjectSubmit(e) {
     e.preventDefault();
     
     if (!checkAuth()) return;
-    
-    ('=== INICIANDO GUARDADO DE PROYECTO ===');
-    ('Modo:', currentProject ? 'EDITAR' : 'CREAR');
-    
-    // Validar permisos específicos para crear proyecto
+
+    console.log('=== INICIANDO GUARDADO DE PROYECTO ===');
+    console.log('Modo:', currentProject ? 'EDITAR' : 'CREAR');
+
+    // Validar permisos
     if (!currentProject && !validateProjectPermissions()) {
         showNotification('No tienes permisos para crear proyectos. Solo profesores, administradores y alumnos de 7mo pueden crear proyectos.', 'error');
         return;
     }
 
-    // Validar campos requeridos antes de enviar
+    // Validar campos requeridos
     const title = document.getElementById('project-title').value.trim();
     const year = document.getElementById('project-year').value;
     const description = document.getElementById('project-description').value.trim();
@@ -3778,20 +4493,39 @@ async function handleProjectSubmit(e) {
             
         const method = currentProject ? 'PUT' : 'POST';
 
-        // PREPARAR FORM DATA para edición o creación
-        const formData = new FormData();
+        // 🔥 CONVERTIR ARCHIVOS A BASE64 ANTES DE ENVIAR
+        const base64Files = [];
+        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+            console.log(`📤 Convirtiendo ${window.uploadedFiles.length} archivos a base64...`);
+            
+            for (const file of window.uploadedFiles) {
+                try {
+                    const base64File = await fileToBase64(file);
+                    base64Files.push(base64File);
+                    console.log(`✅ Archivo convertido: ${file.name}`);
+                } catch (error) {
+                    console.error(`❌ Error convirtiendo archivo ${file.name}:`, error);
+                }
+            }
+            console.log(`🎉 ${base64Files.length} archivos convertidos a base64`);
+        } else {
+            console.log('📁 No hay archivos nuevos para agregar');
+        }
+
+        // PREPARAR DATOS COMO JSON (NO FORM DATA)
+        const jsonData = {};
         
         // Agregar campos del proyecto
-        formData.append('title', title);
-        formData.append('year', parseInt(year));
-        formData.append('description', description);
-        formData.append('detailed_description', document.getElementById('project-detailed-description').value.trim());
-        formData.append('objectives', document.getElementById('project-objectives').value.trim());
-        formData.append('requirements', document.getElementById('project-requirements').value.trim());
-        formData.append('problem', problem);
-        formData.append('status', document.getElementById('project-status').value);
+        jsonData.title = title;
+        jsonData.year = parseInt(year);
+        jsonData.description = description;
+        jsonData.detailed_description = document.getElementById('project-detailed-description').value.trim();
+        jsonData.objectives = document.getElementById('project-objectives').value.trim();
+        jsonData.requirements = document.getElementById('project-requirements').value.trim();
+        jsonData.problem = problem;
+        jsonData.status = document.getElementById('project-status').value;
 
-        // Agregar participantes como JSON string
+        // Agregar participantes como JSON
         const participantInputs = document.querySelectorAll('input[name="participants[]"]');
         const participants = Array.from(participantInputs).map(input => {
             try {
@@ -3802,51 +4536,47 @@ async function handleProjectSubmit(e) {
             }
         }).filter(participant => participant !== null);
         
-        formData.append('students', JSON.stringify(participants));
+        jsonData.students = JSON.stringify(participants);
 
-        // Agregar archivos a eliminar (solo en edición)
+        // 🔥 AGREGAR ARCHIVOS A ELIMINAR
         if (currentProject && window.filesToRemove && window.filesToRemove.length > 0) {
-            formData.append('files_to_remove', JSON.stringify(window.filesToRemove));
-            (`🗑️ Archivos marcados para eliminar: ${window.filesToRemove.length}`);
-        }
-
-        // Agregar nuevos archivos
-        const fileInput = document.getElementById('project-files');
-        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
-            (`📤 Agregando ${window.uploadedFiles.length} nuevos archivos`);
-            window.uploadedFiles.forEach((file, index) => {
-                formData.append('files', file);
-            });
-        } else if (fileInput && fileInput.files.length > 0) {
-            (`📤 Usando archivos del input: ${fileInput.files.length} archivos`);
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('files', fileInput.files[i]);
-            }
+            jsonData.files_to_remove = window.filesToRemove;
+            console.log(`🗑️ Archivos marcados para eliminar: ${window.filesToRemove.length}`, window.filesToRemove);
         } else {
-            ('📁 No hay archivos nuevos para agregar');
+            console.log('📝 No hay archivos para eliminar');
+            jsonData.files_to_remove = [];
         }
 
-        // DEBUG: Mostrar contenido del FormData
-        ('📤 Contenido del FormData:');
-        for (let pair of formData.entries()) {
-            if (pair[0] === 'files') {
-                (`   ${pair[0]}: [File] ${pair[1].name} (${pair[1].size} bytes)`);
-            } else {
-                (`   ${pair[0]}: ${typeof pair[1] === 'string' ? pair[1].substring(0, 50) + (pair[1].length > 50 ? '...' : '') : pair[1]}`);
-            }
+        // 🔥 AGREGAR ARCHIVOS CONVERTIDOS A BASE64
+        if (base64Files.length > 0) {
+            jsonData.files = base64Files;
+            console.log(`📁 Enviando ${base64Files.length} archivos como base64`);
+        } else {
+            jsonData.files = [];
+            console.log('📁 No hay archivos para enviar');
         }
 
-        // ENVIAR CON FORM DATA
-        (`🚀 Enviando ${method} request a: ${url}`);
+        // DEBUG: Mostrar contenido del JSON
+        console.log('📤 Contenido del JSON a enviar:');
+        console.log('   title:', jsonData.title);
+        console.log('   year:', jsonData.year);
+        console.log('   description:', jsonData.description);
+        console.log('   files_to_remove:', jsonData.files_to_remove);
+        console.log('   files:', jsonData.files ? `${jsonData.files.length} archivos base64` : 'ninguno');
+        console.log('   students:', jsonData.students ? 'con participantes' : 'sin participantes');
+
+        // 🔥 ENVIAR COMO JSON (NO COMO FORM DATA)
+        console.log(`🚀 Enviando ${method} request a: ${url} como JSON`);
         response = await fetch(url, {
             method: method,
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json', // 🔥 IMPORTANTE: Cambiar a JSON
             },
-            body: formData
+            body: JSON.stringify(jsonData) // 🔥 Enviar como JSON
         });
 
-        ('📥 Respuesta del servidor:', {
+        console.log('📥 Respuesta del servidor:', {
             status: response.status,
             statusText: response.statusText,
             ok: response.ok
@@ -3854,7 +4584,7 @@ async function handleProjectSubmit(e) {
 
         if (response.ok) {
             const project = await response.json();
-            ('✅ Proyecto guardado exitosamente:', {
+            console.log('✅ Proyecto guardado exitosamente:', {
                 id: project.id,
                 title: project.title,
                 archivos: project.files?.length || 0,
@@ -3875,7 +4605,7 @@ async function handleProjectSubmit(e) {
             const filePreview = document.getElementById('file-preview');
             if (filePreview) filePreview.innerHTML = '';
             
-            // Limpiar arrays globales
+            // 🔥 LIMPIAR ARRAYS GLOBALES
             window.uploadedFiles = [];
             window.filesToRemove = [];
             
@@ -3906,6 +4636,302 @@ async function handleProjectSubmit(e) {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+}
+
+function validateProjectPermissions() {
+    if (!currentUser) return false;
+    
+    // Admin y profesores pueden crear proyectos
+    if (currentUser.user_type === 'admin' || currentUser.user_type === 'teacher') {
+        return true;
+    }
+    
+    // Alumnos de 7mo pueden crear proyectos
+    if (currentUser.user_type === 'student' && currentUser.grade === '7mo') {
+        return true;
+    }
+    
+    return false;
+}
+
+async function uploadProjectFiles(projectId) {
+    console.log('📤 SUBIENDO ARCHIVOS - Iniciando...');
+    
+    if (!window.uploadedFiles || window.uploadedFiles.length === 0) {
+        console.log('📭 No hay archivos para subir');
+        return { success: true, uploaded: 0 };
+    }
+
+    let successfulUploads = 0;
+    let failedUploads = 0;
+
+    console.log(`📦 Procesando ${window.uploadedFiles.length} archivos...`);
+
+    for (const file of window.uploadedFiles) {
+        try {
+            console.log(`⬆️ Procesando archivo: ${file.name} (${file.type})`);
+            
+            // Convertir archivo a base64
+            const base64Data = await readFileAsBase64(file);
+            console.log(`📄 Archivo convertido a base64, tamaño: ${base64Data.length} caracteres`);
+
+            // Preparar datos para enviar
+            const fileData = {
+                file: base64Data,
+                fileName: file.name, // 🔥 ENVIAR NOMBRE ORIGINAL
+                fileType: file.type,
+                fileSize: file.size
+            };
+
+            console.log('🔧 Datos a enviar:', {
+                fileName: fileData.fileName,
+                fileType: fileData.fileType,
+                fileSize: fileData.fileSize,
+                base64Length: fileData.file.length
+            });
+
+            console.log('📤 Enviando a servidor...');
+            
+            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(fileData)
+            });
+
+            console.log(`📥 Respuesta del servidor: ${response.status} ${response.statusText}`);
+
+            const result = await response.json();
+            console.log('📋 Resultado completo:', result);
+
+            if (response.ok && result.success) {
+                console.log(`✅ ${file.name} subido exitosamente`);
+                successfulUploads++;
+            } else {
+                console.error(`❌ Error subiendo ${file.name}:`, result.error);
+                failedUploads++;
+            }
+
+        } catch (error) {
+            console.error(`💥 Error fatal con ${file.name}:`, error);
+            failedUploads++;
+        }
+    }
+
+    console.log(`📊 Resumen: ${successfulUploads} exitosos, ${failedUploads} fallidos`);
+    return { success: failedUploads === 0, uploaded: successfulUploads };
+}
+
+// Función para detectar documentos
+function isDocumentFile(file) {
+  const documentTypes = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'application/rtf'
+  ];
+  
+  const documentExtensions = ['.doc', '.docx', '.pdf', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf'];
+  
+  return documentTypes.includes(file.type) || 
+         documentExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+}
+
+// Función para comprimir imágenes
+function compressImage(file, quality = 0.7) {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = function(e) {
+      const img = new Image();
+      img.src = e.target.result;
+      
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Redimensionar si es muy grande (máximo 1200px en el lado más largo)
+        const maxSize = 1200;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convertir a formato WebP para mejor compresión (si el navegador lo soporta)
+        const format = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const compressedQuality = format === 'image/png' ? 0.8 : quality;
+        
+        canvas.toBlob(function(blob) {
+          const compressedFile = new File([blob], file.name, {
+            type: format,
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        }, format, compressedQuality);
+      };
+    };
+    
+    reader.onerror = () => resolve(file); // Fallback al archivo original
+  });
+}
+
+// Función optimizada para convertir a base64
+function fileToOptimizedBase64(file) {
+  return new Promise((resolve, reject) => {
+    // Validar tamaño máximo (3MB después de compresión)
+    if (file.size > 3 * 1024 * 1024) {
+      reject(new Error('Archivo demasiado grande después de compresión (máximo 3MB)'));
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Usar el base64 completo (con prefijo) para mayor compatibilidad
+      resolve(reader.result);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
+
+// Función para subir versión comprimida como fallback
+async function uploadCompressedVersion(projectId, originalFile, index) {
+  try {
+    console.log(`🔄 Creando versión ultra-comprimida de: ${originalFile.name}`);
+    
+    // Crear versión muy comprimida
+    const ultraCompressedFile = await compressImage(originalFile, 0.4); // Calidad muy baja
+    
+    const base64File = await fileToOptimizedBase64(ultraCompressedFile);
+    
+    if (!base64File || base64File.length > 2 * 1024 * 1024) { // Máximo 2MB
+      console.warn(`❌ Versión comprimida aún demasiado grande: ${originalFile.name}`);
+      return false;
+    }
+    
+    const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        file: base64File,
+        fileName: `compressed_${originalFile.name}`,
+        fileType: ultraCompressedFile.type
+      })
+    });
+    
+    if (response.ok) {
+      console.log(`✅ Versión comprimida guardada: ${originalFile.name}`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`💥 Error subiendo versión comprimida:`, error);
+    return false;
+  }
+}
+
+// Función para convertir archivo a base64 (AGREGAR EN LAS FUNCIONES DE UTILIDAD)
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Extraer solo la parte base64 (sin el data:image/jpeg;base64, prefix)
+            const base64String = reader.result.split(',')[1];
+            resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: base64String
+            });
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
+
+function filterLargeFiles(files) {
+  const maxSize = 10 * 1024 * 1024; // 10MB máximo original
+  const validFiles = [];
+  const largeFiles = [];
+  
+  Array.from(files).forEach(file => {
+    if (file.size <= maxSize) {
+      validFiles.push(file);
+    } else {
+      largeFiles.push({
+        name: file.name,
+        size: (file.size / (1024 * 1024)).toFixed(2) + 'MB'
+      });
+    }
+  });
+  
+  if (largeFiles.length > 0) {
+    const largeFilesList = largeFiles.map(f => `${f.name} (${f.size})`).join(', ');
+    showNotification(
+      `Archivos muy grandes (máx. 10MB): ${largeFilesList}`,
+      'warning'
+    );
+  }
+  
+  return validFiles;
+}
+
+// Función auxiliar para limpiar el formulario
+function cleanupProjectForm() {
+    try {
+        document.getElementById('project-form')?.reset();
+        
+        const participantsContainer = document.getElementById('project-participants');
+        if (participantsContainer) {
+            participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
+        }
+        
+        const filePreview = document.getElementById('file-preview');
+        if (filePreview) filePreview.innerHTML = '';
+        
+        // Limpiar variables globales
+        window.uploadedFiles = [];
+        window.filesToRemove = [];
+        window.currentConversionIdeaId = null;
+        
+        console.log('🧹 Formulario limpiado');
+    } catch (error) {
+        console.error('Error limpiando formulario:', error);
+    }
+}
+
+// Función para setear la idea original en conversión
+function setConversionIdeaId(ideaId) {
+    window.currentConversionIdeaId = ideaId;
+    console.log('🎯 Idea original seteada para conversión:', ideaId);
 }
 
 function showProjectDetails(project) {
@@ -4462,15 +5488,6 @@ function initIdeasSection() {
     ('✅ Sección de ideas inicializada correctamente');
 }
 
-// Función temporal para debug de FormData
-function debugFormData(formData) {
-    ('=== DEBUG FORM DATA ===');
-    for (let pair of formData.entries()) {
-        (pair[0] + ': ', pair[1]);
-    }
-    ('========================');
-}
-
 async function deleteFile(projectId, fileId) {
     if (!confirm('¿Estás seguro de que quieres eliminar este archivo?')) {
         return;
@@ -4586,6 +5603,11 @@ function closeModal(modal) {
             cleanupConversionFiles();
         }
         
+        // Limpiar archivos si es el modal de proyecto
+        if (modal.id === 'project-modal') {
+            resetFileUpload();
+        }
+
         modal.classList.remove('active');
         setTimeout(() => {
             modal.style.display = 'none';
@@ -4733,73 +5755,90 @@ function loadIdeaParticipants(idea) {
     }
 }
 
-// Función para configurar los botones de acción según los permisos - VERSIÓN MEJORADA
+// SOLUCIÓN DEFINITIVA - Reemplaza la función setupIdeaActions completa:
 function setupIdeaActions(idea) {
-    const actionsContainer = document.getElementById('idea-actions');
-    if (!actionsContainer) return;
+  const actionsContainer = document.getElementById('idea-actions');
+  if (!actionsContainer) {
+    console.error('❌ actionsContainer no encontrado');
+    return;
+  }
+  
+  actionsContainer.innerHTML = '';
+  
+  console.log('🔧 Configurando acciones para idea:', {
+    id: idea.id,
+    projectStatus: idea.project_status,
+    name: idea.name
+  });
+  
+  const canEdit = canEditIdea(idea);
+  const canConvert = canConvertIdeaToProject(idea);
+  const hasProject = idea.project_status && idea.project_status !== 'idea';
+  
+  console.log('📊 Estado de permisos:', { canEdit, canConvert, hasProject });
+  
+  if (canEdit) {
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'btn-primary';
+    editButton.innerHTML = '<i class="fas fa-edit"></i> Editar Idea';
+    editButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('✏️ Editando idea:', idea.id);
+      editIdea(idea);
+    });
+    actionsContainer.appendChild(editButton);
+  }
+  
+  if (canConvert) {
+    const convertButton = document.createElement('button');
+    convertButton.type = 'button';
+    convertButton.className = 'btn-success';
+    convertButton.innerHTML = '<i class="fas fa-rocket"></i> Convertir a Proyecto';
     
-    actionsContainer.innerHTML = '';
+    // ✅ EVENT LISTENER DIRECTO Y ROBUSTO
+    convertButton.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🚀 BOTÓN CONVERTIR CLICKEADO - IDEA:', idea);
+      convertIdeaToProject(idea);
+      return false;
+    };
     
-    ('🔧 Configurando acciones para idea:', {
-        id: idea.id,
-        projectStatus: idea.project_status,
-        name: idea.name
+    // También agregar event listener normal por si acaso
+    convertButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🚀 EVENT LISTENER NORMAL - IDEA:', idea);
+      convertIdeaToProject(idea);
+      return false;
     });
     
-    const canEdit = canEditIdea(idea);
-    const canConvert = canConvertIdeaToProject(idea);
-    const hasProject = idea.project_status && idea.project_status !== 'idea';
-    
-    ('📊 Estado de permisos:', { canEdit, canConvert, hasProject });
-    
-    if (canEdit) {
-        const editButton = document.createElement('button');
-        editButton.type = 'button';
-        editButton.className = 'btn-primary';
-        editButton.innerHTML = '<i class="fas fa-edit"></i> Editar Idea';
-        editButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            ('✏️ Editando idea:', idea.id);
-            editIdea(idea);
-        });
-        actionsContainer.appendChild(editButton);
-    }
-    
-    if (canConvert) {
-        const convertButton = document.createElement('button');
-        convertButton.type = 'button';
-        convertButton.className = 'btn-success';
-        convertButton.innerHTML = '<i class="fas fa-rocket"></i> Convertir a Proyecto';
-        convertButton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            ('🚀 Botón Convertir a Proyecto clickeado para idea:', idea);
-            convertIdeaToProject(idea);
-        });
-        actionsContainer.appendChild(convertButton);
-    }
-    
-    // Si la idea ya tiene proyecto, mostrar mensaje informativo
-    if (hasProject) {
-        const infoMessage = document.createElement('div');
-        infoMessage.className = 'idea-project-info';
-        infoMessage.innerHTML = `
-            <div class="info-message">
-                <i class="fas fa-info-circle"></i>
-                <span>Esta idea ya fue convertida a proyecto y no se puede editar ni convertir nuevamente.</span>
-            </div>
-        `;
-        actionsContainer.appendChild(infoMessage);
-    }
-    
-    // Botón de cerrar siempre visible
-    const closeButton = document.createElement('button');
-    closeButton.type = 'button';
-    closeButton.className = 'btn-secondary';
-    closeButton.innerHTML = '<i class="fas fa-times"></i> Cerrar';
-    closeButton.addEventListener('click', () => closeModal(document.getElementById('idea-detail-modal')));
-    actionsContainer.appendChild(closeButton);
-    
-    ('✅ Acciones configuradas para idea');
+    actionsContainer.appendChild(convertButton);
+  }
+  
+  // Si la idea ya tiene proyecto, mostrar mensaje informativo
+  if (hasProject) {
+    const infoMessage = document.createElement('div');
+    infoMessage.className = 'idea-project-info';
+    infoMessage.innerHTML = `
+      <div class="info-message">
+        <i class="fas fa-info-circle"></i>
+        <span>Esta idea ya fue convertida a proyecto y no se puede editar ni convertir nuevamente.</span>
+      </div>
+    `;
+    actionsContainer.appendChild(infoMessage);
+  }
+  
+  // Botón de cerrar siempre visible
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'btn-secondary';
+  closeButton.innerHTML = '<i class="fas fa-times"></i> Cerrar';
+  closeButton.addEventListener('click', () => closeModal(document.getElementById('idea-detail-modal')));
+  actionsContainer.appendChild(closeButton);
+  
+  console.log('✅ Acciones configuradas para idea');
 }
 
 // Event listener para el formulario de conversión de idea a proyecto
@@ -4986,19 +6025,20 @@ function loadIdeaDataIntoForm(idea) {
 // Función para verificar si el usuario puede convertir la idea a proyecto - VERSIÓN MEJORADA
 function canConvertIdeaToProject(idea) {
     if (!currentUser) {
-        ('❌ Usuario no autenticado');
+        console.log('❌ Usuario no autenticado');
         return false;
     }
     
-    ('🔍 Verificando permisos para convertir idea:', {
+    console.log('🔍 Verificando permisos para convertir idea:', {
         ideaId: idea.id,
         projectStatus: idea.project_status,
         userType: currentUser.user_type
     });
     
-    // Si la idea ya tiene proyecto, NO se puede convertir
+    // 🔥 VERIFICACIÓN MÁS EXPLÍCITA DEL ESTADO
+    // Si la idea ya tiene un project_status que no es 'idea', NO se puede convertir
     if (idea.project_status && idea.project_status !== 'idea') {
-        ('❌ Idea no convertible - ya tiene proyecto:', idea.project_status);
+        console.log('❌ Idea no convertible - ya tiene project_status:', idea.project_status);
         return false;
     }
     
@@ -5006,18 +6046,33 @@ function canConvertIdeaToProject(idea) {
     const canConvert = currentUser.user_type === 'teacher' || currentUser.user_type === 'admin';
     
     if (!canConvert) {
-        ('❌ Usuario no tiene permisos para convertir ideas');
+        console.log('❌ Usuario no tiene permisos para convertir ideas');
+    } else {
+        console.log('✅ Usuario tiene permisos para convertir');
     }
     
     return canConvert;
 }
 
-// Función para convertir idea a proyecto - CON CONFIGURACIÓN DE EVENT LISTENER
+function debugIdeaStatus(ideaId) {
+    console.log('=== DEBUG ESTADO DE IDEA ===');
+    const idea = ideas.find(i => i.id === ideaId);
+    if (idea) {
+        console.log('Idea encontrada:', {
+            id: idea.id,
+            name: idea.name,
+            project_status: idea.project_status,
+            canConvert: canConvertIdeaToProject(idea)
+        });
+    } else {
+        console.log('❌ Idea no encontrada en el array local');
+    }
+    console.log('Total de ideas cargadas:', ideas.length);
+    console.log('===========================');
+}
+
 async function convertIdeaToProject(idea) {
-    ('💡 Iniciando conversión de idea:', idea);
-    
-    // LIMPIAR ARCHIVOS PREVIOS
-    cleanupConversionFiles();
+    console.log('💡 INICIANDO CONVERSIÓN DE IDEA:', idea);
     
     if (!idea) {
         showNotification('No se pudo obtener la información de la idea', 'error');
@@ -5032,52 +6087,158 @@ async function convertIdeaToProject(idea) {
         return;
     }
     
-    // CARGAR ESTUDIANTES si no están disponibles
-    if (!window.availableStudents || !Array.isArray(window.availableStudents)) {
-        ('👥 Cargando estudiantes para conversión...');
+    // 🔥 CARGAR ESTUDIANTES ANTES DE ABRIR EL MODAL
+    console.log('👥 Cargando estudiantes para conversión...');
+    try {
         await loadStudentsForProject();
+        console.log('✅ Estudiantes cargados:', window.availableStudents?.length);
+    } catch (error) {
+        console.error('❌ Error cargando estudiantes:', error);
+        // Continuar sin estudiantes
+        window.availableStudents = [];
     }
     
-    // Llenar información de la idea en el modal de conversión
+    // Llenar información en el modal
     document.getElementById('convert-idea-name').textContent = idea.name || 'Sin nombre';
-    document.getElementById('convert-idea-author').textContent = idea.author || idea.author_name || 'Autor desconocido';
+    document.getElementById('convert-idea-author').textContent = idea.author || 'Autor desconocido';
     document.getElementById('convert-idea-category').textContent = getCategoryLabel(idea.category) || 'Sin categoría';
     document.getElementById('convert-idea-problem').textContent = idea.problem || 'Sin descripción del problema';
     
-    // Pre-llenar el formulario con datos de la idea
+    // Pre-llenar formulario
     document.getElementById('project-title-from-idea').value = idea.name || '';
     document.getElementById('project-year-from-idea').value = new Date().getFullYear();
     document.getElementById('project-description-from-idea').value = idea.description || '';
-    document.getElementById('project-status-from-idea').value = 'iniciado';
     
-    // Limpiar participantes y archivos previos
+    // Limpiar participantes y archivos
     const participantsContainer = document.getElementById('conversion-project-participants');
     if (participantsContainer) {
         participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay participantes agregados</p></div>';
     }
     
-    const filePreview = document.getElementById('conversion-file-preview');
-    if (filePreview) {
-        filePreview.innerHTML = '';
-    }
-    
-    // Cargar participantes para el proyecto
-    loadConversionParticipants(idea);
-    
-    // Inicializar sistema de archivos para conversión
-    initConversionFileUpload();
-    
-    // Inicializar búsqueda de estudiantes para conversión
-    initConversionStudentSearch();
-    
-    // CONFIGURAR EVENT LISTENER cuando se abre el modal - MEJORADO
+    // 🔥 FORZAR CONFIGURACIÓN DESPUÉS DE CARGAR ESTUDIANTES
     setTimeout(() => {
         setupConversionFormListener();
-        ('🎯 Modal de conversión completamente configurado');
-    }, 300);
+        initConversionStudentSearch();
+        initConversionFileUpload();
+        console.log('🎯 SISTEMA DE CONVERSIÓN COMPLETAMENTE CONFIGURADO');
+    }, 500);
     
-    ('✅ Modal de conversión configurado, abriendo...');
+    console.log('✅ ABRIENDO MODAL DE CONVERSIÓN');
     openModal('convert-idea-modal');
+}
+
+// Función de debug para verificar el estado del botón
+function debugConversionButton() {
+  console.log('=== DEBUG BOTÓN CONVERSIÓN ===');
+  
+  const btn = document.getElementById('convert-idea-submit-btn');
+  console.log('Botón encontrado:', !!btn);
+  
+  if (btn) {
+    console.log('Propiedades del botón:', {
+      id: btn.id,
+      text: btn.textContent,
+      disabled: btn.disabled,
+      onclick: btn.onclick
+    });
+    
+    // Test manual
+    btn.addEventListener('click', function testHandler() {
+      console.log('🎯 TEST: Click funcionando!');
+    });
+  }
+  
+  console.log('==============================');
+}
+
+function testConversionSystem() {
+    console.log('=== TEST SISTEMA DE CONVERSIÓN ===');
+    
+    // Verificar elementos críticos
+    const elements = {
+        form: document.getElementById('convert-idea-form'),
+        submitBtn: document.getElementById('convert-idea-submit-btn'),
+        modal: document.getElementById('convert-idea-modal'),
+        currentIdea: currentIdea
+    };
+    
+    console.log('Elementos encontrados:', elements);
+    
+    // Verificar event listeners
+    if (elements.form) {
+        const listeners = getEventListeners(elements.form);
+        console.log('Event listeners del formulario:', listeners);
+    }
+    
+    console.log('================================');
+}
+
+// Ejecutar después de que cargue la página
+setTimeout(testConversionSystem, 2000);
+
+// Función auxiliar para debug de event listeners
+function debugEventListeners(elementId) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.log(`❌ Elemento ${elementId} no encontrado`);
+    return;
+  }
+  
+  console.log(`=== DEBUG EVENT LISTENERS: ${elementId} ===`);
+  console.log('Elemento:', element);
+  console.log('onclick:', element.onclick);
+  
+  try {
+    const listeners = getEventListeners(element);
+    console.log('Event listeners:', listeners);
+  } catch (e) {
+    console.log('No se pudieron obtener event listeners:', e.message);
+  }
+  
+  // Agregar listener temporal de debug
+  element.addEventListener('click', function debugListener(e) {
+    console.log(`🎯 CLICK DEBUG en ${elementId}:`, e);
+    console.log('Target:', e.target);
+    console.log('Current Target:', e.currentTarget);
+  });
+}
+
+// Para debug, agrega esto temporalmente en tu consola:
+setTimeout(() => {
+  debugEventListeners('idea-actions');
+  const convertBtn = document.querySelector('.btn-success');
+  if (convertBtn) {
+    console.log('🔍 Botón convertir encontrado:', convertBtn);
+    debugEventListeners(convertBtn.id || 'convert-button');
+  }
+}, 2000);
+
+// Función para generar nombres de archivo MUY cortos y seguros
+function generateSafeFileName(originalName) {
+  // Extraer extensión
+  const ext = originalName.includes('.') ? 
+    originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : 
+    '';
+  
+  // Obtener nombre sin extensión y acortar a máximo 15 caracteres
+  const nameWithoutExt = originalName.replace(ext, '');
+  const shortName = nameWithoutExt
+    .substring(0, 15) // MÁXIMO 15 CARACTERES
+    .replace(/[^a-zA-Z0-9]/g, '_') // Solo caracteres alfanuméricos
+    .replace(/_+/g, '_');
+  
+  // ID único muy corto (4 caracteres)
+  const uniqueId = Date.now().toString(36).substring(2, 6);
+  
+  const finalName = shortName + '_' + uniqueId + ext;
+  
+  console.log('🔧 Nombre generado:', {
+    original: originalName,
+    final: finalName,
+    length: finalName.length
+  });
+  
+  return finalName;
 }
 
 // Función para verificar que todos los sistemas de conversión estén funcionando
@@ -5108,6 +6269,233 @@ function verifyConversionSystems() {
 
 // Hacerla global para testing
 window.debugConversionSystems = verifyConversionSystems;
+
+// FUNCIÓN DEFINITIVA CORREGIDA
+function initFileUpload() {
+    console.log('🔄 ===== INICIANDO SISTEMA DE ARCHIVOS =====');
+    
+    const fileInput = document.getElementById('project-files');
+    const fileUploadArea = document.getElementById('file-upload-area');
+    const filePreview = document.getElementById('file-preview');
+    
+    console.log('📍 Elementos encontrados:', {
+        fileInput: !!fileInput,
+        fileUploadArea: !!fileUploadArea, 
+        filePreview: !!filePreview
+    });
+
+    if (!fileInput || !fileUploadArea) {
+        console.error('❌ ERROR: Elementos críticos no encontrados');
+        return;
+    }
+
+    // Inicializar array global
+    if (!window.uploadedFiles) {
+        window.uploadedFiles = [];
+    }
+
+    // *** ESTRATEGIA SIMPLIFICADA Y FUNCIONAL ***
+    
+    // 1. LIMPIAR Y PREPARAR ELEMENTOS
+    fileInput.value = '';
+
+    // 3. CONFIGURAR EVENT LISTENERS (VERSIÓN SIMPLIFICADA)
+    
+    // Remover event listeners existentes del área
+    const newUploadArea = fileUploadArea.cloneNode(true);
+    fileUploadArea.parentNode.replaceChild(newUploadArea, fileUploadArea);
+    const freshUploadArea = document.getElementById('file-upload-area');
+    
+    // CLICK HANDLER - VERSIÓN MEJORADA
+    freshUploadArea.addEventListener('click', function(e) {
+        console.log('🎯 CLICK EN UPLOAD AREA - Iniciando...');
+        
+        // SOLUCIÓN DEFINITIVA: Usar setTimeout para evitar conflictos
+        setTimeout(() => {
+            console.log('🚀 Ejecutando click en file input...');
+            fileInput.click();
+        }, 10);
+        
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+
+    // CHANGE HANDLER - VERSIÓN CORREGIDA
+    fileInput.addEventListener('change', function(e) {
+        console.log('📁 CHANGE EVENT - Archivos:', e.target.files);
+        
+        if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files);
+        }
+        
+        // CORRECCIÓN: Solo limpiar si el elemento todavía existe
+        if (this && this.value) {
+            setTimeout(() => {
+                this.value = '';
+            }, 100);
+        }
+    });
+
+    // DRAG AND DROP
+    freshUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.add('dragover');
+    });
+
+    freshUploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+    });
+
+    freshUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+        
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFiles(e.dataTransfer.files);
+        }
+    });
+
+// Función mejorada para manejar archivos
+function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    
+    console.log(`📁 Procesando ${files.length} archivos`);
+    
+    let filesAdded = 0;
+    const filesArray = Array.from(files);
+    
+    filesArray.forEach(file => {
+        // Validar tipo de archivo
+        const allowedTypes = [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/pdf',
+            'text/plain',
+            'image/jpeg', 
+            'image/png',
+            'image/gif',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        
+        const isValidType = allowedTypes.includes(file.type) || 
+                           file.type.includes('image/') ||
+                           file.name.endsWith('.docx') ||
+                           file.name.endsWith('.doc') ||
+                           file.name.endsWith('.pdf') ||
+                           file.name.endsWith('.txt');
+        
+        if (!isValidType) {
+            showNotification(`Tipo de archivo no permitido: ${file.name}`, 'error');
+            return;
+        }
+        
+        // Validar duplicados
+        const isDuplicate = window.uploadedFiles.some(
+            existingFile => existingFile.name === file.name && existingFile.size === file.size
+        );
+        
+        if (isDuplicate) {
+            showNotification(`"${file.name}" ya está agregado`, 'warning');
+            return;
+        }
+        
+        // Validar tamaño (50MB máximo)
+        if (file.size > 50 * 1024 * 1024) {
+            showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+            return;
+        }
+        
+        // Validar nombre (máximo 255 caracteres)
+        if (file.name.length > 255) {
+            showNotification(`El nombre de "${file.name}" es demasiado largo. Por favor, renómbralo.`, 'error');
+            return;
+        }
+        
+        // Agregar archivo
+        window.uploadedFiles.push(file);
+        filesAdded++;
+        addFileToPreview(file);
+    });
+    
+    if (filesAdded > 0) {
+        showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
+    }
+}
+    
+    // *** FUNCIÓN addFileToPreview ***
+    function addFileToPreview(file) {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-preview-item';
+        fileItem.setAttribute('data-file-name', file.name);
+        
+        const fileSize = formatFileSize(file.size);
+        const fileIcon = getFileIcon(file.name);
+        
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <div class="file-icon">
+                    <i class="${fileIcon}"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${fileSize}</div>
+                </div>
+            </div>
+            <button type="button" class="file-remove" data-file-name="${file.name}">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        if (filePreview) {
+            const emptyMessage = filePreview.querySelector('.empty-preview');
+            if (emptyMessage) {
+                emptyMessage.remove();
+            }
+            filePreview.appendChild(fileItem);
+        }
+        
+        // Configurar botón de eliminar
+        const removeBtn = fileItem.querySelector('.file-remove');
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const fileName = this.getAttribute('data-file-name');
+            removeFileFromPreview(fileName);
+        });
+    }
+    
+    // *** FUNCIÓN PARA ELIMINAR ARCHIVOS ***
+    window.removeFileFromPreview = function(fileName) {
+        // Remover del array
+        window.uploadedFiles = window.uploadedFiles.filter(file => file.name !== fileName);
+        
+        // Remover del DOM
+        const fileItem = document.querySelector(`.file-preview-item[data-file-name="${fileName}"]`);
+        if (fileItem) {
+            fileItem.remove();
+        }
+        
+        // Mostrar mensaje vacío si no hay archivos
+        if (window.uploadedFiles.length === 0 && filePreview) {
+            filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+        }
+        
+        showNotification(`🗑️ "${fileName}" eliminado`, 'info');
+    };
+    
+    // *** INICIALIZAR PREVIEW ***
+    if (filePreview && window.uploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    console.log('✅ ===== SISTEMA DE ARCHIVOS INICIALIZADO =====');
+}
+
 
 // Función para inicializar el sistema de archivos en conversión - VERSIÓN DEFINITIVA
 function initConversionFileUpload() {
@@ -5158,38 +6546,37 @@ function initConversionFileUpload() {
         handleConversionFiles(e.dataTransfer.files);
     });
     
-    function handleConversionFiles(files) {
-        if (!files || files.length === 0) return;
-        
-        (`📁 Procesando ${files.length} archivos en conversión`);
-        
-        for (let file of files) {
-            // Validar que no sea un archivo duplicado
-            const isDuplicate = window.conversionUploadedFiles.some(
-                existingFile => existingFile.name === file.name && existingFile.size === file.size
-            );
-            
-            if (isDuplicate) {
-                (`⚠️ Archivo duplicado ignorado: ${file.name}`);
-                continue;
-            }
-            
-            if (file.size > 50 * 1024 * 1024) {
-                showNotification(`El archivo ${file.name} es demasiado grande (máx. 50MB)`, 'error');
-                continue;
-            }
-            
-            // Agregar archivo único
-            window.conversionUploadedFiles.push(file);
-            addConversionFileToPreview(file);
-            (`✅ Archivo agregado: ${file.name}`);
-        }
-        
-        // LIMPIAR EL INPUT PARA PERMITIR NUEVAS SELECCIONES
-        fileInput.value = '';
-        
-        showNotification(`Se agregaron ${files.length} archivo(s)`, 'success');
+      function handleConversionFiles(files) {
+    if (!files || files.length === 0) return;
+    
+    console.log(`📁 Procesando ${files.length} archivos en conversión`);
+    
+    // Usar el MISMO filtro de archivos grandes
+    const validFiles = filterLargeFiles(files);
+    
+    let filesAdded = 0;
+    
+    validFiles.forEach(file => {
+      // Validar duplicados
+      const isDuplicate = window.conversionUploadedFiles.some(
+        existingFile => existingFile.name === file.name && existingFile.size === file.size
+      );
+      
+      if (isDuplicate) {
+        showNotification(`"${file.name}" ya está agregado`, 'warning');
+        return;
+      }
+      
+      // Agregar archivo
+      window.conversionUploadedFiles.push(file);
+      filesAdded++;
+      addConversionFileToPreview(file);
+    });
+    
+    if (filesAdded > 0) {
+      showNotification(`✅ ${filesAdded} archivo(s) agregado(s)`, 'success');
     }
+  }
     
     function addConversionFileToPreview(file) {
         const fileItem = document.createElement('div');
@@ -5285,10 +6672,25 @@ function initConversionStudentSearch() {
         
         if (searchTerm.length < 2) return;
         
-        // VERIFICAR que los estudiantes estén disponibles
-        if (!window.availableStudents || !Array.isArray(window.availableStudents)) {
-            console.error('❌ availableStudents no está disponible:', window.availableStudents);
-            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Error al cargar estudiantes</div>';
+        // 🔥 MANEJO MEJORADO DE ESTUDIANTES NO DISPONIBLES
+        if (!window.availableStudents) {
+            console.warn('⚠️ availableStudents no disponible, intentando cargar...');
+            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Cargando estudiantes...</div>';
+            resultsContainer.style.display = 'block';
+            
+            // Intentar cargar estudiantes
+            loadStudentsForProject().then(() => {
+                if (window.availableStudents && window.availableStudents.length > 0) {
+                    console.log('✅ Estudiantes cargados, reintentando búsqueda...');
+                    handleConversionSearchInput.call(this); // Re-ejecutar la búsqueda
+                }
+            });
+            return;
+        }
+        
+        if (!Array.isArray(window.availableStudents)) {
+            console.error('❌ availableStudents no es un array:', window.availableStudents);
+            resultsContainer.innerHTML = '<div class="student-result-item" style="color: var(--text-light); padding: 1rem; text-align: center;">Error en datos de estudiantes</div>';
             resultsContainer.style.display = 'block';
             return;
         }
@@ -5333,6 +6735,10 @@ function initConversionStudentSearch() {
         }
     }
     
+        // Limpiar y agregar event listener
+    searchInput.removeEventListener('input', handleConversionSearchInput);
+    searchInput.addEventListener('input', handleConversionSearchInput);
+
     // Cerrar resultados al hacer clic fuera
     document.addEventListener('click', function(e) {
         if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
@@ -5494,13 +6900,14 @@ function loadConversionParticipants(idea) {
     }
 }
 
-// Función mejorada para manejar la conversión de idea a proyecto - CORREGIDA
+// Función mejorada para manejar la conversión de idea a proyecto - VERSIÓN CORREGIDA
 async function handleConvertIdeaToProject(e) {
     e.preventDefault();
     
-    // PREVENIR MÚLTIPLES EJECUCIONES SIMULTÁNEAS
+    console.log('🚀 Iniciando conversión de idea a proyecto...');
+
     if (conversionInProgress) {
-        ('⏳ Conversión ya en progreso, ignorando click adicional');
+        console.log('⏳ Conversión ya en progreso, ignorando click adicional');
         return;
     }
     
@@ -5509,7 +6916,7 @@ async function handleConvertIdeaToProject(e) {
         return;
     }
     
-    ('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
+    console.log('🚀 Iniciando conversión de idea a proyecto:', currentIdea);
     
     const title = document.getElementById('project-title-from-idea').value.trim();
     const year = document.getElementById('project-year-from-idea').value;
@@ -5521,7 +6928,6 @@ async function handleConvertIdeaToProject(e) {
         return;
     }
     
-    // ENCONTRAR el botón de submit
     let submitBtn = document.querySelector('#convert-idea-form button[type="submit"]');
     if (!submitBtn) {
         submitBtn = document.getElementById('convert-idea-submit-btn');
@@ -5539,10 +6945,7 @@ async function handleConvertIdeaToProject(e) {
     const originalText = submitBtn.innerHTML;
     
     try {
-        // BLOQUEAR CONVERSIÓN MÚLTIPLE
         conversionInProgress = true;
-        
-        // Mostrar loading
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando Proyecto...';
         submitBtn.disabled = true;
         
@@ -5556,7 +6959,7 @@ async function handleConvertIdeaToProject(e) {
             requirements: 'Por definir en base a los recursos disponibles',
             problem: currentIdea.problem,
             status: status,
-            original_idea_id: currentIdea.id,
+            original_idea_id: currentIdea.id,  // 🔥 ESTO ES CLAVE
             original_idea_name: currentIdea.name
         };
         
@@ -5573,58 +6976,100 @@ async function handleConvertIdeaToProject(e) {
         
         projectData.students = JSON.stringify(participants);
         
-        ('📤 Enviando datos del proyecto:', projectData);
+        console.log('📤 Enviando datos del proyecto:', projectData);
+        console.log('🎯 original_idea_id que se envía:', projectData.original_idea_id);
+        console.log('🎯 Tipo de original_idea_id:', typeof projectData.original_idea_id);
         
-        // Crear FormData para enviar archivos
-        const formData = new FormData();
-        for (const key in projectData) {
-            formData.append(key, projectData[key]);
-        }
-        
-        // Agregar archivos si existen
-        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
-            (`📁 Agregando ${window.conversionUploadedFiles.length} archivos`);
-            window.conversionUploadedFiles.forEach((file) => {
-                formData.append('files', file);
-            });
-        }
-        
+        // 🔥 ENVIAR COMO JSON EN LUGAR DE FORMData - ESTO ES CLAVE
+        console.log('📤 Enviando como JSON para asegurar que llegue original_idea_id...');
         const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'  // 🔥 ENVIAR COMO JSON
             },
-            body: formData
+            body: JSON.stringify(projectData)  // 🔥 ENVIAR COMO JSON
         });
         
-        if (response.ok) {
-        const newProject = await response.json();
-        ('✅ Proyecto creado exitosamente:', newProject);
-        
-        // FORZAR RECARGA DE IDEAS DESDE EL SERVIDOR
-        ('🔄 Recargando ideas desde el servidor...');
-        await loadIdeas(); // Esto recargará todas las ideas con el estado actualizado
-        
-        // Buscar la idea actualizada en la lista
-        const updatedIdea = ideas.find(i => i.id === currentIdea.id);
-        
-        if (updatedIdea) {
-            ('✅ Idea actualizada encontrada:', {
-                id: updatedIdea.id,
-                name: updatedIdea.name,
-                project_status: updatedIdea.project_status
-            });
-        } else {
-            console.error('❌ No se pudo encontrar la idea actualizada');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al crear el proyecto');
         }
         
-        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como "Proyecto en curso".`, 'success');
+        const newProject = await response.json();
+        console.log('✅ Proyecto creado exitosamente:', newProject);
+
+        // 🔥 ACTUALIZACIÓN DIRECTA DEL ESTADO DE LA IDEA
+        console.log('🔥 ACTUALIZANDO ESTADO DE LA IDEA A "converted"...');
+        try {
+            const updateResponse = await fetch(`${API_BASE}/ideas/${currentIdea.id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    project_status: 'converted',
+                    project_id: newProject.id  // 🔥 ENVIAR EL project_id TAMBIÉN
+                })
+            });
+            
+            if (updateResponse.ok) {
+                const updatedIdea = await updateResponse.json();
+                console.log('✅ Estado de la idea actualizado:', updatedIdea);
+            } else {
+                console.warn('⚠️ No se pudo actualizar el estado de la idea');
+                
+                // Intentar con la ruta alternativa
+                const altResponse = await fetch(`${API_BASE}/ideas/${currentIdea.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        project_status: 'converted'
+                    })
+                });
+                
+                if (altResponse.ok) {
+                    console.log('✅ Idea actualizada con ruta alternativa');
+                }
+            }
+        } catch (updateError) {
+            console.error('❌ Error actualizando estado de idea:', updateError);
+        }
         
-        // Cerrar modales
+        // SEGUNDO: Subir archivos si existen
+        if (window.conversionUploadedFiles && window.conversionUploadedFiles.length > 0) {
+            console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos desde conversión...`);
+            await uploadConversionFiles(newProject.id);
+        }
+        
+        // TERCERO: Recargar ideas para reflejar el cambio
+        console.log('🔄 Recargando ideas...');
+        await loadIdeas();
+        
+        // Verificar que la idea se actualizó
+        const updatedIdea = ideas.find(i => i.id === currentIdea.id);
+        if (updatedIdea) {
+            console.log('📊 Estado final de la idea:', {
+                id: updatedIdea.id,
+                name: updatedIdea.name,
+                project_status: updatedIdea.project_status,
+                project_id: updatedIdea.project_id
+            });
+            
+            if (updatedIdea.project_status === 'converted') {
+                console.log('🎉 ¡La idea fue marcada correctamente como convertida!');
+            }
+        }
+        
+        showNotification(`¡Proyecto "${newProject.title}" creado exitosamente! La idea ahora está marcada como convertida.`, 'success');
+        
+        // Cerrar modales y limpiar
         closeModal(document.getElementById('convert-idea-modal'));
         closeModal(document.getElementById('idea-detail-modal'));
-        
-        // Limpiar datos temporales
         window.conversionUploadedFiles = [];
         currentIdea = null;
         
@@ -5634,24 +7079,85 @@ async function handleConvertIdeaToProject(e) {
         // Navegar a la sección de proyectos
         showSection('semillero');
         
-    } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear el proyecto');
-    }
-        
     } catch (error) {
         console.error('❌ Error convirtiendo idea a proyecto:', error);
         showNotification(`Error al crear el proyecto: ${error.message}`, 'error');
     } finally {
-        // RESTAURAR ESTADO sin importar el resultado
         conversionInProgress = false;
-        
         if (submitBtn) {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         }
     }
 }
+
+// Función auxiliar para subir archivos de conversión
+async function uploadConversionFiles(projectId) {
+    if (!window.conversionUploadedFiles || window.conversionUploadedFiles.length === 0) {
+        console.log('📁 No hay archivos de conversión para subir');
+        return;
+    }
+    
+    console.log(`📤 Subiendo ${window.conversionUploadedFiles.length} archivos de conversión al proyecto ${projectId}...`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const file of window.conversionUploadedFiles) {
+        try {
+            console.log(`⬆️ Procesando archivo: ${file.name} (${file.type})`);
+            
+            // Leer el archivo como base64
+            const fileData = await readFileAsBase64(file);
+            
+            // Preparar datos para subir
+            const uploadData = {
+                file: fileData,
+                fileName: file.name,
+                fileType: file.type
+            };
+            
+            // Subir archivo individual
+            const response = await fetch(`${API_BASE}/projects/${projectId}/files`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(uploadData)
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Archivo subido: ${file.name}`);
+                successCount++;
+            } else {
+                const errorData = await response.json();
+                console.error(`❌ Error subiendo ${file.name}:`, errorData.error);
+                failCount++;
+            }
+        } catch (error) {
+            console.error(`❌ Error procesando ${file.name}:`, error);
+            failCount++;
+        }
+    }
+    
+    console.log(`📊 Resultado: ${successCount} exitosos, ${failCount} fallidos`);
+}
+
+// Función auxiliar para leer archivo como Base64 (igual que en proyectos)
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Obtener solo la parte base64 (sin el data URL prefix)
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
+
 
 // Función para cargar participantes en el modal de conversión
 function loadConversionParticipants(idea) {
@@ -5983,46 +7489,47 @@ function showChangeStatusConfirmation(suggestionId, currentStatus) {
     openModal('confirm-change-status-modal');
 }
 
-// Ejecutar cambio de estado con endpoint real
+// También cuando cambia el estado de una sugerencia
 async function executeChangeSuggestionStatus(suggestionId, newStatus) {
     try {
-        (`🔄 Cambiando estado de sugerencia ${suggestionId} a: ${newStatus}`);
+        console.log(`🔄 Cambiando estado de sugerencia ${suggestionId} a: ${newStatus}`);
         
         const response = await fetch(`${API_BASE}/suggestions/${suggestionId}`, {
             method: 'PUT',
-            headers: authToken ? {
+            headers: {
                 'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
-            } : {},
+            },
             body: JSON.stringify({ status: newStatus })
         });
-        
+
         if (response.ok) {
             const updatedSuggestion = await response.json();
+            console.log('✅ Estado cambiado exitosamente:', updatedSuggestion);
             
-            // Actualizar lista local
-            const suggestionIndex = suggestions.findIndex(s => s.id === suggestionId);
-            if (suggestionIndex !== -1) {
-                suggestions[suggestionIndex] = updatedSuggestion;
+            // Actualizar la sugerencia en el array local
+            const index = suggestions.findIndex(s => s.id === suggestionId);
+            if (index !== -1) {
+                suggestions[index] = updatedSuggestion;
             }
             
-            showNotification(`Sugerencia marcada como ${newStatus === 'pendiente' ? 'Subida' : 'Realizada'}`, 'success');
+            // 🔥 ACTUALIZAR CONTADORES DESPUÉS DEL CAMBIO
+            updateSuggestionCounters();
             
-            // Cerrar modales
-            closeModal(document.getElementById('confirm-change-status-modal'));
-            closeModal(document.getElementById('suggestion-detail-modal'));
-            
-            // Recargar sugerencias
+            // Re-renderizar si es necesario
             renderSuggestions();
+            
+            showNotification('Estado de sugerencia actualizado', 'success');
+            closeModal(document.getElementById('change-status-modal'));
             
         } else {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Error al cambiar el estado');
+            throw new Error(errorData.error || 'Error cambiando estado');
         }
         
     } catch (error) {
         console.error('❌ Error cambiando estado:', error);
-        showNotification(`Error al cambiar el estado: ${error.message}`, 'error');
+        showNotification(`Error: ${error.message}`, 'error');
     }
 }
 
@@ -7328,7 +8835,7 @@ function createSuggestionElement(suggestion) {
     return suggestionDiv;
 }
 
-// Función auxiliar para escapar HTML (seguridad)
+// Función para escapar HTML (seguridad)
 function escapeHtml(unsafe) {
     if (!unsafe) return '';
     return unsafe
@@ -7393,185 +8900,56 @@ function openAddCommentModal(suggestionId) {
 }
 
 
-// ==================== FUNCIONES PARA MANEJO DE ARCHIVOS ====================
+// ==================== SISTEMA DE ARCHIVOS MEJORADO ====================
 
-function initFileUpload() {
+// Variable global mejorada
+let fileUploadInitialized = false;
+
+
+// FUNCIÓN PARA LIMPIAR COMPLETAMENTE
+function cleanupFileUpload() {
     const fileInput = document.getElementById('project-files');
     const fileUploadArea = document.getElementById('file-upload-area');
-    const filePreview = document.getElementById('file-preview');
     
-    if (!fileInput || !fileUploadArea) {
-        console.error('❌ Elementos de upload no encontrados');
-        return;
+    if (fileInput) {
+        fileInput.value = '';
+        // Clonar para remover event listeners
+        const newFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(newFileInput, fileInput);
     }
     
-    ('✅ Sistema de archivos inicializado');
-    
-    // INICIALIZAR ARRAY VACÍO
-    if (!window.uploadedFiles) {
-        window.uploadedFiles = [];
+    if (fileUploadArea) {
+        const newFileUploadArea = fileUploadArea.cloneNode(true);
+        fileUploadArea.parentNode.replaceChild(newFileUploadArea, fileUploadArea);
     }
     
-    // Función para limpiar completamente los archivos
-    window.clearAllFiles = function() {
-        window.uploadedFiles = [];
-        if (fileInput) fileInput.value = '';
-        if (filePreview) {
-            filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
-        }
-        ('🗑️ Todos los archivos limpiados');
-    };
-
-    let uploadedFiles = [];
-    
-    // Evento para cambio de archivos - CORREGIDO
-    fileInput.addEventListener('change', function(e) {
-        ('📁 Input de archivos cambiado:', e.target.files);
-        handleFiles(e.target.files);
-    });
-    
-    // Drag and drop
-    fileUploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        fileUploadArea.classList.add('dragover');
-    });
-    
-    fileUploadArea.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        fileUploadArea.classList.remove('dragover');
-    });
-    
-    fileUploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        fileUploadArea.classList.remove('dragover');
-        ('📁 Archivos soltados:', e.dataTransfer.files);
-        handleFiles(e.dataTransfer.files);
-        
-        // Actualizar el input de archivos con los archivos soltados
-        fileInput.files = e.dataTransfer.files;
-    });
-    
-    function handleFiles(files) {
-        ('🔄 Procesando archivos:', files.length);
-        
-        if (files.length === 0) {
-            ('📁 No se recibieron archivos');
-            return;
-        }
-        
-        for (let file of files) {
-            ('📄 Procesando archivo:', file.name, file.size, file.type);
-            
-            // Validar tamaño (50MB)
-            if (file.size > 50 * 1024 * 1024) {
-                showNotification(`El archivo ${file.name} es demasiado grande (máx. 50MB)`, 'error');
-                continue;
-            }
-            
-            // Validar tipo
-            const allowedTypes = [
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'image/jpeg',
-                'image/jpg',
-                'image/png',
-                'video/mp4',
-                'video/avi',
-                'application/zip',
-                'application/x-rar-compressed',
-                'text/plain'
-            ];
-            
-            const allowedExts = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.mp4', '.avi', '.zip', '.rar', '.txt'];
-            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
-            
-            if (!allowedTypes.includes(file.type) && !allowedExts.includes(fileExt)) {
-                showNotification(`Tipo de archivo no permitido: ${file.name}`, 'error');
-                continue;
-            }
-            
-            addFileToPreview(file);
-            uploadedFiles.push(file);
-        }
-        
-        (`✅ ${uploadedFiles.length} archivos listos para enviar`);
-        
-        // NO limpiar el input - mantener los archivos seleccionados
-    }
-    
-    function addFileToPreview(file) {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-preview-item';
-        
-        const fileSize = formatFileSize(file.size);
-        const fileIcon = getFileIcon(file.name);
-        
-        fileItem.innerHTML = `
-            <div class="file-info">
-                <div class="file-icon">
-                    <i class="${fileIcon}"></i>
-                </div>
-                <div class="file-details">
-                    <div class="file-name">${file.name}</div>
-                    <div class="file-size">${fileSize}</div>
-                </div>
-            </div>
-            <button type="button" class="file-remove" onclick="removeFileFromPreview(this, '${file.name}')">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        if (filePreview) {
-            // Remover mensaje de vacío si existe
-            const emptyMessage = filePreview.querySelector('.empty-preview');
-            if (emptyMessage) {
-                emptyMessage.remove();
-            }
-            filePreview.appendChild(fileItem);
-        }
-    }
-    
-    // Guardar referencia global
-    window.uploadedFiles = uploadedFiles;
-    window.removeFileFromPreview = function(button, fileName) {
-        const fileItem = button.closest('.file-preview-item');
-        if (fileItem) {
-            fileItem.remove();
-        }
-        
-        // Remover del array
-        window.uploadedFiles = window.uploadedFiles.filter(file => file.name !== fileName);
-        
-        // Actualizar el input de archivos
-        updateFileInput();
-        
-        (`🗑️ Archivo removido: ${fileName}`);
-        showNotification(`Archivo ${fileName} removido`, 'info');
-        
-        // Mostrar mensaje de vacío si no hay archivos
-        if (window.uploadedFiles.length === 0 && filePreview) {
-            filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
-        }
-    };
-    
-    function updateFileInput() {
-        // Crear un nuevo DataTransfer para actualizar el input
-        const dataTransfer = new DataTransfer();
-        window.uploadedFiles.forEach(file => {
-            dataTransfer.items.add(file);
-        });
-        fileInput.files = dataTransfer.files;
-        
-        ('🔄 Input de archivos actualizado:', fileInput.files.length, 'archivos');
-    }
-    
-    // Inicializar mensaje de vacío
-    if (filePreview && window.uploadedFiles.length === 0) {
-        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
-    }
+    window.uploadedFiles = [];
+    fileUploadInitialized = false;
 }
 
+// Función para resetear completamente el sistema de archivos
+function resetFileUpload() {
+    console.log('🔄 Reseteando sistema de archivos...');
+    
+    // Limpiar array global
+    window.uploadedFiles = [];
+    
+    // Limpiar preview de forma segura
+    const filePreview = document.getElementById('file-preview');
+    if (filePreview) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    // Limpiar input file de forma segura
+    const fileInput = document.getElementById('project-files');
+    if (fileInput && fileInput.value) {
+        fileInput.value = '';
+    }
+    
+    console.log('✅ Sistema de archivos reseteado');
+}
+
+// Función auxiliar para formatear tamaño de archivo
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -7580,10 +8958,10 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function getFileIcon(fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    
-    const icons = {
+// Función para obtener icono según tipo de archivo
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const iconMap = {
         'pdf': 'fas fa-file-pdf',
         'doc': 'fas fa-file-word',
         'docx': 'fas fa-file-word',
@@ -7594,10 +8972,13 @@ function getFileIcon(fileName) {
         'avi': 'fas fa-file-video',
         'zip': 'fas fa-file-archive',
         'rar': 'fas fa-file-archive',
-        'txt': 'fas fa-file-alt'
+        'txt': 'fas fa-file-alt',
+        'ino': 'fas fa-file-code',
+        'cpp': 'fas fa-file-code',
+        'h': 'fas fa-file-code',
+        'py': 'fas fa-file-code'
     };
-    
-    return icons[ext] || 'fas fa-file';
+    return iconMap[ext] || 'fas fa-file';
 }
 
 // ==================== FUNCIONES DE PRESENTACIÓN ====================
@@ -7690,63 +9071,7 @@ function updateUserCounters() {
     document.getElementById('user-suggestions-count').textContent = userSuggestionsCount;
 }
 
-async function downloadResource(fileUrl, fileName = 'archivo') {
-    if (!fileUrl) {
-        showNotification('No hay archivo para descargar', 'error');
-        return;
-    }
 
-    ('📥 Iniciando descarga:', { fileUrl, fileName });
-
-    // Si es un enlace externo, abrir en nueva pestaña
-    if (fileUrl.startsWith('http') && !fileUrl.includes('/uploads/')) {
-        ('🔗 Abriendo enlace externo:', fileUrl);
-        window.open(fileUrl, '_blank');
-        return;
-    }
-
-    try {
-        // Para archivos locales, forzar descarga
-        const response = await fetch(fileUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-        
-        // Crear URL temporal
-        const url = window.URL.createObjectURL(blob);
-        
-        // Crear elemento anchor para descarga
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        
-        // Forzar nombre de archivo para descarga
-        const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        a.download = safeFileName;
-        
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        ('✅ Descarga iniciada:', safeFileName);
-        showNotification(`Descargando ${safeFileName}...`, 'success');
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        
-        // Fallback: intentar abrir en nueva pestaña
-        ('🔄 Intentando fallback...');
-        window.open(fileUrl, '_blank');
-        
-        showNotification('Descarga iniciada en nueva pestaña', 'info');
-    }
-}
 
 function downloadIdeaPDF() {
     const idea = window.currentIdea;
@@ -7871,160 +9196,132 @@ function switchAuthForm(formType) {
     }
 }
 
+// Función de debug para los contadores de sugerencias
+function debugSuggestionCounters() {
+    console.log('=== DEBUG CONTADORES SUGERENCIAS ===');
+    console.log('suggestions array:', suggestions);
+    console.log('Total de sugerencias:', suggestions.length);
+    
+    const pendientes = suggestions.filter(s => s.status === 'pendiente').length;
+    const enProgreso = suggestions.filter(s => s.status === 'en_progreso').length;
+    const realizadas = suggestions.filter(s => s.status === 'realizada').length;
+    
+    console.log('Pendientes:', pendientes);
+    console.log('En progreso:', enProgreso);
+    console.log('Realizadas:', realizadas);
+    console.log('===============================');
+    
+    // También verificar los elementos HTML
+    const totalElement = document.getElementById('suggestions-total');
+    const pendientesElement = document.getElementById('suggestions-pendientes');
+    const realizadasElement = document.getElementById('suggestions-realizadas');
+    
+    console.log('Elementos HTML:');
+    console.log('Total element:', totalElement);
+    console.log('Pendientes element:', pendientesElement);
+    console.log('Realizadas element:', realizadasElement);
+    
+    if (totalElement) console.log('Total text:', totalElement.textContent);
+    if (pendientesElement) console.log('Pendientes text:', pendientesElement.textContent);
+    if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
+}
+
+// ==================== FUNCIONES NUEVAS PARA DESCARGAS MÓVILES ====================
+
+// Función PRINCIPAL para descargar archivos de proyectos
 async function downloadProjectFile(projectId, fileId, fileName) {
-    try {
-        (`📥 Descargando archivo - Proyecto: ${projectId}, Archivo ID: ${fileId}`);
-        
-        // Obtener información del archivo
-        const projectResponse = await fetch(`${API_BASE}/projects/${projectId}`, {
-            headers: authToken ? {
-                'Authorization': `Bearer ${authToken}`
-            } : {}
-        });
-        
-        if (!projectResponse.ok) {
-            throw new Error('No se pudo obtener información del proyecto');
-        }
-        
-        const project = await projectResponse.json();
-        const file = project.files.find(f => f.id === fileId);
-        
-        if (!file) {
-            throw new Error('Archivo no encontrado en el proyecto');
-        }
-        
-        ('📄 Información del archivo:', file);
-        
-        // Crear URL de descarga con timestamp para evitar cache
-        const timestamp = new Date().getTime();
-        const downloadUrl = `${API_BASE}/files/download/${fileId}?t=${timestamp}`;
-        const originalName = file.original_name || fileName || 'archivo_descargado';
-        
-        ('🔗 URL de descarga:', downloadUrl);
-        
-        // MÉTODO 1: Usar fetch y Blob (más confiable)
+    console.log('📱 INICIANDO DESCARGA:', fileName);
+    
+    // Mostrar notificación
+    showNotification(`⬇️ Descargando: ${fileName}`, 'info');
+    
+    // URL CORRECTA para descarga (usando la ruta que SÍ funciona)
+    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+    
+    console.log('🔗 URL de descarga:', downloadUrl);
+    
+    // Método que SÍ funciona en Android
+    triggerAndroidDownload(downloadUrl, fileName);
+}
+
+
+// Función PRINCIPAL para descargar recursos de biblioteca  
+async function downloadLibraryResource(resourceId, resourceName) {
+    console.log('📱 DESCARGANDO RECURSO:', resourceName);
+    
+    showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
+    
+    // URL CORRECTA para descarga
+    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+    
+    console.log('🔗 URL de descarga:', downloadUrl);
+    
+    triggerAndroidDownload(downloadUrl, resourceName);
+}
+
+// Función que SÍ activa las notificaciones del sistema
+function triggerAndroidDownload(downloadUrl, fileName) {
+    console.log('🚀 ACTIVANDO DESCARGA ANDROID:', fileName);
+    
+    // Estrategia 1: Redirección DIRECTA (la que SÍ funciona)
+    // Esta es la clave - usar window.location.href en lugar de métodos complejos
+    window.location.href = downloadUrl;
+    
+    // Estrategia 2: Abrir en nueva pestaña como backup
+    setTimeout(() => {
         try {
-            const response = await fetch(downloadUrl, {
-                method: 'GET',
-                headers: authToken ? {
-                    'Authorization': `Bearer ${authToken}`
-                } : {}
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-            const blob = await response.blob();
-            
-            if (blob.size === 0) {
-                throw new Error('El archivo recibido está vacío');
-            }
-            
-            // Crear URL del blob
-            const blobUrl = URL.createObjectURL(blob);
-            
-            // Crear enlace de descarga
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = originalName;
-            a.style.display = 'none';
-            
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            // Liberar la URL después de un tiempo
-            setTimeout(() => {
-                URL.revokeObjectURL(blobUrl);
-                ('✅ URL del blob liberada');
-            }, 1000);
-            
-            ('✅ Descarga mediante Blob exitosa');
-            showNotification(`Descargando: ${originalName}`, 'success');
-            return;
-            
-        } catch (fetchError) {
-            ('❌ Método Blob falló, intentando método directo:', fetchError);
+            window.open(downloadUrl, '_blank');
+        } catch (e) {
+            console.log('No se pudo abrir nueva pestaña');
         }
-        
-        // MÉTODO 2: Enlace directo (fallback)
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = originalName;
-        a.target = '_blank'; // Abrir en nueva pestaña si falla la descarga
-        a.style.display = 'none';
-        
-        // Agregar headers de autorización para el enlace
-        if (authToken) {
-            a.setAttribute('data-token', authToken);
-        }
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        ('✅ Descarga mediante enlace directo iniciada');
-        showNotification(`Iniciando descarga: ${originalName}`, 'success');
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        showNotification(`Error al descargar: ${error.message}`, 'error');
+    }, 100);
+    
+    // Estrategia 3: Mostrar ayuda por si acaso
+    setTimeout(() => {
+        showNotification(
+            `✅ ${fileName} se está descargando. Revisa tus notificaciones.`,
+            'success',
+            5000
+        );
+    }, 2000);
+}
+
+// Función para mostrar ayuda de ubicación de archivos
+function showDownloadHelp(fileName) {
+    if (isMobileDevice()) {
+        setTimeout(() => {
+            showNotification(
+                `📁 "${fileName}" se está descargando. ` +
+                `Revisa la carpeta "Descargas" de tu celular. ` +
+                `La notificación del sistema debería aparecer en la barra superior.`,
+                'info',
+                8000
+            );
+        }, 3000);
     }
 }
 
-async function downloadLibraryResource(resourceId, resourceTitle, fileUrl) {
-    try {
-        ('📚 Descargando recurso de biblioteca:', { resourceId, resourceTitle, fileUrl });
-        
-        // Si no hay autenticación, intentar descarga directa
-        if (!authToken) {
-            ('🔓 Sin autenticación, intentando descarga directa...');
-            attemptDirectDownload(fileUrl, resourceTitle);
-            return;
-        }
+// Función para detectar móvil
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
-        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-        ('📥 Usando endpoint de descarga:', downloadUrl);
-        
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            }
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = resourceTitle || 'recurso';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+// Función para mejorar las notificaciones en móvil
+function showMobileDownloadNotification(fileName, type = 'success') {
+    if (isMobileDevice()) {
+        // En móviles, hacer las notificaciones más persistentes
+        const message = type === 'success' 
+            ? `✅ ${fileName} descargado` 
+            : `❌ Error al descargar ${fileName}`;
             
-            showNotification('Descarga iniciada', 'success');
-        } else if (response.status === 403) {
-            console.warn('🚫 Acceso denegado a descarga, intentando método directo...');
-            // Intentar descarga directa como fallback
-            attemptDirectDownload(fileUrl, resourceTitle);
-        } else {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Error ${response.status}`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
-        
-        // Si hay error de autenticación o permisos, intentar descarga directa
-        if (error.message.includes('No tienes permisos') || error.message.includes('Acceso denegado') || error.message.includes('403')) {
-            ('🔄 Intentando descarga directa...');
-            attemptDirectDownload(fileUrl, resourceTitle);
-        } else {
-            showNotification(`Error en descarga: ${error.message}`, 'error');
-        }
+        showNotification(message, type, 5000); // 5 segundos en móvil
+    } else {
+        // En desktop, comportamiento normal
+        const message = type === 'success'
+            ? `Descarga completada: ${fileName}`
+            : `Error al descargar: ${fileName}`;
+            
+        showNotification(message, type);
     }
 }
 
@@ -8295,33 +9592,6 @@ function getStatusInfo(status) {
     }
 }
 
-function getCategoryLabel(category) {
-    const categories = {
-        'electronica': 'Electrónica Aplicada',
-        'robotica': 'Robótica',
-        'iot': 'IoT',
-        'proyectos-sociales': 'Proyectos Sociales',
-        'salud': 'Salud',
-        'bienestar': 'Bienestar',
-        'energia': 'Energía',
-        'automotriz': 'Automotriz',
-        'programacion': 'Programación',
-        'manuales': 'Manuales'
-    };
-    return categories[category] || category;
-}
-
-function getResourceTypeLabel(type) {
-    const types = {
-        'documento': 'Documento',
-        'video': 'Video',
-        'enlace': 'Enlace',
-        'presentacion': 'Presentación',
-        'manual': 'Manual'
-    };
-    return types[type] || type;
-}
-
 function getUserTypeLabel(type) {
     const types = {
         'student': 'Alumno',
@@ -8451,8 +9721,8 @@ function confirmRemoveParticipant(button) {
 
 // Función para quitar archivo existente (ahora abre modal de confirmación)
 function confirmRemoveExistingFile(fileId, button) {
-    const fileItem = button.closest('.file-preview-item');
-    const fileName = fileItem.querySelector('.file-name').textContent.split(' (Existente)')[0];
+    const fileItem = button.closest('.existing-file');
+    const fileName = fileItem.querySelector('.file-name').textContent;
     
     pendingRemoveFile = {
         id: fileId,
@@ -8589,33 +9859,54 @@ function executeRemoveParticipant() {
     pendingRemoveParticipant = { element: null, name: '' };
 }
 
-// Función que se ejecuta cuando se confirma quitar archivo
+// Función que se ejecuta cuando se confirma la eliminación en el modal
 function executeRemoveFile() {
-    if (!pendingRemoveFile.element) return;
+    if (!pendingRemoveFile) {
+        console.error('❌ No hay archivo pendiente para eliminar');
+        return;
+    }
+
+    const { id, name, element } = pendingRemoveFile;
+    const fileItem = element.closest('.existing-file');
     
-    const button = pendingRemoveFile.element;
-    const fileItem = button.closest('.file-preview-item');
-    
+    console.log(`🗑️ Ejecutando eliminación del archivo: ${name} (ID: ${id})`);
+
+    // Remover del DOM
     if (fileItem) {
         fileItem.remove();
-        
-        // Agregar el fileId a la lista de archivos a eliminar
-        if (!window.filesToRemove) {
-            window.filesToRemove = [];
-        }
-        window.filesToRemove.push(pendingRemoveFile.id);
-        
-        showNotification(`Archivo marcado para quitar: ${pendingRemoveFile.name}`, 'info');
-        
-        // Si no quedan archivos, mostrar mensaje vacío
-        const filePreview = document.getElementById('file-preview');
-        if (filePreview && filePreview.children.length === 0) {
-            filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
-        }
+    }
+
+    // 🔥 AGREGAR A LA LISTA DE ARCHIVOS A ELIMINAR
+    if (!window.filesToRemove) {
+        window.filesToRemove = [];
     }
     
+    // Verificar que no esté ya en la lista
+    if (!window.filesToRemove.includes(id)) {
+        window.filesToRemove.push(id);
+        console.log(`✅ Archivo agregado a filesToRemove: ${name} (ID: ${id})`);
+        console.log(`📋 filesToRemove actual:`, window.filesToRemove);
+    }
+
+    showNotification(`Archivo "${name}" marcado para eliminar`, 'info');
+
+    // Si no quedan archivos, mostrar mensaje vacío
+    const filePreview = document.getElementById('file-preview');
+    const remainingFiles = filePreview.querySelectorAll('.file-preview-item');
+    if (remainingFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos en el proyecto</p></div>';
+    }
+
+    // Cerrar modal y limpiar
     closeModal(document.getElementById('confirm-remove-file-modal'));
-    pendingRemoveFile = { id: null, name: '', element: null };
+    pendingRemoveFile = null;
+}
+
+// Función para cancelar la eliminación
+function cancelRemoveFile() {
+    console.log('❌ Eliminación de archivo cancelada');
+    closeModal(document.getElementById('confirm-remove-file-modal'));
+    pendingRemoveFile = null;
 }
 
 // Función que se ejecuta cuando se confirma eliminar archivo físicamente
@@ -8649,6 +9940,27 @@ async function executeDeleteFile() {
         closeModal(document.getElementById('confirm-delete-file-modal'));
         pendingDeleteFile = { projectId: null, fileId: null, name: '' };
     }
+}
+
+// Función para abrir modal de Programas
+function openProgramasModal() {
+    currentLibraryCategory = 'programas';
+    loadCategoryResources('programas');
+    openModal('programas-modal');
+}
+
+// Función para abrir modal de Habilidades Técnicas
+function openHabilidadesTecnicasModal() {
+    currentLibraryCategory = 'habilidades_tecnicas';
+    loadCategoryResources('habilidades_tecnicas');
+    openModal('habilidades-tecnicas-modal');
+}
+
+// Función para abrir modal de Habilidades Blandas
+function openHabilidadesBlandasModal() {
+    currentLibraryCategory = 'habilidades_blandas';
+    loadCategoryResources('habilidades_blandas');
+    openModal('habilidades-blandas-modal');
 }
 
 // ==================== DATOS DE EJEMPLO ====================
@@ -8713,19 +10025,25 @@ function getSampleLibraryResources() {
     return [
         {
             id: 1,
-            title: "Guía de Arduino para Principiantes",
-            description: "Manual completo para empezar con Arduino y electrónica básica.",
-            resource_type: "documento",
-            category: "electronica",
-            file_url: "/uploads/guia-arduino.pdf"
+            title: 'Manual de Arduino Básico',
+            description: 'Guía completa para empezar con Arduino',
+            resource_type: 'documento',
+            main_category: 'programas',
+            subcategory: 'programacion',
+            file_url: '/files/arduino-manual.pdf',
+            uploader_name: 'Profesor Electrónica',
+            created_at: new Date().toISOString()
         },
         {
             id: 2,
-            title: "Introducción a IoT",
-            description: "Conceptos básicos de Internet de las Cosas y aplicaciones prácticas.",
-            resource_type: "enlace",
-            category: "iot",
-            external_url: "https://example.com/iot-intro"
+            title: 'Tutorial de PCB Design',
+            description: 'Aprende a diseñar circuitos impresos',
+            resource_type: 'video', 
+            main_category: 'habilidades_tecnicas',
+            subcategory: 'electronica',
+            external_url: 'https://youtube.com/tutorial-pcb',
+            uploader_name: 'Ing. Circuitos',
+            created_at: new Date().toISOString()
         }
     ];
 }
@@ -8806,104 +10124,138 @@ function updateCharCounter(element, counter, maxLength) {
 
 // Función para manejar el envío del formulario de idea - ACTUALIZADA
 async function submitNewIdea(e) {
-    e.preventDefault();
-    
-    if (!checkAuth()) return;
-    
-    ('🚀 Enviando nueva idea...');
-    
-    // Validar campos requeridos
+  e.preventDefault();
+  
+  if (!checkAuth()) return;
+  
+  console.log('💡 Enviando nueva idea...');
+  
+  // Mostrar loading
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+  submitBtn.disabled = true;
+  
+  try {
+    // Recoger datos del formulario con validaciones
     const name = document.getElementById('idea-name').value.trim();
     const category = document.getElementById('idea-category').value;
     const problem = document.getElementById('idea-problem').value.trim();
     const description = document.getElementById('idea-description').value.trim();
     
+    // Validaciones básicas
     if (!name || !category || !problem || !description) {
-        showNotification('Por favor completa todos los campos obligatorios', 'error');
-        return;
+      showNotification('Por favor completa todos los campos obligatorios', 'error');
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+      return;
     }
     
     // Obtener complejidad y presupuesto seleccionados
-    const complexityBtn = document.querySelector('#idea-form .complexity-btn.active');
-    const budgetBtn = document.querySelector('#idea-form .budget-btn.active');
+    const complexityBtn = document.querySelector('.complexity-btn.active');
+    const budgetBtn = document.querySelector('.budget-btn.active');
     const complexity = complexityBtn ? complexityBtn.getAttribute('data-complexity') : 'baja';
     const budget = budgetBtn ? budgetBtn.getAttribute('data-budget') : 'bajo';
     
-    // Recoger participantes si existen
-    let participants = [];
-    const participantInputs = document.querySelectorAll('#idea-participants input[name="idea-participants[]"]');
-    if (participantInputs.length > 0) {
-        participants = Array.from(participantInputs).map(input => {
-            try {
-                return JSON.parse(input.value);
-            } catch (error) {
-                console.error('Error parseando participante:', input.value);
-                return null;
-            }
-        }).filter(participant => participant !== null);
-    }
+    // Recoger participantes
+    const participantInputs = document.querySelectorAll('input[name="idea-participants[]"]');
+    const participants = Array.from(participantInputs).map(input => {
+      try {
+        return JSON.parse(input.value);
+      } catch (error) {
+        console.error('Error parseando participante:', input.value);
+        return null;
+      }
+    }).filter(participant => participant !== null);
     
+    // Preparar datos para enviar
     const formData = {
-        name: name,
-        author: `${currentUser.first_name} ${currentUser.last_name}`,
-        category: category,
-        problem: problem,
-        description: description,
-        complexity: complexity,
-        budget: budget,
-        created_by: currentUser.id
+      name: name,
+      category: category,
+      problem: problem,
+      description: description,
+      complexity: complexity,
+      budget: budget,
+      author: `${currentUser.first_name} ${currentUser.last_name}`,
+      created_by: currentUser.id
     };
     
-    // Agregar participantes si hay
+    // Agregar participantes solo si existen
     if (participants.length > 0) {
-        formData.students = JSON.stringify(participants);
+      formData.students = JSON.stringify(participants);
+      console.log(`👥 Enviando ${participants.length} participantes`);
     }
     
-    ('📤 Enviando datos de idea:', formData);
+    console.log('📤 Datos de idea a enviar:', {
+      name: formData.name,
+      category: formData.category,
+      complexity: formData.complexity,
+      budget: formData.budget,
+      hasParticipants: !!formData.students
+    });
     
-    // Mostrar loading
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
-    submitBtn.disabled = true;
-
-    try {
-        const newIdea = await apiCall('/ideas', {
-            method: 'POST',
-            body: JSON.stringify(formData)
-        });
-
-        ('✅ Idea creada exitosamente:', newIdea);
-        
-        // Agregar a la lista local
-        ideas.unshift(newIdea);
-        
-        // Actualizar la vista
-        renderIdeas();
-        
-        // Cerrar modal y limpiar formulario
-        closeModal(document.getElementById('upload-idea-modal'));
-        document.getElementById('idea-form').reset();
-        
-        // Limpiar participantes
-        const participantsContainer = document.getElementById('idea-participants');
-        if (participantsContainer) {
-            participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay colaboradores agregados</p></div>';
-        }
-        
-        showNotification('¡Idea publicada exitosamente!', 'success');
-        
-        // Actualizar estadísticas del usuario
-        updateUserCounters();
-
-    } catch (error) {
-        console.error('❌ Error publicando idea:', error);
-        showNotification('Error al publicar la idea: ' + error.message, 'error');
-    } finally {
-        // Restaurar botón
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
+    // Enviar a la API
+    const response = await fetch(`${API_BASE}/ideas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    console.log('📥 Respuesta del servidor:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    if (response.ok) {
+      const newIdea = await response.json();
+      console.log('✅ Idea creada exitosamente:', newIdea);
+      
+      // Agregar a la lista local
+      ideas.unshift(newIdea);
+      
+      // Recargar la vista
+      renderIdeas();
+      
+      // Cerrar modal y limpiar formulario
+      closeModal(document.getElementById('upload-idea-modal'));
+      document.getElementById('idea-form').reset();
+      
+      // Limpiar participantes
+      const participantsContainer = document.getElementById('idea-participants');
+      if (participantsContainer) {
+        participantsContainer.innerHTML = '<div class="empty-participants"><i class="fas fa-users"></i><p>No hay colaboradores agregados</p></div>';
+      }
+      
+      showNotification('¡Idea publicada exitosamente!', 'success');
+      
+    } else {
+      // Obtener detalles del error
+      let errorMessage = 'Error al publicar la idea';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+        console.error('❌ Error del servidor:', errorData);
+      } catch (parseError) {
+        const errorText = await response.text();
+        console.error('❌ Error texto:', errorText);
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
     }
+    
+  } catch (error) {
+    console.error('❌ Error publicando idea:', error);
+    showNotification(`Error: ${error.message}`, 'error');
+  } finally {
+    // Restaurar botón
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  }
 }
 
 // Función para renderizar las ideas en el grid
@@ -9338,7 +10690,108 @@ function updateNavigation(sectionId) {
     });
 }
 
+// Agregar al final de tu script.js
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const navbar = document.querySelector('.navbar');
+    
+    if (mobileMenu && navbar) {
+        mobileMenu.addEventListener('click', function() {
+            navbar.classList.toggle('active');
+        });
+        
+        // Cerrar menú al hacer clic en un enlace
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                navbar.classList.remove('active');
+            });
+        });
+        
+        // Cerrar menú al hacer clic fuera
+        document.addEventListener('click', function(event) {
+            if (!navbar.contains(event.target) && !mobileMenu.contains(event.target)) {
+                navbar.classList.remove('active');
+            }
+        });
+    }
+});
+
 // ==================== FUNCIONES MEJORADAS PARA NUEVAS SECCIONES ====================
+// Agrega esta función al final de tu script.js para debuggear el sistema de archivos
+function debugFileUploadSystem() {
+    console.log('🔍 === DEBUG SISTEMA DE ARCHIVOS ===');
+    
+    // Verificar elementos críticos para proyecto
+    const projectFileInput = document.getElementById('project-files');
+    const projectUploadArea = document.getElementById('file-upload-area');
+    
+    console.log('📁 MODAL PROYECTO:');
+    console.log('File Input:', projectFileInput ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    console.log('Upload Area:', projectUploadArea ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    
+    if (projectFileInput) {
+        console.log('File Input Properties:', {
+            id: projectFileInput.id,
+            name: projectFileInput.name,
+            multiple: projectFileInput.multiple,
+            style: {
+                display: projectFileInput.style.display,
+                visibility: projectFileInput.style.visibility,
+                pointerEvents: projectFileInput.style.pointerEvents
+            }
+        });
+    }
+    
+    // Verificar elementos críticos para conversión
+    const conversionFileInput = document.getElementById('conversion-project-files');
+    const conversionUploadArea = document.getElementById('conversion-file-upload-area');
+    
+    console.log('📁 MODAL CONVERSIÓN:');
+    console.log('File Input:', conversionFileInput ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    console.log('Upload Area:', conversionUploadArea ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    
+    // Verificar event listeners
+    console.log('🎯 EVENT LISTENERS:');
+    
+    if (projectFileInput) {
+        const listeners = getEventListeners(projectFileInput);
+        console.log('Project File Input Listeners:', listeners);
+    }
+    
+    if (projectUploadArea) {
+        const listeners = getEventListeners(projectUploadArea);
+        console.log('Project Upload Area Listeners:', listeners);
+    }
+    
+    // Verificar arrays globales
+    console.log('📊 ARRAYS GLOBALES:');
+    console.log('uploadedFiles:', window.uploadedFiles ? `✅ ${window.uploadedFiles.length} archivos` : '❌ NO DEFINIDO');
+    console.log('conversionUploadedFiles:', window.conversionUploadedFiles ? `✅ ${window.conversionUploadedFiles.length} archivos` : '❌ NO DEFINIDO');
+    
+    console.log('====================================');
+}
+
+// Función para probar el click en los upload areas
+function testUploadAreas() {
+    console.log('🧪 TESTEANDO ÁREAS DE UPLOAD...');
+    
+    const projectUploadArea = document.getElementById('file-upload-area');
+    const conversionUploadArea = document.getElementById('conversion-file-upload-area');
+    
+    if (projectUploadArea) {
+        console.log('🖱️ Haciendo click en área de proyecto...');
+        projectUploadArea.click();
+    }
+    
+    if (conversionUploadArea) {
+        console.log('🖱️ Haciendo click en área de conversión...');
+        conversionUploadArea.click();
+    }
+}
+
+// Hacer las funciones globales para testing
+window.debugFiles = debugFileUploadSystem;
+window.testUpload = testUploadAreas;
 
 function initNewSections() {
     // Inicializar event listeners para botones de creación
@@ -9404,73 +10857,175 @@ function initEnhancedFilters() {
 
 // Inicializar sistema de biblioteca mejorado - VERSIÓN CON FORZADO
 function initEnhancedLibrary() {
-    ('📚 Inicializando biblioteca mejorada...');
+    console.log('📚 Inicializando biblioteca mejorada...');
     
-    // Forzar la configuración después de múltiples delays
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 1...');
-        setupLibraryCategoryCards();
-        setupEnhancedResourceForm();
-    }, 100);
-    
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 2...');
-        setupCategoryModals();
-    }, 300);
-    
-    setTimeout(() => {
-        ('🔧 Ejecutando configuración fase 3...');
-        loadLibraryResources();
-        verifyModalPositions(); // Verificar posiciones
-    }, 500);
-    
-    setTimeout(() => {
-        ('✅ Biblioteca mejorada inicializada completamente');
-        debugLibrarySetup();
-    }, 1000);
-}
-
-// Configurar cards de categorías - VERSIÓN ULTRA ROBUSTA
-function setupLibraryCategoryCards() {
-    ('🔄 Configurando cards de categorías de biblioteca...');
-    
-    const categoryCards = [
-        { id: 'programas-card', modalId: 'programas-modal', category: 'programas' },
-        { id: 'habilidades-tecnicas-card', modalId: 'habilidades-tecnicas-modal', category: 'habilidades-tecnicas' },
-        { id: 'habilidades-blandas-card', modalId: 'habilidades-blandas-modal', category: 'habilidades-blandas' }
-    ];
-    
-    let configuredCount = 0;
-    
+    // Configurar event listeners para las cards de categoría
+    const categoryCards = document.querySelectorAll('.category-card');
     categoryCards.forEach(card => {
-        const element = document.getElementById(card.id);
-        if (element) {
-            (`🎯 Configurando card: ${card.id}`);
-            
-            // Crear un nuevo elemento para evitar problemas de event listeners
-            const newElement = element.cloneNode(true);
-            element.parentNode.replaceChild(newElement, element);
-            
-            // Agregar event listener directo y robusto
-            newElement.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                
-                (`🎯 Click en categoría: ${card.id}`);
-                (`📦 Datos:`, card);
-                
-                // Intentar múltiples formas de abrir el modal
-                openCategoryModalRobust(card.modalId, card.category);
+        const category = card.getAttribute('data-category');
+        if (category) {
+            card.addEventListener('click', () => {
+                console.log('🎯 Categoría seleccionada:', category);
+                showCategoryView(category);
             });
-            
-            configuredCount++;
-            (`✅ Card configurada: ${card.id}`);
-        } else {
-            console.error(`❌ No se encontró el elemento: ${card.id}`);
         }
     });
     
-    (`📊 Cards configuradas: ${configuredCount} de ${categoryCards.length}`);
+    console.log('✅ Biblioteca mejorada inicializada');
+}
+
+// Función CORREGIDA para cargar recursos por categoría
+async function loadResourcesByCategory(mainCategory) {
+    try {
+        console.log(`📂 Cargando recursos de categoría: ${mainCategory}`);
+        
+        const response = await fetch(`${API_BASE}/library`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al cargar recursos');
+        }
+        
+        const allResources = await response.json();
+        console.log(`📦 Total de recursos cargados: ${allResources.length}`);
+        
+        // DEBUG: Mostrar todos los recursos y sus categorías
+        console.log('🔍 Todos los recursos:', allResources.map(r => ({
+            id: r.id,
+            title: r.title,
+            main_category: r.main_category,
+            resource_type: r.resource_type
+        })));
+        
+        // Filtrar recursos por categoría principal - CORREGIDO
+        const filteredResources = allResources.filter(resource => {
+            const matches = resource.main_category === mainCategory;
+            console.log(`📄 ${resource.title} - ${resource.main_category} === ${mainCategory} -> ${matches}`);
+            return matches;
+        });
+        
+        console.log(`✅ Recursos filtrados para ${mainCategory}:`, filteredResources.length);
+        
+        // Mostrar en la consola para debugging
+        filteredResources.forEach(resource => {
+            console.log(`📄 Recurso: ${resource.title} - ${resource.main_category} - ${resource.subcategory}`);
+        });
+        
+        // Actualizar la interfaz
+        showFilteredResources(filteredResources, mainCategory);
+        
+    } catch (error) {
+        console.error(`❌ Error cargando recursos de ${mainCategory}:`, error);
+        showNotification(`Error al cargar recursos: ${error.message}`, 'error');
+    }
+}
+
+// Función para mostrar recursos filtrados - NUEVA
+function showFilteredResources(resources, category) {
+    const mainView = document.getElementById('library-main-view');
+    const filteredView = document.getElementById('library-filtered-view');
+    const categoryTitle = document.getElementById('filtered-category-title');
+    const resourcesCount = document.getElementById('filtered-resources-count');
+    const resourcesGrid = document.getElementById('filtered-resources-grid');
+    
+    if (!mainView || !filteredView || !categoryTitle || !resourcesCount || !resourcesGrid) {
+        console.error('❌ Elementos de la vista filtrada no encontrados');
+        return;
+    }
+    
+    // Ocultar vista principal, mostrar vista filtrada
+    mainView.style.display = 'none';
+    filteredView.style.display = 'block';
+    
+    // Actualizar título y contador
+    categoryTitle.textContent = getCategoryLabel(category);
+    resourcesCount.textContent = `${resources.length} recurso${resources.length !== 1 ? 's' : ''}`;
+    
+    // Limpiar grid
+    resourcesGrid.innerHTML = '';
+    
+    if (resources.length === 0) {
+        resourcesGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>No hay recursos en esta categoría</h3>
+                <p>No se encontraron recursos en la categoría ${getCategoryLabel(category)}</p>
+                <button class="btn-primary" onclick="showModalById('new-resource-modal')">
+                    <i class="fas fa-plus"></i> Subir Primer Recurso
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // Crear cards para cada recurso
+    resources.forEach(resource => {
+        const resourceCard = createResourceCard(resource);
+        resourcesGrid.innerHTML += resourceCard;
+    });
+    
+    console.log(`✅ Mostrando ${resources.length} recursos en la categoría ${category}`);
+}
+
+
+// Función para mostrar vista de categoría
+function showCategoryView(category) {
+    console.log('🎯 Categoría seleccionada:', category);
+    
+    // Mapear nombres de categoría a IDs de modal
+    const categoryModals = {
+        'programas': 'programas-modal',
+        'habilidades_tecnicas': 'habilidades-tecnicas-modal', 
+        'habilidades_blandas': 'habilidades-blandas-modal'
+    };
+    
+    const modalId = categoryModals[category];
+    
+    if (!modalId) {
+        console.error('❌ Modal no encontrado para categoría:', category);
+        return;
+    }
+    
+    console.log('🔄 Abriendo modal:', modalId);
+    openCategoryModal(modalId, category);
+}
+
+
+// Función para volver a vista principal
+function backToMainLibrary() {
+    const mainView = document.getElementById('library-main-view');
+    const filteredView = document.getElementById('library-filtered-view');
+    
+    if (mainView) mainView.style.display = 'block';
+    if (filteredView) filteredView.style.display = 'none';
+    
+    // Recargar recursos principales si es necesario
+    loadLibraryResources();
+}
+
+// Función COMPLETAMENTE CORREGIDA para manejar categorías
+function setupLibraryCategoryCards() {
+    const categoryCards = document.querySelectorAll('.library-category-card');
+    
+    categoryCards.forEach(card => {
+        card.addEventListener('click', function() {
+            // CORREGIDO: Extraer correctamente el ID de la categoría
+            const cardId = this.id; // Ej: "programas-card", "habilidades_tecnicas-card", etc.
+            const category = cardId.replace('-card', '');
+            
+            console.log('🎯 Categoría seleccionada:', category);
+            showCategoryView(category);
+        });
+    });
+    
+    // Botón volver
+    const backBtn = document.getElementById('back-to-main-library');
+    if (backBtn) {
+        backBtn.addEventListener('click', backToMainLibrary);
+    }
 }
 
 // Función ultra robusta para abrir modales
@@ -9511,47 +11066,151 @@ function openCategoryModalRobust(modalId, category) {
     }
 }
 
-// Función mejorada para abrir modales de categoría - VERSIÓN DEFINITIVA
-function openCategoryModal(modalId, categoryCardId) {
-    (`📖 Abriendo modal de categoría: ${modalId}`);
-    
-    // Buscar el modal de forma más robusta
-    let modal = document.getElementById(modalId);
-    
+function openCategoryModal(modalId, category) {
+    const modal = document.getElementById(modalId);
     if (!modal) {
-        console.error(`❌ Modal no encontrado: ${modalId}`);
-        ('🔍 Buscando en todo el documento...');
-        
-        // Buscar en todo el documento
-        modal = document.querySelector(`#${modalId}`);
-        if (!modal) {
-            console.error(`❌ Modal ${modalId} no existe en el DOM`);
-            
-            // Crear modal de emergencia
-            createEmergencyModal(modalId);
-            return;
+        console.error('❌ Modal no encontrado:', modalId);
+        return;
+    }
+    
+    // Cargar recursos de la categoría antes de abrir el modal
+    loadCategoryResourcesForModal(category, modalId);
+    
+    // Abrir el modal
+    openModal(modal);
+    
+    console.log(`✅ Modal ${modalId} abierto para categoría ${category}`);
+}
+
+function loadCategoryResourcesForModal(category, modalId) {
+    console.log(`📚 Cargando recursos para modal: ${modalId}, categoría: ${category}`);
+    
+    // Determinar el contenedor basado en el modal
+    const containerMap = {
+        'programas-modal': 'programas-container',
+        'habilidades-tecnicas-modal': 'habilidades-tecnicas-container',
+        'habilidades-blandas-modal': 'habilidades-blandas-container'
+    };
+    
+    const containerId = containerMap[modalId];
+    const countElementId = modalId === 'programas-modal' ? 'programas-modal-count' :
+                          modalId === 'habilidades-tecnicas-modal' ? 'tecnicas-modal-count' :
+                          'blandas-modal-count';
+    
+    if (!containerId) {
+        console.error('❌ Contenedor no encontrado para modal:', modalId);
+        return;
+    }
+    
+    const container = document.getElementById(containerId);
+    const countElement = document.getElementById(countElementId);
+    
+    if (!container) {
+        console.error('❌ Elemento contenedor no encontrado:', containerId);
+        return;
+    }
+    
+    // Filtrar recursos por categoría principal
+    const categoryResources = libraryResources.filter(resource => 
+        resource.main_category === category
+    );
+    
+    console.log(`✅ ${categoryResources.length} recursos encontrados para ${category}`);
+    
+    // Actualizar contador
+    if (countElement) {
+        countElement.textContent = categoryResources.length;
+    }
+    
+    // Renderizar recursos usando la MISMA función que en la vista general
+    renderResourcesInContainer(container, categoryResources);
+    
+    // Configurar event listeners para búsqueda y filtros
+    setupCategoryFilters(category, modalId);
+}
+
+function renderResourcesInContainer(container, resources) {
+    if (!container) return;
+    
+    // Limpiar el contenedor primero
+    container.innerHTML = '';
+    
+    if (resources.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>No hay recursos en esta categoría</h3>
+                <p>¡Sé el primero en subir un recurso!</p>
+                ${currentUser ? `<button class="btn-primary" onclick="openNewResourceModal()">
+                    <i class="fas fa-plus"></i> Subir Recurso
+                </button>` : ''}
+            </div>
+        `;
+        return;
+    }
+    
+    // Crear y agregar cada card como elemento DOM
+    resources.forEach(resource => {
+        const cardElement = createLibraryCard(resource);
+        container.appendChild(cardElement);
+    });
+    
+    console.log(`✅ ${resources.length} cards renderizadas en el contenedor`);
+}
+
+function setupCategoryFilters(category, modalId) {
+    console.log(`🔧 Configurando filtros para: ${modalId}`);
+    
+    // Mapear elementos de filtro basado en el modal
+    const filterMap = {
+        'programas-modal': {
+            search: 'programas-search',
+            subcategory: 'programas-subcategory-filter',
+            type: 'programas-type-filter'
+        },
+        'habilidades-tecnicas-modal': {
+            search: 'tecnicas-search',
+            subcategory: 'tecnicas-subcategory-filter'
+        },
+        'habilidades-blandas-modal': {
+            search: 'blandas-search',
+            subcategory: 'blandas-subcategory-filter'
+        }
+    };
+    
+    const filters = filterMap[modalId];
+    if (!filters) return;
+    
+    // Configurar búsqueda
+    if (filters.search) {
+        const searchInput = document.getElementById(filters.search);
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                filterCategoryResources(category, modalId, e.target.value, filters);
+            });
         }
     }
     
-    // Determinar la categoría basada en el modalId
-    let category = '';
-    if (modalId === 'programas-modal') category = 'programas';
-    else if (modalId === 'habilidades-tecnicas-modal') category = 'habilidades-tecnicas';
-    else if (modalId === 'habilidades-blandas-modal') category = 'habilidades-blandas';
+    // Configurar filtro de subcategoría
+    if (filters.subcategory) {
+        const subcategoryFilter = document.getElementById(filters.subcategory);
+        if (subcategoryFilter) {
+            subcategoryFilter.addEventListener('change', (e) => {
+                filterCategoryResources(category, modalId, null, filters);
+            });
+        }
+    }
     
-    (`🎯 Categoría detectada: ${category}`);
-    
-    // Usar la función openModal mejorada
-    openModal(modal);
-    
-    // Cargar recursos de la categoría después de abrir el modal
-    if (category) {
-        setTimeout(() => {
-            loadCategoryResources(category);
-        }, 300);
+    // Configurar filtro de tipo (solo para programas)
+    if (filters.type) {
+        const typeFilter = document.getElementById(filters.type);
+        if (typeFilter) {
+            typeFilter.addEventListener('change', (e) => {
+                filterCategoryResources(category, modalId, null, filters);
+            });
+        }
     }
 }
-
 // Función de emergencia para crear modales
 function createEmergencyModal(modalId) {
     (`🚨 Creando modal de emergencia para: ${modalId}`);
@@ -9754,58 +11413,78 @@ function updateSubcategories(mainCategory) {
     }
 }
 
-// Inicializar upload de archivos para recursos
+// Sistema de archivos para recursos de biblioteca
 function initResourceFileUpload() {
     const fileInput = document.getElementById('resource-file');
-    const uploadArea = document.getElementById('resource-file-upload-area');
+    const fileUploadArea = document.getElementById('resource-file-upload-area');
     const filePreview = document.getElementById('resource-file-preview');
     
-    if (!fileInput || !uploadArea) return;
+    if (!fileInput || !fileUploadArea) {
+        console.error('❌ Elementos de upload no encontrados');
+        return;
+    }
     
-    // Array para almacenar archivos temporalmente
-    window.resourceUploadedFiles = [];
+    console.log('🔄 Inicializando sistema de archivos para recursos...');
+    
+    // Inicializar array global para recursos
+    if (!window.resourceUploadedFiles) {
+        window.resourceUploadedFiles = [];
+    }
     
     // Configurar event listeners
+    fileUploadArea.addEventListener('click', function() {
+        console.log('🎯 Click en área de upload');
+        fileInput.click();
+    });
+    
     fileInput.addEventListener('change', function(e) {
+        console.log('📁 Input file cambiado:', e.target.files);
         handleResourceFiles(e.target.files);
     });
     
     // Drag and drop
-    uploadArea.addEventListener('dragover', function(e) {
+    fileUploadArea.addEventListener('dragover', function(e) {
         e.preventDefault();
-        uploadArea.classList.add('dragover');
+        this.classList.add('dragover');
     });
     
-    uploadArea.addEventListener('dragleave', function(e) {
+    fileUploadArea.addEventListener('dragleave', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        this.classList.remove('dragover');
     });
     
-    uploadArea.addEventListener('drop', function(e) {
+    fileUploadArea.addEventListener('drop', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        this.classList.remove('dragover');
+        console.log('📁 Archivos soltados:', e.dataTransfer.files);
         handleResourceFiles(e.dataTransfer.files);
     });
     
     function handleResourceFiles(files) {
         if (!files || files.length === 0) return;
         
-        for (let file of files) {
-            // Validar tamaño
+        console.log(`📁 Procesando ${files.length} archivos para recursos`);
+        
+        let filesAdded = 0;
+        const filesArray = Array.from(files);
+        
+        filesArray.forEach(file => {
+            // Validar tamaño (50MB máximo)
             if (file.size > 50 * 1024 * 1024) {
-                showNotification(`El archivo ${file.name} es demasiado grande (máx. 50MB)`, 'error');
-                continue;
+                showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+                return;
             }
             
             // Agregar archivo
             window.resourceUploadedFiles.push(file);
+            filesAdded++;
             addResourceFileToPreview(file);
+        });
+        
+        if (filesAdded > 0) {
+            showNotification(`✅ ${filesAdded} archivo(s) listo(s) para subir`, 'success');
+            console.log('📋 Archivos listos:', window.resourceUploadedFiles);
         }
-        
-        // Limpiar input para permitir nuevas selecciones
-        fileInput.value = '';
-        
-        showNotification(`Se agregaron ${files.length} archivo(s)`, 'success');
     }
     
     function addResourceFileToPreview(file) {
@@ -9839,18 +11518,20 @@ function initResourceFileUpload() {
             filePreview.appendChild(fileItem);
         }
         
-        // Configurar event listener para eliminar
+        // Configurar botón de eliminar
         const removeBtn = fileItem.querySelector('.file-remove');
-        removeBtn.addEventListener('click', function() {
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
             const fileName = this.getAttribute('data-file-name');
             removeResourceFileFromPreview(fileName);
         });
     }
     
-    // Función para eliminar archivo del preview
     window.removeResourceFileFromPreview = function(fileName) {
+        // Remover del array
         window.resourceUploadedFiles = window.resourceUploadedFiles.filter(file => file.name !== fileName);
         
+        // Remover del DOM
         const fileItem = document.querySelector(`.file-preview-item[data-file-name="${fileName}"]`);
         if (fileItem) {
             fileItem.remove();
@@ -9860,7 +11541,16 @@ function initResourceFileUpload() {
         if (window.resourceUploadedFiles.length === 0 && filePreview) {
             filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
         }
+        
+        showNotification(`🗑️ "${fileName}" removido`, 'info');
     };
+    
+    // Inicializar preview vacío
+    if (filePreview && window.resourceUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview" style="text-align: center; padding: 2rem; color: var(--text-light);"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    console.log('✅ Sistema de archivos para recursos inicializado');
 }
 
 // Configurar modales de categorías - VERSIÓN MEJORADA
@@ -9918,94 +11608,36 @@ function setupCategoryModals() {
     });
 }
 
-// Función para verificar el estado de la biblioteca
-function debugLibrarySetup() {
-    ('=== DEBUG BIBLIOTECA ===');
+// Función de debug para verificar datos de recursos
+function debugLibraryResources() {
+    console.log('=== DEBUG BIBLIOTECA ===');
+    console.log('Total recursos:', libraryResources.length);
     
-    // Verificar cards
-    const cards = ['programas-card', 'habilidades-tecnicas-card', 'habilidades-blandas-card'];
-    cards.forEach(cardId => {
-        const element = document.getElementById(cardId);
-        (`Card ${cardId}:`, element ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    libraryResources.forEach((resource, index) => {
+        console.log(`Recurso ${index + 1}:`, {
+            id: resource.id,
+            title: resource.title,
+            resource_type: resource.resource_type,
+            file_url: resource.file_url,
+            external_url: resource.external_url,
+            main_category: resource.main_category,
+            subcategory: resource.subcategory
+        });
     });
     
-    // Verificar modales
-    const modals = ['programas-modal', 'habilidades-tecnicas-modal', 'habilidades-blandas-modal'];
-    modals.forEach(modalId => {
-        const element = document.getElementById(modalId);
-        (`Modal ${modalId}:`, element ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
-    });
-    
-    // Verificar contenedores
-    const containers = ['programas-container', 'habilidades-tecnicas-container', 'habilidades-blandas-container'];
-    containers.forEach(containerId => {
-        const element = document.getElementById(containerId);
-        (`Contenedor ${containerId}:`, element ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
-    });
-    
-    ('========================');
+    console.log('========================');
 }
 
 // Hacerla global para testing
-window.debugLibrary = debugLibrarySetup;
+window.debugLibrary = debugLibraryResources;
 
-// Cargar recursos de categoría específica - VERSIÓN MEJORADA
+// Función para cargar recursos por categoría
 function loadCategoryResources(category) {
-    (`📚 Cargando recursos para categoría: ${category}`);
-    
-    const container = document.getElementById(`${category}-container`);
-    if (!container) {
-        console.error(`❌ Contenedor no encontrado: ${category}-container`);
-        
-        // Crear contenedor si no existe
-        const modal = document.getElementById(`${category}-modal`);
-        if (modal) {
-            const content = modal.querySelector('.category-modal-content');
-            if (content) {
-                content.innerHTML = `
-                    <div class="category-stats-bar">
-                        <div class="category-stat">
-                            <span class="stat-number" id="${category}-modal-count">0</span>
-                            <span class="stat-label">Recursos Disponibles</span>
-                        </div>
-                    </div>
-                    <div class="category-filters">
-                        <div class="search-box with-icon">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="${category}-search" placeholder="Buscar recursos...">
-                        </div>
-                    </div>
-                    <div class="category-resources-grid" id="${category}-container">
-                        <div class="loading-state">
-                            <div class="loading-spinner"></div>
-                            <p>Cargando recursos...</p>
-                        </div>
-                    </div>
-                `;
-                
-                // Reconfigurar los event listeners
-                setupCategoryModalFilters(category);
-            }
-        }
-        return;
-    }
-    
-    // Mostrar loading
-    container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando recursos...</p></div>';
-    
-    // Filtrar recursos por categoría principal
-    const mainCategory = category.replace('-', '_');
-    const categoryResources = libraryResources.filter(resource => 
-        resource.main_category === mainCategory
+    const filteredResources = libraryResources.filter(resource => 
+        resource.main_category === category
     );
     
-    (`✅ Encontrados ${categoryResources.length} recursos para ${category}`);
-    
-    // Pequeño delay para mejor UX
-    setTimeout(() => {
-        renderCategoryResources(category, categoryResources);
-        updateCategoryStats(category, categoryResources.length);
-    }, 300);
+    renderCategoryResources(category, filteredResources);
 }
 
 // Configurar filtros para modales de categoría
@@ -10039,29 +11671,42 @@ function setupCategoryModalFilters(category) {
     }
 }
 
-
-// Renderizar recursos en modal de categoría
+// Función para renderizar recursos en modal de categoría
 function renderCategoryResources(category, resources) {
-    const container = document.getElementById(`${category}-container`);
-    if (!container) return;
+    const containerId = `${category.replace('_', '-')}-container`;
+    const container = document.getElementById(containerId);
+    const countElement = document.getElementById(`${category}-modal-count`);
+    
+    if (!container) {
+        console.error('❌ Contenedor no encontrado:', containerId);
+        return;
+    }
     
     container.innerHTML = '';
     
     if (resources.length === 0) {
         container.innerHTML = `
-            <div class="empty-category-state">
+            <div class="empty-state">
                 <i class="fas fa-inbox"></i>
-                <p>No hay recursos en esta categoría</p>
-                <small>¡Sé el primero en subir un recurso!</small>
+                <h3>No hay recursos en esta categoría</h3>
+                <p>¡Sé el primero en subir un recurso!</p>
             </div>
         `;
         return;
     }
     
+    // Actualizar contador
+    if (countElement) {
+        countElement.textContent = resources.length;
+    }
+    
+    // Renderizar recursos
     resources.forEach(resource => {
-        const resourceCard = createCategoryResourceCard(resource);
-        container.appendChild(resourceCard);
+        const card = createLibraryCard(resource);
+        container.appendChild(card);
     });
+    
+    console.log(`✅ ${resources.length} recursos renderizados en ${category}`);
 }
 
 // Crear card de recurso para categoría
@@ -10069,90 +11714,199 @@ function createCategoryResourceCard(resource) {
     const card = document.createElement('div');
     card.className = 'category-resource-card';
     
-    const resourceType = getResourceTypeLabel(resource.resource_type);
-    const subcategory = getSubcategoryLabel(resource.main_category, resource.subcategory);
+    const isLink = resource.resource_type === 'enlace';
+    const hasFile = resource.file_data || resource.file_name;
     
-    card.innerHTML = `
-        <div class="resource-card-header">
-            <h4 class="resource-title">${resource.title}</h4>
-            <span class="resource-type-badge">${resourceType}</span>
-        </div>
-        
-        <div class="resource-card-body">
-            <p class="resource-description">${resource.description}</p>
+    console.log('🔄 Creando card para recurso:', {
+        id: resource.id,
+        type: resource.resource_type,
+        isLink: isLink,
+        hasFile: hasFile,
+        fileName: resource.file_name
+    });
+
+    return `
+        <div class="resource-card" data-resource-id="${resource.id}">
+            <div class="resource-header">
+                <h3 class="resource-title">${escapeHtml(resource.title)}</h3>
+                <span class="resource-type-badge ${resource.resource_type}">
+                    ${getResourceTypeLabel(resource.resource_type)}
+                </span>
+            </div>
+            
+            <div class="resource-description">
+                <p>${escapeHtml(resource.description)}</p>
+            </div>
             
             <div class="resource-meta">
-                <span class="resource-subcategory">${subcategory}</span>
-                <span class="resource-date">${new Date(resource.created_at).toLocaleDateString('es-ES')}</span>
+                <span class="resource-category">
+                    <i class="fas fa-folder"></i>
+                    ${escapeHtml(resource.main_category)} / ${escapeHtml(resource.subcategory)}
+                </span>
+                <span class="resource-uploader">
+                    <i class="fas fa-user"></i>
+                    ${escapeHtml(resource.uploader_name || 'Usuario')}
+                </span>
+                <span class="resource-date">
+                    <i class="fas fa-calendar"></i>
+                    ${formatDate(resource.created_at)}
+                </span>
+                ${resource.file_size ? `
+                <span class="resource-size">
+                    <i class="fas fa-weight-hanging"></i>
+                    ${formatFileSize(resource.file_size)}
+                </span>
+                ` : ''}
             </div>
             
-            <div class="resource-uploader">
-                <i class="fas fa-user"></i>
-                <span>${resource.uploader_name || 'Usuario'}</span>
-            </div>
-        </div>
-        
-        <div class="resource-card-actions">
-            ${resource.file_url ? `
-                <button class="btn-primary btn-sm" onclick="downloadLibraryResource(${resource.id}, '${resource.title}', '${resource.file_url}')">                   
-                <i class="fas fa-download"></i> Descargar
+            <div class="resource-actions">
+                <!-- Botón Ver Detalles (siempre visible) -->
+                <button class="btn btn-outline btn-sm view-resource-details" 
+                        data-resource-id="${resource.id}">
+                    <i class="fas fa-eye"></i> Ver Detalles
                 </button>
-            ` : ''}
-            
-            ${resource.external_url ? `
-                <button class="btn-outline btn-sm" onclick="window.open('${resource.external_url}', '_blank')">
+                
+                <!-- Botón Visitar (solo para enlaces) -->
+                ${isLink && resource.external_url ? `
+                <button class="btn btn-primary btn-sm visit-resource" 
+                        data-url="${escapeHtml(resource.external_url)}">
                     <i class="fas fa-external-link-alt"></i> Visitar
                 </button>
-            ` : ''}
-            
-            ${canManageLibrary() ? `
-                <button class="btn-outline btn-sm btn-danger" onclick="deleteLibraryResource(${resource.id})">
-                    <i class="fas fa-trash"></i>
+                ` : ''}
+                
+                <!-- Botón Descargar (solo para recursos con archivos) -->
+                ${!isLink && hasFile ? `
+                <button class="btn btn-success btn-sm download-resource" 
+                        data-resource-id="${resource.id}"
+                        data-file-name="${escapeHtml(resource.file_name || resource.title)}">
+                    <i class="fas fa-download"></i> Descargar
                 </button>
-            ` : ''}
+                ` : ''}
+                
+                <!-- Botón Eliminar (solo admin/uploader) -->
+                ${(currentUser.user_type === 'admin' || currentUser.id === resource.uploaded_by) ? `
+                <button class="btn btn-danger btn-sm delete-resource" 
+                        data-resource-id="${resource.id}">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+                ` : ''}
+            </div>
         </div>
     `;
-    
+
     return card;
 }
 
-// Filtrar recursos por categoría
-function filterCategoryResources(category, searchTerm = '') {
-    const resources = libraryResources.filter(resource => 
-        resource.main_category === category.replace('-', '_')
+// Función para actualizar subcategorías según la categoría principal
+function updateResourceSubcategories(mainCategory) {
+    const subcategorySelect = document.getElementById('resource-subcategory');
+    if (!subcategorySelect) return;
+    
+    console.log('🔄 Actualizando subcategorías para:', mainCategory);
+    
+    // Limpiar opciones actuales
+    subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
+    
+    if (!mainCategory) return;
+    
+    // Definir subcategorías según la categoría principal
+    const subcategories = {
+        programas: [
+            { value: 'programacion', label: 'Programación' },
+            { value: 'simulacion', label: 'Simulación' },
+            { value: 'diseno', label: 'Diseño' },
+            { value: 'utilidades', label: 'Utilidades' }
+        ],
+        habilidades_tecnicas: [
+            { value: 'electronica', label: 'Electrónica' },
+            { value: 'programacion', label: 'Programación' },
+            { value: 'robotica', label: 'Robótica' },
+            { value: 'iot', label: 'IoT' },
+            { value: 'proyectos', label: 'Proyectos' },
+            { value: 'manuales', label: 'Manuales' }
+        ],
+        habilidades_blandas: [
+            { value: 'comunicacion', label: 'Comunicación' },
+            { value: 'trabajo_equipo', label: 'Trabajo en Equipo' },
+            { value: 'liderazgo', label: 'Liderazgo' },
+            { value: 'presentaciones', label: 'Presentaciones' },
+            { value: 'gestion_proyectos', label: 'Gestión de Proyectos' }
+        ]
+    };
+    
+    // Agregar opciones
+    const categorySubcategories = subcategories[mainCategory] || [];
+    categorySubcategories.forEach(subcat => {
+        const option = document.createElement('option');
+        option.value = subcat.value;
+        option.textContent = subcat.label;
+        subcategorySelect.appendChild(option);
+    });
+    
+    console.log(`✅ ${categorySubcategories.length} subcategorías cargadas`);
+}
+
+// Función para filtrar recursos en modal de categoría
+function filterCategoryResources(category, modalId, searchTerm = null, filters) {
+    const containerMap = {
+        'programas-modal': 'programas-container',
+        'habilidades-tecnicas-modal': 'habilidades-tecnicas-container',
+        'habilidades-blandas-modal': 'habilidades-blandas-container'
+    };
+    
+    const containerId = containerMap[modalId];
+    const container = document.getElementById(containerId);
+    
+    if (!container) return;
+    
+    // Obtener valores actuales de los filtros
+    let currentSearch = searchTerm;
+    let currentSubcategory = 'all';
+    let currentType = 'all';
+    
+    if (!currentSearch && filters.search) {
+        const searchInput = document.getElementById(filters.search);
+        currentSearch = searchInput ? searchInput.value.toLowerCase() : '';
+    }
+    
+    if (filters.subcategory) {
+        const subcategoryFilter = document.getElementById(filters.subcategory);
+        currentSubcategory = subcategoryFilter ? subcategoryFilter.value : 'all';
+    }
+    
+    if (filters.type) {
+        const typeFilter = document.getElementById(filters.type);
+        currentType = typeFilter ? typeFilter.value : 'all';
+    }
+    
+    // Filtrar recursos
+    const categoryResources = libraryResources.filter(resource => 
+        resource.main_category === category
     );
     
-    let filteredResources = resources;
-    
-    // Aplicar búsqueda
-    if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filteredResources = filteredResources.filter(resource =>
-            resource.title.toLowerCase().includes(term) ||
-            resource.description.toLowerCase().includes(term)
-        );
-    }
-    
-    // Aplicar filtro de subcategoría
-    const subcategoryFilter = document.getElementById(`${category}-subcategory-filter`);
-    if (subcategoryFilter && subcategoryFilter.value !== 'all') {
-        filteredResources = filteredResources.filter(resource =>
-            resource.subcategory === subcategoryFilter.value
-        );
-    }
-    
-    // Aplicar filtro de tipo (solo para programas)
-    if (category === 'programas') {
-        const typeFilter = document.getElementById('programas-type-filter');
-        if (typeFilter && typeFilter.value !== 'all') {
-            filteredResources = filteredResources.filter(resource =>
-                resource.resource_type === typeFilter.value
-            );
+    const filteredResources = categoryResources.filter(resource => {
+        // Filtro de búsqueda
+        const matchesSearch = !currentSearch || 
+            resource.title.toLowerCase().includes(currentSearch) ||
+            resource.description.toLowerCase().includes(currentSearch);
+        
+        // Filtro de subcategoría
+        const matchesSubcategory = currentSubcategory === 'all' || 
+            resource.subcategory === currentSubcategory;
+        
+        // Filtro de tipo (solo para programas)
+        let matchesType = true;
+        if (filters.type && currentType !== 'all') {
+            matchesType = resource.resource_type === currentType;
         }
-    }
+        
+        return matchesSearch && matchesSubcategory && matchesType;
+    });
     
-    renderCategoryResources(category, filteredResources);
-    updateCategoryStats(category, filteredResources.length);
+    console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
+    
+    // Re-renderizar recursos filtrados
+    renderResourcesInContainer(container, filteredResources);
 }
 
 // Actualizar estadísticas de categoría
@@ -10164,69 +11918,91 @@ function updateCategoryStats(category, count) {
     if (cardCountElement) cardCountElement.textContent = count;
 }
 
-// Función para enviar recurso mejorado
-async function submitEnhancedResource(e) {
-    e.preventDefault();
-    
-    if (!checkAuth()) return;
-    
-    const formData = new FormData();
-    
-    // Campos básicos
-    formData.append('title', document.getElementById('resource-title').value);
-    formData.append('description', document.getElementById('resource-description').value);
-    formData.append('resource_type', document.getElementById('resource-type').value);
-    formData.append('main_category', document.getElementById('resource-main-category').value);
-    formData.append('subcategory', document.getElementById('resource-subcategory').value);
-    
-    // Archivos o URL
-    const resourceType = document.getElementById('resource-type').value;
-    if (resourceType === 'enlace') {
-        formData.append('external_url', document.getElementById('resource-url').value);
-    } else {
-        // Agregar archivos
-        if (window.resourceUploadedFiles && window.resourceUploadedFiles.length > 0) {
-            window.resourceUploadedFiles.forEach(file => {
-                formData.append('files', file);
-            });
-        }
-    }
-    
+async function submitEnhancedResource(formData) {
     try {
+        console.log('📚 === ENVIANDO RECURSO A BIBLIOTECA (COMO JSON) ===');
+        
+        // Convertir FormData a objeto JSON
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            if (key === 'file' && value instanceof File) {
+                // Convertir archivo a base64
+                data.fileData = await readFileAsBase64(value);
+                data.fileName = value.name;
+                data.fileType = value.type;
+            } else {
+                data[key] = value;
+            }
+        }
+        
+        console.log('📤 Datos a enviar (JSON):', {
+            ...data,
+            fileData: data.fileData ? `[Base64: ${data.fileData.length} chars]` : 'No file'
+        });
+
         const response = await fetch(`${API_BASE}/library`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
-        
-        if (response.ok) {
-            const newResource = await response.json();
-            libraryResources.unshift(newResource);
-            
-            // Actualizar vistas
-            renderLibraryResources();
-            updateLibraryStats();
-            updateCategoryCards();
-            
-            showNotification('Recurso subido exitosamente', 'success');
-            closeModal(document.getElementById('new-resource-modal'));
-            document.getElementById('resource-form').reset();
-            
-            // Limpiar archivos temporales
-            window.resourceUploadedFiles = [];
-            const filePreview = document.getElementById('resource-file-preview');
-            if (filePreview) filePreview.innerHTML = '';
-            
-        } else {
-            throw new Error('Error en la respuesta del servidor');
+
+        console.log('📥 Respuesta del servidor:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+        });
+
+        if (!response.ok) {
+            let errorText;
+            try {
+                const errorData = await response.json();
+                errorText = errorData.error || `Error ${response.status}`;
+                console.error('❌ Error del servidor:', errorData);
+            } catch (e) {
+                errorText = await response.text();
+                console.error('❌ Error texto:', errorText);
+            }
+            throw new Error(errorText);
         }
+
+        const result = await response.json();
+        console.log('✅ Recurso subido exitosamente:', result);
+        return result;
+
     } catch (error) {
-        console.error('Error subiendo recurso:', error);
-        showNotification('Error al subir el recurso', 'error');
+        console.error('❌ Error subiendo recurso:', error);
+        throw new Error('Error en la respuesta del servidor: ' + error.message);
     }
 }
+
+// Función de debug para file input
+function debugFileInput() {
+    console.log('🔍 DEBUG FILE INPUT:');
+    const fileInput = document.getElementById('resource-file');
+    console.log('Elemento:', fileInput);
+    console.log('Files:', fileInput.files);
+    console.log('Files length:', fileInput.files.length);
+    console.log('Files array:', Array.from(fileInput.files));
+    
+    if (fileInput.files.length > 0) {
+        Array.from(fileInput.files).forEach((file, index) => {
+            console.log(`📄 Archivo ${index + 1}:`, {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            });
+        });
+    }
+    
+    console.log('libraryUploadedFiles:', window.libraryUploadedFiles);
+}
+
+// Hacerla global
+window.debugFiles = debugFileInput;
 
 // Actualizar cards de categorías
 function updateCategoryCards() {
@@ -10249,58 +12025,885 @@ function canManageLibrary() {
     return currentUser && (currentUser.user_type === 'teacher' || currentUser.user_type === 'admin');
 }
 
-// Helper para obtener label de subcategoría
-function getSubcategoryLabel(mainCategory, subcategory) {
-    if (librarySubcategories[mainCategory]) {
-        const subcat = librarySubcategories[mainCategory].find(sc => sc.value === subcategory);
-        return subcat ? subcat.label : subcategory;
+// Variable global para el recurso actual
+let currentResource = null;
+
+// Función para mostrar detalles de recurso
+async function showResourceDetails(resourceId) {
+    try {
+        console.log('🔍 Mostrando detalles del recurso:', resourceId);
+        
+        const response = await fetch(`${API_BASE}/library/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al cargar los detalles del recurso');
+        }
+        
+        const resource = await response.json();
+        console.log('📋 Detalles del recurso:', resource);
+        
+        const isLink = resource.resource_type === 'enlace';
+        const hasFile = resource.file_data || resource.file_name;
+        
+        // OBTENER REFERENCIAS A LOS ELEMENTOS - CON VERIFICACIÓN
+        const titleElement = document.getElementById('detail-resource-title');
+        const typeElement = document.getElementById('detail-resource-type');
+        const categoryElement = document.getElementById('detail-resource-category');
+        const uploaderElement = document.getElementById('detail-resource-uploader');
+        const dateElement = document.getElementById('detail-resource-date');
+        const descriptionElement = document.getElementById('detail-resource-description');
+        const infoTypeElement = document.getElementById('detail-info-type');
+        const infoCategoryElement = document.getElementById('detail-info-category');
+        const infoSubcategoryElement = document.getElementById('detail-info-subcategory');
+        const infoSizeElement = document.getElementById('detail-info-size');
+        const infoFormatElement = document.getElementById('detail-info-format');
+        
+        // VERIFICAR QUE TODOS LOS ELEMENTOS EXISTAN
+        const elements = [
+            titleElement, typeElement, categoryElement, uploaderElement, 
+            dateElement, descriptionElement, infoTypeElement, infoCategoryElement,
+            infoSubcategoryElement, infoSizeElement, infoFormatElement
+        ];
+        
+        const missingElements = elements.filter(el => !el);
+        if (missingElements.length > 0) {
+            console.error('❌ Elementos del modal no encontrados:', missingElements);
+            throw new Error('Error: El modal no está correctamente cargado');
+        }
+        
+        // ACTUALIZAR CONTENIDO DEL MODAL
+        titleElement.textContent = resource.title;
+        typeElement.textContent = getResourceTypeLabel(resource.resource_type);
+        typeElement.className = `resource-type-badge ${resource.resource_type}`;
+        categoryElement.textContent = resource.main_category;
+        uploaderElement.textContent = `Subido por ${resource.uploader_name || 'Usuario'}`;
+        dateElement.textContent = formatDate(resource.created_at);
+        descriptionElement.textContent = resource.description;
+        
+        // Información adicional
+        infoTypeElement.textContent = getResourceTypeLabel(resource.resource_type);
+        infoCategoryElement.textContent = resource.main_category;
+        infoSubcategoryElement.textContent = resource.subcategory || 'N/A';
+        infoSizeElement.textContent = resource.file_size ? formatFileSize(resource.file_size) : 'N/A';
+        infoFormatElement.textContent = resource.file_type ? 
+            (resource.file_type.split('/')[1]?.toUpperCase() || resource.file_type) : 'N/A';
+        
+        // CONFIGURAR BOTONES CON VERIFICACIÓN
+        const downloadBtn = document.getElementById('resource-download-btn');
+        const linkBtn = document.getElementById('resource-link-btn');
+        const filesSection = document.getElementById('resource-files-section');
+        
+        if (!downloadBtn || !linkBtn || !filesSection) {
+            console.error('❌ Botones del modal no encontrados');
+            throw new Error('Error: Los botones del modal no están disponibles');
+        }
+        
+        // Configurar botón de descarga
+        if (!isLink && hasFile) {
+            downloadBtn.style.display = 'flex';
+            // Limpiar event listeners anteriores
+            downloadBtn.replaceWith(downloadBtn.cloneNode(true));
+            const newDownloadBtn = document.getElementById('resource-download-btn');
+            newDownloadBtn.onclick = () => downloadResource(resource.id, resource.file_name || resource.title);
+        } else {
+            downloadBtn.style.display = 'none';
+        }
+        
+        // Configurar botón de enlace
+        if (isLink && resource.external_url) {
+            linkBtn.style.display = 'flex';
+            // Limpiar event listeners anteriores
+            linkBtn.replaceWith(linkBtn.cloneNode(true));
+            const newLinkBtn = document.getElementById('resource-link-btn');
+            newLinkBtn.onclick = () => window.open(resource.external_url, '_blank', 'noopener,noreferrer');
+        } else {
+            linkBtn.style.display = 'none';
+        }
+        
+        // Mostrar sección de archivos si hay
+        if (hasFile && !isLink) {
+            filesSection.style.display = 'block';
+            const filesList = document.getElementById('detail-resource-files');
+            if (filesList) {
+                filesList.innerHTML = `
+                    <div class="resource-file-item">
+                        <i class="fas fa-file ${getFileIcon(resource.file_type)}"></i>
+                        <div class="file-info">
+                            <span class="file-name">${escapeHtml(resource.file_name)}</span>
+                            <span class="file-size">${resource.file_size ? formatFileSize(resource.file_size) : 'Tamaño desconocido'}</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline download-file-btn" 
+                                onclick="downloadResource(${resource.id}, '${escapeHtml(resource.file_name || resource.title)}')">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            filesSection.style.display = 'none';
+        }
+        
+        // MOSTRAR EL MODAL
+        const modal = document.getElementById('resource-detail-modal');
+        if (!modal) {
+            throw new Error('Modal no encontrado en el DOM');
+        }
+        
+        modal.style.display = 'block';
+        setTimeout(() => {
+            modal.classList.add('active');
+        }, 0);
+        
+    } catch (error) {
+        console.error('❌ Error mostrando detalles:', error);
+        showNotification('Error al cargar los detalles del recurso: ' + error.message, 'error');
     }
-    return subcategory;
 }
+
+// Función mejorada para cerrar el modal
+function closeResourceDetailModal() {
+    const modal = document.getElementById('resource-detail-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        
+        // Limpiar event listeners para evitar duplicados
+        const downloadBtn = document.getElementById('resource-download-btn');
+        const linkBtn = document.getElementById('resource-link-btn');
+        
+        if (downloadBtn) {
+            downloadBtn.onclick = null;
+        }
+        if (linkBtn) {
+            linkBtn.onclick = null;
+        }
+    }, 300);
+}
+
+// Configurar event listeners para cerrar el modal (solo una vez)
+function setupModalEventListeners() {
+    // Cerrar con la X
+    const closeBtn = document.querySelector('#resource-detail-modal .close');
+    if (closeBtn) {
+        closeBtn.onclick = closeResourceDetailModal;
+    }
+    
+    // Cerrar al hacer clic fuera del modal
+    const modal = document.getElementById('resource-detail-modal');
+    if (modal) {
+        modal.onclick = function(e) {
+            if (e.target === this) {
+                closeResourceDetailModal();
+            }
+        };
+    }
+    
+    // Cerrar con ESC
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('resource-detail-modal');
+        if (e.key === 'Escape' && modal && modal.style.display === 'block') {
+            closeResourceDetailModal();
+        }
+    });
+}
+
+// Ejecutar la configuración cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    setupModalEventListeners();
+});
+
+// También ejecutar si la página ya está cargada
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupModalEventListeners);
+} else {
+    setupModalEventListeners();
+}
+
+// Función de diagnóstico para el modal
+function checkModalState() {
+    const modal = document.getElementById('resource-detail-modal');
+    const elements = [
+        'detail-resource-title',
+        'detail-resource-type', 
+        'detail-resource-category',
+        'detail-resource-uploader',
+        'detail-resource-date',
+        'detail-resource-description',
+        'resource-download-btn',
+        'resource-link-btn'
+    ];
+    
+    console.log('🔍 Estado del modal:');
+    console.log('Modal encontrado:', !!modal);
+    console.log('Display style:', modal ? modal.style.display : 'N/A');
+    
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        console.log(`- ${id}:`, element ? 'ENCONTRADO' : 'NO ENCONTRADO');
+    });
+}
+
+function showModal(title, content, size = 'medium') {
+    // Cerrar modal existente si hay uno
+    const existingModal = document.querySelector('.modal-overlay');
+    if (existingModal) {
+        document.body.removeChild(existingModal);
+    }
+    
+    // Crear overlay del modal
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+    modalOverlay.innerHTML = `
+        <div class="modal ${size}">
+            <div class="modal-header">
+                <h2>${title}</h2>
+                <button class="close-modal" onclick="closeModal(this.closest('.modal-overlay'))">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                ${content}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modalOverlay);
+    
+    // Animación de entrada
+    setTimeout(() => {
+        modalOverlay.classList.add('active');
+    }, 10);
+    
+    // Cerrar al hacer clic fuera
+    modalOverlay.addEventListener('click', function(e) {
+        if (e.target === modalOverlay) {
+            closeModal(modalOverlay);
+        }
+    });
+    
+    // Cerrar con ESC
+    const closeOnEsc = function(e) {
+        if (e.key === 'Escape') {
+            closeModal(modalOverlay);
+            document.removeEventListener('keydown', closeOnEsc);
+        }
+    };
+    document.addEventListener('keydown', closeOnEsc);
+}
+
+// Función para mostrar detalles en el modal
+function displayResourceDetails(resource) {
+    // Llenar información básica
+    document.getElementById('detail-resource-title').textContent = resource.title;
+    document.getElementById('detail-resource-description').textContent = resource.description;
+    document.getElementById('detail-resource-type').textContent = getResourceTypeLabel(resource.resource_type);
+    document.getElementById('detail-resource-category').textContent = getCategoryLabel(resource.main_category);
+    document.getElementById('detail-resource-uploader').textContent = resource.uploader_name || 'Usuario';
+    document.getElementById('detail-resource-date').textContent = new Date(resource.created_at).toLocaleDateString('es-ES');
+    
+    // Información adicional
+    document.getElementById('detail-info-type').textContent = getResourceTypeLabel(resource.resource_type);
+    document.getElementById('detail-info-category').textContent = getCategoryLabel(resource.main_category);
+    document.getElementById('detail-info-subcategory').textContent = resource.subcategory || 'No especificada';
+    
+    // Configurar botones de acción
+    const downloadBtn = document.getElementById('resource-download-btn');
+    const linkBtn = document.getElementById('resource-link-btn');
+    
+    if (resource.resource_type !== 'enlace' && resource.file_url) {
+        downloadBtn.style.display = 'block';
+        downloadBtn.onclick = () => downloadLibraryResource(resource.id, resource.title);
+    } else {
+        downloadBtn.style.display = 'none';
+    }
+    
+    if (resource.resource_type === 'enlace' && resource.external_url) {
+        linkBtn.style.display = 'block';
+        linkBtn.onclick = () => window.open(resource.external_url, '_blank');
+    } else {
+        linkBtn.style.display = 'none';
+    }
+    
+    openModal('resource-detail-modal');
+}
+
+// Función para crear item de archivo
+function createResourceFileItem(resource) {
+    const fileName = resource.file_url ? resource.file_url.split('/').pop() : 'Archivo';
+    const fileSize = resource.file_size ? formatFileSize(resource.file_size) : 'Tamaño desconocido';
+    const fileIcon = getFileIcon(fileName);
+    
+    return `
+        <div class="resource-file-item">
+            <div class="resource-file-info">
+                <div class="resource-file-icon">
+                    <i class="${fileIcon}"></i>
+                </div>
+                <div class="resource-file-details">
+                    <div class="resource-file-name">${resource.title}</div>
+                    <div class="resource-file-size">${fileSize}</div>
+                </div>
+            </div>
+            <div class="resource-file-actions">
+                <button class="btn-outline btn-sm" onclick="downloadResource(${JSON.stringify(resource).replace(/"/g, '&quot;')})">
+                    <i class="fas fa-download"></i> Descargar
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Función para descargar recurso
+async function downloadResource(resourceId, fileName = null) {
+    try {
+        console.log('📥 Iniciando descarga del recurso:', resourceId);
+        
+        // Mostrar loading en el botón
+        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
+        downloadBtns.forEach(btn => {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando...';
+            btn.disabled = true;
+            
+            // Restaurar después de 3 segundos (por si falla)
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }, 3000);
+        });
+        
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al descargar el recurso');
+        }
+        
+        // Obtener el blob del archivo
+        const blob = await response.blob();
+        
+        // Crear URL temporal para descarga
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Usar el nombre del archivo del recurso o generar uno
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let downloadFileName = fileName;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+                downloadFileName = filenameMatch[1].replace(/['"]/g, '');
+            }
+        }
+        
+        // Si no tenemos nombre, usar un nombre por defecto
+        if (!downloadFileName) {
+            downloadFileName = `recurso-${resourceId}.${blob.type.split('/')[1] || 'bin'}`;
+        }
+        
+        a.download = downloadFileName;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ Descarga completada:', downloadFileName);
+        showNotification('Descarga iniciada', 'success');
+        
+        // Restaurar botones
+        downloadBtns.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
+            btn.disabled = false;
+        });
+        
+    } catch (error) {
+        console.error('❌ Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${error.message}`, 'error');
+        
+        // Restaurar botones en caso de error
+        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
+        downloadBtns.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
+            btn.disabled = false;
+        });
+    }
+}
+
+// Función para actualizar contador de descargas
+async function updateDownloadCount(resourceId) {
+    try {
+        // Aquí puedes implementar la lógica para actualizar el contador en la BD
+        console.log('📊 Actualizando contador de descargas para recurso:', resourceId);
+        
+        // Ejemplo: Incrementar contador localmente
+        const resourceIndex = libraryResources.findIndex(r => r.id === resourceId);
+        if (resourceIndex !== -1) {
+            if (!libraryResources[resourceIndex].download_count) {
+                libraryResources[resourceIndex].download_count = 0;
+            }
+            libraryResources[resourceIndex].download_count++;
+        }
+        
+    } catch (error) {
+        console.error('Error actualizando contador:', error);
+    }
+}
+
+// Función para obtener etiqueta del tipo de recurso
+function getResourceTypeLabel(type) {
+    const types = {
+        'manual': 'Manual',
+        'presentacion': 'Presentación',
+        'guia': 'Guía',
+        'enlace': 'Enlace Externo',
+        'documento': 'Documento',
+        'video': 'Video',
+        'audio': 'Audio'
+    };
+    return types[type] || type;
+}
+
+function getCategoryLabel(category) {
+    const labels = {
+        'programas': 'Programas y Software',
+        'habilidades_tecnicas': 'Habilidades Técnicas', 
+        'habilidades_blandas': 'Habilidades Blandas'
+    };
+    return labels[category] || category;
+}
+
+function getSubcategoryLabel(mainCategory, subcategory) {
+    const subcategories = {
+        programas: {
+            'programacion': 'Programación',
+            'simulacion': 'Simulación',
+            'diseno': 'Diseño',
+            'utilidades': 'Utilidades'
+        },
+        habilidades_tecnicas: {
+            'electronica': 'Electrónica',
+            'programacion': 'Programación',
+            'robotica': 'Robótica',
+            'iot': 'IoT',
+            'proyectos': 'Proyectos',
+            'manuales': 'Manuales'
+        },
+        habilidades_blandas: {
+            'comunicacion': 'Comunicación',
+            'trabajo_equipo': 'Trabajo en Equipo',
+            'liderazgo': 'Liderazgo',
+            'presentaciones': 'Presentaciones',
+            'gestion_proyectos': 'Gestión de Proyectos'
+        }
+    };
+    return subcategories[mainCategory]?.[subcategory] || subcategory || 'N/A';
+}
+
+function getFileFormat(url) {
+    if (!url) return 'N/A';
+    if (url.includes('youtube') || url.includes('vimeo')) return 'Video';
+    if (url.includes('.pdf')) return 'PDF';
+    if (url.includes('.doc') || url.includes('.docx')) return 'Word';
+    if (url.includes('.ppt') || url.includes('.pptx')) return 'PowerPoint';
+    if (url.includes('.zip') || url.includes('.rar')) return 'Comprimido';
+    return 'Archivo';
+}
+
+// Función para formatear fecha
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+// Event listener para cerrar el modal
+document.querySelector('#resource-detail-modal .close').addEventListener('click', function() {
+    const modal = document.getElementById('resource-detail-modal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+});
+
+// Cerrar al hacer clic fuera del modal
+document.getElementById('resource-detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.classList.remove('active');
+        setTimeout(() => {
+            this.style.display = 'none';
+        }, 300);
+    }
+});
 
 // Modificar la función existente loadLibraryResources para incluir las nuevas categorías
 async function loadLibraryResources() {
     try {
-        libraryResources = await apiCall('/library');
-        renderLibraryResources();
-        updateLibraryStats();
-        updateCategoryCards();
+        console.log('📚 Cargando recursos de biblioteca...');
+        const response = await fetch(`${API_BASE}/library`);
+        
+        if (response.ok) {
+            libraryResources = await response.json();
+            console.log(`✅ ${libraryResources.length} recursos cargados`);
+            renderLibraryResources();
+            updateLibraryStats();
+            setupLibraryCategoryCards();
+            // Event listener para botones de descarga en las cards
+            document.addEventListener('click', function(e) {
+                // Botón descargar en cards
+                if (e.target.closest('.download-resource')) {
+                    const btn = e.target.closest('.download-resource');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    const fileName = btn.getAttribute('data-file-name');
+                    downloadResource(resourceId, fileName);
+                }
+                
+                // Botón visitar en cards
+                if (e.target.closest('.visit-resource')) {
+                    const btn = e.target.closest('.visit-resource');
+                    const url = btn.getAttribute('data-url');
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+                
+                // Botón ver detalles en cards
+                if (e.target.closest('.view-resource-details')) {
+                    const btn = e.target.closest('.view-resource-details');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    
+                    // Verificar que el modal esté listo
+                    const modal = document.getElementById('resource-detail-modal');
+                    if (!modal) {
+                        console.error('❌ Modal no encontrado al hacer clic');
+                        showNotification('Error: El modal no está disponible', 'error');
+                        return;
+                    }
+                    
+                    showResourceDetails(resourceId);
+                }
+                
+                // Botón eliminar en cards
+                if (e.target.closest('.delete-resource')) {
+                    const btn = e.target.closest('.delete-resource');
+                    const resourceId = btn.getAttribute('data-resource-id');
+                    deleteResource(resourceId);
+                }
+            });
+        } else {
+            throw new Error('Error cargando recursos');
+        }
     } catch (error) {
-        console.error('Error cargando recursos de biblioteca:', error);
+        console.error('❌ Error cargando recursos de biblioteca:', error);
+        // Usar datos de ejemplo si hay error
         libraryResources = getSampleLibraryResources();
         renderLibraryResources();
         updateLibraryStats();
-        updateCategoryCards();
+    }
+}
+
+
+// En tu función que carga las categorías, asegúrate de tener esto:
+function setupCategoryCards() {
+    document.addEventListener('click', function(e) {
+        // Cards de categoría
+        if (e.target.closest('.category-card')) {
+            const card = e.target.closest('.category-card');
+            const category = card.getAttribute('data-category');
+            
+            if (category) {
+                console.log(`🎯 Categoría seleccionada: ${category}`);
+                showCategoryView(category);
+            }
+        }
+        
+        // Botón volver
+        if (e.target.closest('#back-to-main-library')) {
+            backToMainLibrary();
+        }
+    });
+}
+
+// Ejecutar cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    setupCategoryCards();
+});
+
+// Función para actualizar los contadores de categorías de biblioteca
+function updateLibraryCategoryCounters() {
+    if (!libraryResources || libraryResources.length === 0) return;
+    
+    const categories = {
+        'programas': 'programas-count',
+        'habilidades_tecnicas': 'tecnicas-count', 
+        'habilidades_blandas': 'blandas-count'
+    };
+    
+    Object.entries(categories).forEach(([category, elementId]) => {
+        const count = libraryResources.filter(r => r.main_category === category).length;
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = count;
+        }
+    });
+}
+
+// Inicialización completa del sistema de biblioteca
+function initLibrarySystem() {
+    console.log('🔄 Inicializando sistema de biblioteca...');
+    
+    try {
+        initEnhancedLibrary();
+        initLibraryFileUpload();
+        setupCategoryModals();
+        console.log('✅ Sistema de biblioteca inicializado correctamente');
+    } catch (error) {
+        console.error('❌ Error inicializando biblioteca:', error);
+        setTimeout(initLibrarySystem, 1000);
     }
 }
 
 // Actualizar la función renderLibraryResources existente
 function renderLibraryResources() {
     const container = document.getElementById('library-container');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Contenedor de biblioteca no encontrado');
+        return;
+    }
     
     container.innerHTML = '';
     
     if (libraryResources.length === 0) {
+        document.getElementById('library-empty').style.display = 'block';
+        return;
+    }
+    
+    document.getElementById('library-empty').style.display = 'none';
+    
+    // Aplicar filtros
+    const searchTerm = document.getElementById('search-library')?.value.toLowerCase() || '';
+    const categoryFilter = document.getElementById('library-category-filter')?.value || 'all';
+    const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
+    
+    const filteredResources = libraryResources.filter(resource => {
+        const matchesSearch = !searchTerm || 
+            resource.title.toLowerCase().includes(searchTerm) ||
+            resource.description.toLowerCase().includes(searchTerm) ||
+            (resource.main_category && resource.main_category.toLowerCase().includes(searchTerm));
+        
+        const matchesCategory = categoryFilter === 'all' || 
+            (resource.main_category && resource.main_category === categoryFilter);
+        
+        const matchesType = typeFilter === 'all' || 
+            (resource.resource_type && resource.resource_type === typeFilter);
+        
+        return matchesSearch && matchesCategory && matchesType;
+    });
+    
+    if (filteredResources.length === 0) {
         container.innerHTML = `
-            <div class="empty-state" id="library-empty">
-                <div class="empty-icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <h3>No hay recursos disponibles</h3>
-                <p>¡Sé el primero en compartir un recurso educativo!</p>
-                <button class="btn-primary" id="create-first-resource">
-                    <i class="fas fa-plus"></i> Subir Primer Recurso
-                </button>
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron recursos</h3>
+                <p>Intenta con otros términos de búsqueda</p>
             </div>
         `;
         return;
     }
     
-    libraryResources.forEach(resource => {
-        const resourceCard = createEnhancedLibraryCard(resource);
-        container.appendChild(resourceCard);
+    // Renderizar recursos filtrados
+    filteredResources.forEach(resource => {
+        const card = createLibraryCard(resource);
+        container.appendChild(card);
     });
+    
+    console.log(`✅ ${filteredResources.length} recursos renderizados`);
+}
+
+// SISTEMA DE ARCHIVOS PARA BIBLIOTECA - VERSIÓN CORREGIDA
+function initLibraryFileUpload() {
+    const fileInput = document.getElementById('resource-file');
+    const fileUploadArea = document.getElementById('resource-file-upload-area');
+    const filePreview = document.getElementById('resource-file-preview');
+    
+    if (!fileInput || !fileUploadArea) {
+        console.error('❌ Elementos de upload no encontrados');
+        return;
+    }
+    
+    console.log('📚 Inicializando upload de archivos para biblioteca');
+    
+    // Inicializar array global para archivos de biblioteca
+    if (!window.libraryUploadedFiles) {
+        window.libraryUploadedFiles = [];
+    }
+    
+    // LIMPIAR event listeners existentes
+    const newFileInput = fileInput.cloneNode(true);
+    fileInput.parentNode.replaceChild(newFileInput, fileInput);
+    const freshFileInput = document.getElementById('resource-file');
+    
+    const newUploadArea = fileUploadArea.cloneNode(true);
+    fileUploadArea.parentNode.replaceChild(newUploadArea, fileUploadArea);
+    const freshUploadArea = document.getElementById('resource-file-upload-area');
+    
+    // CONFIGURAR NUEVOS EVENT LISTENERS
+    
+    // Click en área de upload
+    freshUploadArea.addEventListener('click', function(e) {
+        console.log('🎯 Click en área de upload');
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(() => {
+            freshFileInput.click();
+        }, 10);
+        return false;
+    });
+    
+    // Change en input de archivos
+    freshFileInput.addEventListener('change', function(e) {
+        console.log('📁 Change event - Archivos:', e.target.files);
+        if (e.target.files && e.target.files.length > 0) {
+            handleLibraryFiles(e.target.files);
+        }
+        // Limpiar input para permitir seleccionar los mismos archivos otra vez
+        setTimeout(() => {
+            this.value = '';
+        }, 100);
+    });
+    
+    // Drag and drop
+    freshUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.add('dragover');
+    });
+    
+    freshUploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+    });
+    
+    freshUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('dragover');
+        console.log('📁 Drop event - Archivos:', e.dataTransfer.files);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleLibraryFiles(e.dataTransfer.files);
+        }
+    });
+    
+    function handleLibraryFiles(files) {
+        if (!files || files.length === 0) return;
+        
+        console.log(`📁 Procesando ${files.length} archivos para biblioteca`);
+        
+        let filesAdded = 0;
+        
+        for (let file of files) {
+            // Validar que no sea duplicado
+            const isDuplicate = window.libraryUploadedFiles.some(
+                existingFile => existingFile.name === file.name && existingFile.size === file.size
+            );
+            
+            if (isDuplicate) {
+                console.log('⚠️ Archivo duplicado ignorado:', file.name);
+                showNotification(`"${file.name}" ya está en la lista`, 'warning');
+                continue;
+            }
+            
+            // Validar tamaño (50MB máximo)
+            if (file.size > 50 * 1024 * 1024) {
+                showNotification(`"${file.name}" es muy grande (máx. 50MB)`, 'error');
+                continue;
+            }
+            
+            // Agregar archivo
+            window.libraryUploadedFiles.push(file);
+            filesAdded++;
+            addLibraryFileToPreview(file);
+            console.log('✅ Archivo agregado:', file.name);
+        }
+        
+        if (filesAdded > 0) {
+            showNotification(`${filesAdded} archivo(s) agregado(s)`, 'success');
+        }
+    }
+    
+    function addLibraryFileToPreview(file) {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-preview-item';
+        fileItem.setAttribute('data-file-name', file.name);
+        
+        const fileSize = formatFileSize(file.size);
+        const fileIcon = getFileIcon(file.name);
+        
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <div class="file-icon">
+                    <i class="${fileIcon}"></i>
+                </div>
+                <div class="file-details">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${fileSize}</div>
+                </div>
+            </div>
+            <button type="button" class="file-remove" onclick="removeLibraryFileFromPreview('${file.name}')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        if (filePreview) {
+            const emptyMessage = filePreview.querySelector('.empty-preview');
+            if (emptyMessage) {
+                emptyMessage.remove();
+            }
+            filePreview.appendChild(fileItem);
+        }
+    }
+    
+    // Inicializar preview vacío
+    if (filePreview && window.libraryUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+}
+
+// Función para remover archivo de biblioteca
+function removeLibraryFileFromPreview(fileName) {
+    console.log('🗑️ Eliminando archivo:', fileName);
+    
+    // Remover del array
+    window.libraryUploadedFiles = window.libraryUploadedFiles.filter(file => file.name !== fileName);
+    
+    // Remover del DOM
+    const fileItem = document.querySelector(`.file-preview-item[data-file-name="${fileName}"]`);
+    if (fileItem) {
+        fileItem.remove();
+    }
+    
+    // Mostrar mensaje vacío si no hay archivos
+    const filePreview = document.getElementById('resource-file-preview');
+    if (filePreview && window.libraryUploadedFiles.length === 0) {
+        filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+    }
+    
+    showNotification(`Archivo "${fileName}" eliminado`, 'info');
 }
 
 // Crear card mejorada para la vista general
@@ -10403,15 +13006,202 @@ function getFileExtension(url) {
     return extension ? '.' + extension : '';
 }
 
-// Reemplaza la función submitNewResource existente con esta:
+// Función para manejar la visibilidad de campos según el tipo de recurso
+function handleResourceTypeChange() {
+    const resourceType = document.getElementById('resource-type').value;
+    const fileGroup = document.getElementById('resource-file-group');
+    const urlGroup = document.getElementById('resource-url-group');
+    
+    console.log('🔄 Cambiando tipo de recurso a:', resourceType);
+    
+    // Ocultar ambos grupos primero
+    if (fileGroup) fileGroup.style.display = 'none';
+    if (urlGroup) urlGroup.style.display = 'none';
+    
+    // Mostrar el grupo correspondiente
+    if (resourceType === 'enlace') {
+        if (urlGroup) urlGroup.style.display = 'block';
+        console.log('🔗 Mostrando campo de URL');
+    } else {
+        if (fileGroup) fileGroup.style.display = 'block';
+        console.log('📁 Mostrando campo de archivo');
+    }
+}
+
 async function submitNewResource(e) {
     e.preventDefault();
     
+    console.log('📚 Iniciando subida de recurso...');
+    
     if (!checkAuth()) return;
     
-    // Usar el nuevo formulario mejorado
-    await submitEnhancedResource(e);
+    // Obtener datos del formulario
+    const title = document.getElementById('resource-title').value.trim();
+    const description = document.getElementById('resource-description').value.trim();
+    const resourceType = document.getElementById('resource-type').value;
+    const externalUrl = document.getElementById('resource-url').value.trim();
+    const mainCategory = document.getElementById('resource-main-category').value;
+    const subcategory = document.getElementById('resource-subcategory').value;
+    
+    // DEBUG: Verificar todos los datos
+    console.log('🔍 Datos del formulario:', {
+        title: title,
+        description: description,
+        resourceType: resourceType,
+        externalUrl: externalUrl,
+        mainCategory: mainCategory,
+        subcategory: subcategory,
+        filesCount: window.libraryUploadedFiles ? window.libraryUploadedFiles.length : 0,
+        hasFiles: !!(window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0)
+    });
+    
+    // Validaciones básicas
+    if (!title || !description || !resourceType || !mainCategory) {
+        showNotification('Por favor completa todos los campos obligatorios', 'error');
+        return;
+    }
+    
+    // Validación específica por tipo de recurso - CORREGIDA
+    if (resourceType !== 'enlace') {
+        // Para tipos que requieren archivo (manual, presentacion, etc.)
+        if (!window.libraryUploadedFiles || window.libraryUploadedFiles.length === 0) {
+            showNotification('Debes seleccionar al menos un archivo para este tipo de recurso', 'error');
+            return;
+        }
+    } else {
+        // Para enlaces externos
+        if (!externalUrl) {
+            showNotification('La URL es requerida para recursos de tipo enlace', 'error');
+            return;
+        }
+        // Para enlaces, no debe haber archivos
+        if (window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0) {
+            showNotification('Los recursos de tipo enlace no pueden tener archivos adjuntos', 'error');
+            return;
+        }
+    }
+    
+    // Mostrar loading
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+    submitBtn.disabled = true;
+    
+    try {
+        console.log('🚀 Preparando datos para enviar...');
+        
+        // Preparar datos base - FORMATO CORREGIDO (igual que proyectos)
+        const formData = {
+            title: title,
+            description: description,
+            resource_type: resourceType,
+            external_url: resourceType === 'enlace' ? externalUrl : '',
+            main_category: mainCategory,
+            subcategory: subcategory
+        };
+        
+        console.log('📤 Datos base preparados:', formData);
+        
+        // Procesar archivos si existen - CORREGIDO (Base64 igual que proyectos)
+        if (resourceType !== 'enlace' && window.libraryUploadedFiles && window.libraryUploadedFiles.length > 0) {
+            console.log(`📁 Procesando ${window.libraryUploadedFiles.length} archivos...`);
+            
+            // Tomar solo el primer archivo (para simplificar, igual que en proyectos)
+            const file = window.libraryUploadedFiles[0];
+            console.log('📄 Archivo a subir:', file.name, formatFileSize(file.size));
+            
+            // Leer archivo como base64 - MÉTODO IDÉNTICO A PROYECTOS
+            const fileBase64 = await readFileAsBase64(file);
+            
+            // AGREGAR CAMPOS EN EL MISMO FORMATO QUE PROYECTOS
+            formData.fileData = fileBase64;        // Base64 string (igual que proyectos)
+            formData.fileName = file.name;         // Nombre original del archivo
+            formData.fileType = file.type;         // Tipo MIME del archivo
+            // fileSize se calcula automáticamente en el servidor
+            
+            console.log('✅ Archivo convertido a base64, longitud:', fileBase64.length);
+            console.log('📦 Datos de archivo preparados:', {
+                fileName: file.name,
+                fileType: file.type,
+                fileSize: file.size,
+                base64Length: fileBase64.length
+            });
+        } else if (resourceType === 'enlace') {
+            // Para enlaces, limpiar cualquier dato de archivo
+            formData.fileData = null;
+            formData.fileName = null;
+            formData.fileType = null;
+            console.log('🔗 Recurso de tipo enlace - sin archivos');
+        }
+        
+        console.log('📤 Enviando datos al servidor...', {
+            title: formData.title,
+            resource_type: formData.resource_type,
+            hasFileData: !!formData.fileData,
+            fileDataLength: formData.fileData ? formData.fileData.length : 0
+        });
+        
+        const response = await fetch(`${API_BASE}/library`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        console.log('📥 Respuesta del servidor:', response.status, response.statusText);
+        
+        if (response.ok) {
+            const newResource = await response.json();
+            console.log('✅ Recurso creado exitosamente:', {
+                id: newResource.id,
+                title: newResource.title,
+                resource_type: newResource.resource_type,
+                has_file: !!newResource.file_data
+            });
+            
+            showNotification(`Recurso "${title}" subido exitosamente`, 'success');
+            
+            // Cerrar modal y limpiar formulario
+            closeModal(document.getElementById('new-resource-modal'));
+            document.getElementById('resource-form').reset();
+            
+            // Limpiar archivos
+            window.libraryUploadedFiles = [];
+            const filePreview = document.getElementById('resource-file-preview');
+            if (filePreview) {
+                filePreview.innerHTML = '<div class="empty-preview"><i class="fas fa-file"></i><p>No hay archivos seleccionados</p></div>';
+            }
+            
+            // Recargar recursos
+            await loadLibraryResources();
+            
+        } else {
+            const errorData = await response.json();
+            console.error('❌ Error del servidor:', errorData);
+            
+            // Mensajes de error más específicos
+            let errorMessage = errorData.error || 'Error al subir el recurso';
+            if (errorMessage.includes('row-level security policy')) {
+                errorMessage = 'Error de configuración en la base de datos. Contacta al administrador.';
+            } else if (errorMessage.includes('archivo')) {
+                errorMessage = 'Error al procesar el archivo. Verifica que no sea demasiado grande.';
+            }
+            
+            throw new Error(errorMessage);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error subiendo recurso:', error);
+        showNotification(`Error: ${error.message}`, 'error');
+    } finally {
+        // Restaurar botón
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
 }
+
 
 function sortIdeasList(sortBy) {
     switch(sortBy) {
@@ -10448,17 +13238,41 @@ function updateSuggestionStats() {
 }
 
 function updateLibraryStats() {
-    if (!libraryResources.length) return;
+    if (!libraryResources || libraryResources.length === 0) {
+        // Resetear contadores si no hay recursos
+        ['stats-resources-total', 'stats-resources-docs', 'stats-resources-videos', 'stats-resources-links'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = '0';
+        });
+        return;
+    }
     
-    const total = libraryResources.length;
-    const docs = libraryResources.filter(r => r.resource_type === 'documento').length;
-    const videos = libraryResources.filter(r => r.resource_type === 'video').length;
-    const links = libraryResources.filter(r => r.resource_type === 'enlace').length;
+    // Contar por tipo
+    const docsCount = libraryResources.filter(r => 
+        ['documento', 'presentacion', 'manual'].includes(r.resource_type)
+    ).length;
     
-    document.getElementById('stats-resources-total').textContent = total;
-    document.getElementById('stats-resources-docs').textContent = docs;
-    document.getElementById('stats-resources-videos').textContent = videos;
-    document.getElementById('stats-resources-links').textContent = links;
+    const videosCount = libraryResources.filter(r => 
+        r.resource_type === 'video'
+    ).length;
+    
+    const linksCount = libraryResources.filter(r => 
+        r.resource_type === 'enlace'
+    ).length;
+    
+    // Actualizar UI
+    const totalElement = document.getElementById('stats-resources-total');
+    const docsElement = document.getElementById('stats-resources-docs');
+    const videosElement = document.getElementById('stats-resources-videos');
+    const linksElement = document.getElementById('stats-resources-links');
+    
+    if (totalElement) totalElement.textContent = libraryResources.length;
+    if (docsElement) docsElement.textContent = docsCount;
+    if (videosElement) videosElement.textContent = videosCount;
+    if (linksElement) linksElement.textContent = linksCount;
+    
+    // Actualizar contadores de categorías
+    updateLibraryCategoryCounters();
 }
 
 // En la función renderSuggestions(), asegurar que se muestren a todos
@@ -10553,6 +13367,57 @@ function updateResultsInfo() {
     }
 }
 
+// Función MEJORADA para actualizar contadores de sugerencias
+function updateSuggestionCounters() {
+    console.log('🔄 Actualizando contadores de sugerencias...');
+    
+    if (!suggestions || !Array.isArray(suggestions)) {
+        console.error('❌ suggestions no es un array válido:', suggestions);
+        return;
+    }
+
+    // Calcular contadores
+    const total = suggestions.length;
+    const pendientes = suggestions.filter(s => s.status === 'pendiente').length;
+    const enProgreso = suggestions.filter(s => s.status === 'en_progreso').length;
+    const realizadas = suggestions.filter(s => s.status === 'realizada' || s.status === 'completada').length;
+
+    console.log('📊 Contadores calculados:', {
+        total,
+        pendientes,
+        enProgreso,
+        realizadas
+    });
+
+    // Actualizar elementos HTML
+    const totalElement = document.getElementById('suggestions-total');
+    const pendientesElement = document.getElementById('suggestions-pendientes');
+    const realizadasElement = document.getElementById('suggestions-realizadas');
+
+    if (totalElement) {
+        totalElement.textContent = total;
+        console.log('✅ Total actualizado:', total);
+    } else {
+        console.error('❌ Elemento suggestions-total no encontrado');
+    }
+
+    if (pendientesElement) {
+        pendientesElement.textContent = pendientes;
+        console.log('✅ Pendientes actualizado:', pendientes);
+    } else {
+        console.error('❌ Elemento suggestions-pendientes no encontrado');
+    }
+
+    if (realizadasElement) {
+        realizadasElement.textContent = realizadas;
+        console.log('✅ Realizadas actualizado:', realizadas);
+    } else {
+        console.error('❌ Elemento suggestions-realizadas no encontrado');
+    }
+
+    console.log('🎯 Contadores actualizados exitosamente');
+}
+
 // Modificar filterLibrary para incluir filtro por tipo
 function filterLibrary() {
     const libraryCards = document.querySelectorAll('#library-container .library-card');
@@ -10594,6 +13459,224 @@ function clearSectionContent() {
             }
         }
     });
+}
+
+// ==================== MENÚ MÓVIL ESTILO CUENTA DNI ====================
+
+function initMobileMenu() {
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileNav = document.getElementById('mobile-nav');
+    const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+    
+    if (!mobileMenuBtn || !mobileNav) return;
+
+    // Abrir/cerrar menú
+    function toggleMobileMenu() {
+        mobileMenuBtn.classList.toggle('active');
+        mobileNav.classList.toggle('active');
+        mobileNavOverlay.classList.toggle('active');
+        document.body.style.overflow = mobileNav.classList.contains('active') ? 'hidden' : '';
+    }
+
+    // Event listeners
+    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+    mobileNavOverlay.addEventListener('click', toggleMobileMenu);
+
+    // Cerrar menú al hacer clic en un enlace Y navegar a la sección
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sectionId = link.getAttribute('data-section');
+            
+            if (sectionId) {
+                // Cerrar menú primero
+                toggleMobileMenu();
+                
+                // Pequeño delay para que se cierre el menú antes de cambiar sección
+                setTimeout(() => {
+                    // Usar TU función showSection existente
+                    if (typeof showSection === 'function') {
+                        showSection(sectionId);
+                    } else {
+                        // Fallback si showSection no existe
+                        navigateToSection(sectionId);
+                    }
+                }, 300);
+            }
+        });
+    });
+
+    // También conectar los enlaces del navbar desktop
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sectionId = link.getAttribute('data-section');
+            
+            if (sectionId && typeof showSection === 'function') {
+                showSection(sectionId);
+            }
+        });
+    });
+
+    // Cerrar menú con ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mobileNav.classList.contains('active')) {
+            toggleMobileMenu();
+        }
+    });
+
+    // Sincronizar navegación activa entre desktop y móvil
+    syncNavigation();
+}
+
+function syncNavigation() {
+    // Observar cambios en las secciones activas
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                const section = mutation.target;
+                if (section.classList.contains('section')) {
+                    updateActiveNavigation();
+                }
+            }
+        });
+    });
+
+    // Observar todas las secciones
+    document.querySelectorAll('.section').forEach(section => {
+        observer.observe(section, { attributes: true });
+    });
+}
+
+function updateActiveNavigation() {
+    // Encontrar la sección activa actual
+    const activeSection = document.querySelector('.section.active');
+    if (!activeSection) return;
+    
+    const sectionId = activeSection.id;
+    
+    // Actualizar navegación desktop
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('data-section') === sectionId) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Actualizar navegación móvil
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('data-section') === sectionId) {
+            link.classList.add('active');
+        }
+    });
+}
+
+// ==================== ACTUALIZAR MENÚ MÓVIL CON ESTADO DE USUARIO ====================
+
+function updateMobileMenu(user = null) {
+    const mobileUserInfo = document.getElementById('mobile-user-info');
+    const mobileAuthButtons = document.getElementById('mobile-auth-buttons');
+    const mobileLogoutSection = document.getElementById('mobile-logout-section');
+    const mobileUserSection = document.getElementById('mobile-user-section');
+    const mobileUserName = document.getElementById('mobile-user-name');
+    const mobileUserEmail = document.getElementById('mobile-user-email');
+    const mobileAdminNav = document.getElementById('mobile-admin-nav');
+
+    if (user) {
+        // Usuario autenticado - mostrar info de usuario y botón de logout
+        if (mobileUserInfo) mobileUserInfo.style.display = 'flex';
+        if (mobileAuthButtons) mobileAuthButtons.style.display = 'none';
+        if (mobileLogoutSection) mobileLogoutSection.style.display = 'block';
+        if (mobileUserSection) mobileUserSection.style.display = 'block';
+        
+        if (mobileUserName) mobileUserName.textContent = `${user.first_name} ${user.last_name}`;
+        if (mobileUserEmail) mobileUserEmail.textContent = user.email;
+        
+        // Mostrar/ocultar enlace de admin
+        if (mobileAdminNav) {
+            mobileAdminNav.style.display = user.user_type === 'admin' ? 'block' : 'none';
+        }
+    } else {
+        // Usuario NO autenticado - mostrar botones de login/register
+        if (mobileUserInfo) mobileUserInfo.style.display = 'none';
+        if (mobileAuthButtons) mobileAuthButtons.style.display = 'block';
+        if (mobileLogoutSection) mobileLogoutSection.style.display = 'none';
+        if (mobileUserSection) mobileUserSection.style.display = 'none';
+        if (mobileAdminNav) mobileAdminNav.style.display = 'none';
+    }
+    
+    ('✅ Menú móvil actualizado para usuario:', user ? `${user.first_name} ${user.last_name}` : 'No autenticado');
+}
+
+// ==================== INICIALIZACIÓN ====================
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileMenu();
+    
+    // Botones de login/register del menú móvil
+    const mobileLoginBtn = document.getElementById('mobile-login-btn');
+    const mobileRegisterBtn = document.getElementById('mobile-register-btn');
+    const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+    
+    if (mobileLoginBtn) {
+        mobileLoginBtn.addEventListener('click', function() {
+            showLoginModal();
+            closeMobileMenu();
+        });
+    }
+    
+    if (mobileRegisterBtn) {
+        mobileRegisterBtn.addEventListener('click', function() {
+            showRegisterModal();
+            closeMobileMenu();
+        });
+    }
+    
+    if (mobileLogoutBtn) {
+        mobileLogoutBtn.addEventListener('click', function() {
+            logout();
+            closeMobileMenu();
+        });
+    }
+
+    // También conectar el logo para ir al home
+    const logo = document.querySelector('.logo');
+    if (logo) {
+        logo.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (typeof showSection === 'function') {
+                showSection('home');
+            }
+        });
+    }
+});
+
+function closeMobileMenu() {
+    const mobileNav = document.getElementById('mobile-nav');
+    const mobileOverlay = document.getElementById('mobile-nav-overlay');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    
+    if (mobileNav) mobileNav.classList.remove('active');
+    if (mobileOverlay) mobileOverlay.classList.remove('active');
+    if (mobileMenuBtn) mobileMenuBtn.classList.remove('active');
+}
+
+// ==================== FUNCIÓN DE FALLBACK ====================
+
+function navigateToSection(sectionId) {
+    // Ocultar todas las secciones
+    document.querySelectorAll('.section').forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // Mostrar la sección seleccionada
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add('active');
+    }
+    
+    // Actualizar navegación
+    updateActiveNavigation();
 }
 
 // Event listener global como respaldo para las cards
