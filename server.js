@@ -1624,6 +1624,92 @@ const checkProjectPermissions = async (req, res, next) => {
     }
 };
 
+// ==================== RUTAS ESPECIALES PARA DESCARGAS MÓVILES ====================
+
+// Ruta para descarga directa de archivos de proyectos (SIN autenticación temporal)
+app.get('/api/mobile/download/file/:fileId', async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        console.log('📱 Descarga móvil directa para archivo:', fileId);
+        
+        const fileResult = await pool.query(
+            'SELECT * FROM project_files WHERE id = $1',
+            [fileId]
+        );
+
+        if (fileResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+        }
+
+        const file = fileResult.rows[0];
+        
+        if (!file.file_data) {
+            return res.status(404).json({ error: 'Datos de archivo no disponibles' });
+        }
+
+        console.log('✅ Enviando archivo para móvil:', file.original_name);
+        
+        // Convertir base64 a buffer
+        const fileBuffer = Buffer.from(file.file_data, 'base64');
+        
+        // Headers ESPECIALES para móviles
+        res.setHeader('Content-Type', file.file_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Access-Control-Allow-Origin', '*'); // IMPORTANTE para móviles
+        
+        res.send(fileBuffer);
+        
+    } catch (error) {
+        console.error('❌ Error en descarga móvil:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// Ruta para descarga directa de recursos de biblioteca
+app.get('/api/mobile/download/library/:resourceId', async (req, res) => {
+    try {
+        const { resourceId } = req.params;
+        console.log('📱 Descarga móvil directa para recurso:', resourceId);
+
+        const resourceResult = await pool.query(
+            `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
+            [resourceId]
+        );
+
+        if (resourceResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Recurso no encontrado' });
+        }
+
+        const resource = resourceResult.rows[0];
+
+        if (!resource.file_data) {
+            return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
+        }
+
+        console.log('✅ Enviando recurso para móvil:', resource.file_name);
+
+        const fileBuffer = Buffer.from(resource.file_data, 'base64');
+        const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
+            (resource.file_name && resource.file_name.includes('.') ? 
+             resource.file_name.substring(resource.file_name.lastIndexOf('.')) : '');
+
+        // Headers ESPECIALES para móviles
+        res.setHeader('Content-Type', resource.file_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        
+        res.send(fileBuffer);
+        
+    } catch (error) {
+        console.error('❌ Error en descarga móvil de biblioteca:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
 // Rutas para proyectos con archivos
 app.get('/api/projects/:id', async (req, res) => {
     try {
