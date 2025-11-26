@@ -1299,7 +1299,8 @@ function getActivityDescription(activity) {
 app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
     try {
         const { fileId } = req.params;
-        console.log('📥 Descargando archivo desde BD (Mobile):', fileId);
+        
+        console.log('📥 Descargando archivo desde BD:', fileId);
         
         const fileResult = await pool.query(
             'SELECT * FROM project_files WHERE id = $1',
@@ -1316,26 +1317,19 @@ app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Datos de archivo no disponibles' });
         }
 
-        console.log('✅ Enviando archivo (Mobile):', file.original_name);
+        console.log('✅ Enviando archivo:', file.original_name);
         
         // Convertir base64 a buffer
         const fileBuffer = Buffer.from(file.file_data, 'base64');
         
-        // Headers mejorados para móviles
         res.setHeader('Content-Type', file.file_type || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.original_name)}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
         res.setHeader('Content-Length', fileBuffer.length);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        
-        // Header adicional para iOS
-        res.setHeader('X-Content-Type-Options', 'nosniff');
         
         res.send(fileBuffer);
-        
+
     } catch (error) {
-        console.error('❌ Error descargando archivo (Mobile):', error);
+        console.error('❌ Error descargando archivo:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
@@ -1358,48 +1352,48 @@ app.get('/api/library', async (req, res) => {
 
 // Ruta ACTUALIZADA para descargar recursos de biblioteca - BASE64
 app.get('/api/library/download/:resourceId', authenticateToken, async (req, res) => {
-    try {
-        const { resourceId } = req.params;
-        console.log('📥 Descargando recurso (Mobile):', resourceId);
+  try {
+    const { resourceId } = req.params;
+    console.log('📥 Descargando recurso (Base64):', resourceId);
 
-        const resourceResult = await pool.query(
-            `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
-            [resourceId]
-        );
+    // Obtener información del recurso
+    const resourceResult = await pool.query(
+      `SELECT lr.* FROM library_resources lr WHERE lr.id = $1`,
+      [resourceId]
+    );
 
-        if (resourceResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Recurso no encontrado' });
-        }
-
-        const resource = resourceResult.rows[0];
-
-        if (!resource.file_data) {
-            return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
-        }
-
-        console.log('✅ Enviando archivo desde Base64 (Mobile):', resource.file_name);
-
-        const fileBuffer = Buffer.from(resource.file_data, 'base64');
-        const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
-            (resource.file_name && resource.file_name.includes('.') ? 
-             resource.file_name.substring(resource.file_name.lastIndexOf('.')) : '');
-
-        // Headers mejorados para móviles
-        res.setHeader('Content-Type', resource.file_type || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeFileName)}"`);
-        res.setHeader('Content-Length', fileBuffer.length);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-
-        console.log('📤 Enviando recurso (Mobile):', safeFileName);
-        res.send(fileBuffer);
-        
-    } catch (error) {
-        console.error('❌ Error en descarga de biblioteca (Mobile):', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+    if (resourceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recurso no encontrado' });
     }
+
+    const resource = resourceResult.rows[0];
+
+    // Verificar si tiene archivo en Base64
+    if (!resource.file_data) {
+      return res.status(400).json({ error: 'Este recurso no tiene archivo asociado' });
+    }
+
+    console.log('✅ Enviando archivo desde Base64:', resource.file_name);
+
+    // Convertir base64 a buffer
+    const fileBuffer = Buffer.from(resource.file_data, 'base64');
+
+    // Nombre seguro para descarga
+    const safeFileName = resource.title.replace(/[^a-zA-Z0-9.\-_]/g, '_') + 
+      (resource.file_name && resource.file_name.includes('.') ? 
+       resource.file_name.substring(resource.file_name.lastIndexOf('.')) : '');
+
+    res.setHeader('Content-Type', resource.file_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+
+    console.log('📤 Enviando recurso (Base64):', safeFileName);
+    res.send(fileBuffer);
+
+  } catch (error) {
+    console.error('❌ Error en descarga de biblioteca (Base64):', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 // Ruta para obtener un recurso específico de biblioteca
