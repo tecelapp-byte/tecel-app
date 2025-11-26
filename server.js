@@ -1710,6 +1710,40 @@ app.get('/api/mobile/download/library/:resourceId', async (req, res) => {
     }
 });
 
+// Ruta de diagnóstico COMPLETA - AGREGA ESTO
+app.get('/api/debug/download-test', (req, res) => {
+    console.log('🧪 TEST DE DESCARGA SOLICITADO');
+    
+    // Crear un archivo de texto de prueba
+    const testContent = `Archivo de prueba TECEL
+Generado: ${new Date().toISOString()}
+Esto es una prueba de descarga móvil.
+
+Si puedes ver este contenido, la descarga funciona correctamente.`;
+
+    // Configurar headers ESPECÍFICOS para Android
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="prueba_descarga_tecel.txt"');
+    res.setHeader('Content-Length', Buffer.byteLength(testContent, 'utf8'));
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    console.log('📤 Enviando archivo de prueba...');
+    res.send(testContent);
+});
+
+app.get('/api/debug/check-headers', (req, res) => {
+    console.log('📋 HEADERS DE LA PETICIÓN:', req.headers);
+    res.json({
+        userAgent: req.headers['user-agent'],
+        accept: req.headers['accept'],
+        mobile: /Mobile|Android/i.test(req.headers['user-agent'] || ''),
+        headers: req.headers
+    });
+});
+
 // Rutas para proyectos con archivos
 app.get('/api/projects/:id', async (req, res) => {
     try {
