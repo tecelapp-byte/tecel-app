@@ -41,9 +41,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-    implementation 'com.getcapacitor:core:4.6.0' // o tu versión actual
-    implementation 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'androidx.webkit:webkit:1.4.0'
 }
 
 apply from: 'capacitor.build.gradle'
