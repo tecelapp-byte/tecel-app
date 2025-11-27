@@ -9246,63 +9246,88 @@ function openInExternalBrowser(url) {
     }
 }
 
-// Función PRINCIPAL para descargar archivos
+// SOLUCIÓN ULTRA-DIRECTA - Reemplaza las funciones anteriores
 async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📱 SOLICITANDO DESCARGA:', fileName);
+    console.log('🚀 DESCARGA ULTRA-DIRECTA:', fileName);
     
-    // Mostrar notificación inmediata
-    showNotification(`📥 Preparando descarga: ${fileName}`, 'info');
+    // URL ABSOLUTA EXPLÍCITA - sin dependencias
+    const downloadUrl = `https://tecel-app.onrender.com/api/download/file/${fileId}`;
     
-    // URL universal de descarga
-    const downloadUrl = `https://tecel-app.onrender.com/download/file/${fileId}`;
+    console.log('🔗 URL EXPLÍCITA:', downloadUrl);
     
-    console.log('🔗 URL de descarga:', downloadUrl);
+    // Método más directo posible
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    a.target = '_blank'; // Crucial para Android
+    a.style.display = 'none';
     
-    // Estrategia para WebView/APK
-    if (isInWebView()) {
-        // En WebView, abrir en navegador externo
-        showNotification(
-            `🌐 Abriendo en navegador para descargar: ${fileName}`,
-            'info',
-            5000
-        );
-        
-        // Dar tiempo a que el usuario vea el mensaje
-        setTimeout(() => {
-            openInExternalBrowser(downloadUrl);
-        }, 1000);
-        
-    } else {
-        // En navegador normal, descarga directa
-        showNotification(`⬇️ Descargando: ${fileName}`, 'info');
-        window.location.href = downloadUrl;
-    }
+    document.body.appendChild(a);
+    a.click();
+    
+    // No remover inmediatamente, dar tiempo
+    setTimeout(() => {
+        if (document.body.contains(a)) {
+            document.body.removeChild(a);
+        }
+    }, 10000);
+    
+    showNotification(`📥 ${fileName} - Descarga iniciada`, 'info', 5000);
 }
 
-// Función para recursos de biblioteca
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📱 SOLICITANDO DESCARGA DE RECURSO:', resourceName);
+    console.log('🚀 DESCARGA ULTRA-DIRECTA RECURSO:', resourceName);
     
-    showNotification(`📥 Preparando descarga: ${resourceName}`, 'info');
+    const downloadUrl = `https://tecel-app.onrender.com/api/download/library/${resourceId}`;
     
-    const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+    console.log('🔗 URL EXPLÍCITA:', downloadUrl);
     
-    if (isInWebView()) {
-        showNotification(
-            `🌐 Abriendo en navegador para descargar: ${resourceName}`,
-            'info',
-            5000
-        );
-        
-        setTimeout(() => {
-            openInExternalBrowser(downloadUrl);
-        }, 1000);
-        
-    } else {
-        showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
-        window.location.href = downloadUrl;
-    }
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = resourceName;
+    a.target = '_blank';
+    a.style.display = 'none';
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+        if (document.body.contains(a)) {
+            document.body.removeChild(a);
+        }
+    }, 10000);
+    
+    showNotification(`📥 ${resourceName} - Descarga iniciada`, 'info', 5000);
 }
+
+// Función de diagnóstico - agrega esto temporalmente
+function diagnoseDownload() {
+    console.log('🔍 DIAGNÓSTICO DE DESCARGA:');
+    console.log('📍 URL actual:', window.location.href);
+    console.log('📍 Origen:', window.location.origin);
+    console.log('📍 User Agent:', navigator.userAgent);
+    console.log('📍 Es WebView:', /WebView/.test(navigator.userAgent));
+    
+    // Probar una URL de descarga absoluta
+    const testUrl = getAbsoluteUrl('/api/download/file/1');
+    console.log('📍 URL absoluta de prueba:', testUrl);
+    
+    // Verificar si la URL es accesible
+    fetch(testUrl)
+        .then(response => {
+            console.log('📍 Test fetch - Status:', response.status);
+            console.log('📍 Test fetch - Headers:', {
+                contentType: response.headers.get('content-type'),
+                contentDisposition: response.headers.get('content-disposition')
+            });
+        })
+        .catch(error => {
+            console.log('📍 Test fetch - Error:', error);
+        });
+}
+
+// Ejecutar diagnóstico al cargar la página
+setTimeout(diagnoseDownload, 3000);
 
 // Función auxiliar para mostrar ayuda
 function showDownloadInstructions(fileName) {
