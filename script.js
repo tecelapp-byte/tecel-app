@@ -369,6 +369,9 @@ function initializeApp() {
         // ACTUALIZAR MENÚ MÓVIL CON EL ESTADO ACTUAL
         updateMobileMenu(currentUser);
 
+        // Inicializar sistema de descargas
+        initDownloadSystem();
+        
         if (currentUser) {
             hideFullscreenAuthModal();
             showSection('home');
@@ -1977,6 +1980,67 @@ function setupIdeaStudentSearch() {
             }
         });
     }
+}
+
+// Agregar al inicio del script.js, en la sección de inicialización
+function initMobileDownloadStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .mobile-download-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .mobile-download-modal.active {
+            display: flex;
+        }
+        
+        .mobile-download-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .download-icon {
+            font-size: 3rem;
+            color: #4CAF50;
+            margin-bottom: 1rem;
+        }
+        
+        .download-progress {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        
+        .download-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .download-timer {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // Función para cancelar selección en ideas
@@ -9226,310 +9290,317 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
-// ==================== FUNCIONES NUEVAS PARA DESCARGAS MÓVILES ====================
-// Función para detectar si está en WebView/APK
-function isInWebView() {
-    return /WebView|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && 
-           !/Chrome|Firefox|Safari/i.test(navigator.userAgent);
-}
-
-// Función para abrir en navegador externo
-function openInExternalBrowser(url) {
-    console.log('🔗 Abriendo en navegador externo:', url);
-    
-    // Intentar abrir en nueva pestaña
-    const newWindow = window.open(url, '_system');
-    
-    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        // Fallback: redirección forzada
-        window.location.href = url;
+// Sistema de descargas móviles - REEMPLAZA TODAS LAS FUNCIONES DE DESCARGA EXISTENTES
+class MobileDownloadManager {
+    constructor() {
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.init();
     }
-}
 
-// Reemplazar la función existente de descarga de archivos de proyecto
-window.downloadProjectFile = async function(projectId, fileId, fileName) {
-    try {
-        console.log('📥 Iniciando descarga:', fileName);
-        
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            // Estrategia móvil mejorada
-            const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-            
-            // Crear link temporal
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.setAttribute('download', fileName);
-            link.setAttribute('target', '_blank');
-            link.style.display = 'none';
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Notificación mejorada para móviles
-            setTimeout(() => {
-                showNotification(
-                    `✅ ${fileName} - Descarga en progreso. ` +
-                    `Revisa las notificaciones de tu dispositivo.`,
-                    'success',
-                    6000
-                );
-            }, 1000);
-            
-        } else {
-            // Para desktop
-            const downloadUrl = `${API_BASE}/files/download/${fileId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${fileName}`, 'success');
-        }
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        showNotification(`Error al descargar: ${fileName}`, 'error');
+    init() {
+        this.createDownloadModal();
+        this.setupGlobalListeners();
     }
-};
 
-// Reemplazar la función existente de descarga de biblioteca
-window.downloadLibraryResource = async function(resourceId, resourceName) {
-    try {
-        console.log('📚 Descargando recurso:', resourceName);
+    createDownloadModal() {
+        const modalHTML = `
+            <div id="mobile-download-modal" class="mobile-download-modal">
+                <div class="mobile-download-content">
+                    <div class="download-icon">📥</div>
+                    <h3 id="download-file-name">Preparando descarga...</h3>
+                    <div class="download-progress">
+                        <div id="download-progress-bar" class="download-progress-bar"></div>
+                    </div>
+                    <p id="download-message">Iniciando descarga...</p>
+                    <div class="download-timer" id="download-timer">La descarga comenzará en 3 segundos</div>
+                    <div style="margin-top: 1.5rem;">
+                        <button id="cancel-download" class="btn-outline" style="margin-right: 1rem;">Cancelar</button>
+                        <button id="force-download" class="btn-primary">Forzar Descarga</button>
+                    </div>
+                </div>
+            </div>
+        `;
         
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-            
-            // Método múltiple para móviles
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName;
-            link.target = '_blank';
-            link.style.display = 'none';
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Notificación extendida
-            setTimeout(() => {
-                showNotification(
-                    `📥 ${resourceName} se está descargando. ` +
-                    `Busca el archivo en tu carpeta de Descargas.`,
-                    'success',
-                    7000
-                );
-            }, 1500);
-            
-        } else {
-            const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${resourceName}`, 'success');
-        }
-        
-    } catch (error) {
-        console.error('❌ Error descargando recurso:', error);
-        showNotification(`Error al descargar: ${resourceName}`, 'error');
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        this.setupModalEvents();
     }
-};
 
-// Función de diagnóstico - agrega esto temporalmente
-function diagnoseDownload() {
-    console.log('🔍 DIAGNÓSTICO DE DESCARGA:');
-    console.log('📍 URL actual:', window.location.href);
-    console.log('📍 Origen:', window.location.origin);
-    console.log('📍 User Agent:', navigator.userAgent);
-    console.log('📍 Es WebView:', /WebView/.test(navigator.userAgent));
-    
-    // Probar una URL de descarga absoluta
-    const testUrl = getAbsoluteUrl('/api/download/file/1');
-    console.log('📍 URL absoluta de prueba:', testUrl);
-    
-    // Verificar si la URL es accesible
-    fetch(testUrl)
-        .then(response => {
-            console.log('📍 Test fetch - Status:', response.status);
-            console.log('📍 Test fetch - Headers:', {
-                contentType: response.headers.get('content-type'),
-                contentDisposition: response.headers.get('content-disposition')
-            });
-        })
-        .catch(error => {
-            console.log('📍 Test fetch - Error:', error);
+    setupModalEvents() {
+        document.getElementById('cancel-download').addEventListener('click', () => {
+            this.closeModal();
         });
-}
 
-// Ejecutar diagnóstico al cargar la página
-setTimeout(diagnoseDownload, 3000);
+        document.getElementById('force-download').addEventListener('click', () => {
+            this.forceDownload();
+        });
+    }
 
-// Función auxiliar para mostrar ayuda
-function showDownloadInstructions(fileName) {
-    const instructions = `
-📱 **INSTRUCCIONES DE DESCARGA:**
+    setupGlobalListeners() {
+        // Interceptar clicks en enlaces de descarga
+        document.addEventListener('click', (e) => {
+            const downloadBtn = e.target.closest('[data-download]');
+            if (downloadBtn && this.isMobile) {
+                e.preventDefault();
+                const type = downloadBtn.dataset.downloadType;
+                const id = downloadBtn.dataset.downloadId;
+                const name = downloadBtn.dataset.downloadName;
+                
+                if (type && id && name) {
+                    this.handleDownload(type, id, name);
+                }
+            }
+        });
+    }
 
-1. **La descarga se abrirá en tu navegador**
-2. **Espera a que aparezca la notificación del sistema**
-3. **Toca la notificación para abrir el archivo**
-4. **El archivo se guardará en: ${fileName}**
-
-📍 *Si no funciona, mantén presionado el enlace y selecciona "Descargar"*
-    `;
-    
-    showNotification(instructions, 'info', 8000);
-}
-
-// Función que SÍ activa las notificaciones del sistema
-function triggerAndroidDownload(downloadUrl, fileName) {
-    console.log('🚀 ACTIVANDO DESCARGA ANDROID:', fileName);
-    
-    // Estrategia 1: Redirección DIRECTA (la que SÍ funciona)
-    // Esta es la clave - usar window.location.href en lugar de métodos complejos
-    window.location.href = downloadUrl;
-    
-    // Estrategia 2: Abrir en nueva pestaña como backup
-    setTimeout(() => {
+    async handleDownload(type, id, fileName) {
+        console.log('📱 Manejo de descarga móvil:', { type, id, fileName });
+        
+        this.showModal(fileName);
+        
         try {
-            window.open(downloadUrl, '_blank');
-        } catch (e) {
-            console.log('No se pudo abrir nueva pestaña');
-        }
-    }, 100);
-    
-    // Estrategia 3: Mostrar ayuda por si acaso
-    setTimeout(() => {
-        showNotification(
-            `✅ ${fileName} se está descargando. Revisa tus notificaciones.`,
-            'success',
-            5000
-        );
-    }, 2000);
-}
-
-// Función para mostrar ayuda de ubicación de archivos
-function showDownloadHelp(fileName) {
-    if (isMobileDevice()) {
-        setTimeout(() => {
-            showNotification(
-                `📁 "${fileName}" se está descargando. ` +
-                `Revisa la carpeta "Descargas" de tu celular. ` +
-                `La notificación del sistema debería aparecer en la barra superior.`,
-                'info',
-                8000
-            );
-        }, 3000);
-    }
-}
-
-// Función para detectar móvil
-function isMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-// Función auxiliar para mejorar notificaciones en móviles
-function showMobileDownloadNotification(fileName) {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // Notificación más larga y descriptiva para móviles
-        showNotification(
-            `📥 ${fileName} - La descarga ha comenzado. ` +
-            `Revisa la bandeja de notificaciones de tu dispositivo o la carpeta de Descargas.`,
-            'success',
-            8000 // Mostrar por más tiempo
-        );
-        
-        // Intentar usar notificaciones nativas del navegador
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('TECEL - Descarga Completada', {
-                body: `El archivo "${fileName}" se ha descargado correctamente. Toca para abrir.`,
-                icon: '/favicon.ico',
-                tag: 'tecel-download'
-            });
+            // Paso 1: Preparar URLs
+            const downloadUrl = this.getDownloadUrl(type, id);
+            const helpUrl = `${API_BASE}/download-help/${encodeURIComponent(fileName)}`;
+            
+            // Paso 2: Mostrar progreso
+            this.updateProgress(30, 'Preparando descarga...');
+            
+            // Paso 3: Estrategia múltiple para móviles
+            await this.executeMultiStrategyDownload(downloadUrl, helpUrl, fileName);
+            
+        } catch (error) {
+            console.error('❌ Error en descarga móvil:', error);
+            this.showError('Error en la descarga: ' + error.message);
         }
     }
-}
 
-// Función UNIVERSAL de descarga como fallback
-function universalDownload(url, fileName) {
-    return new Promise((resolve, reject) => {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    getDownloadUrl(type, id) {
+        const baseUrl = `${API_BASE}/download`;
+        switch(type) {
+            case 'project-file':
+                return `${baseUrl}/file/${id}`;
+            case 'library-resource':
+                return `${baseUrl}/library/${id}`;
+            default:
+                return `${baseUrl}/${type}/${id}`;
+        }
+    }
+
+    async executeMultiStrategyDownload(downloadUrl, helpUrl, fileName) {
+        let downloadSuccess = false;
         
-        if (isMobile) {
-            // Estrategia móvil: múltiples métodos
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            
-            // Método 1: Click directo
-            link.click();
-            
-            // Método 2: Abrir en nueva ventana después de un delay
-            setTimeout(() => {
-                window.open(url, '_blank');
-            }, 500);
-            
-            // Método 3: Usar XMLHttpRequest para forzar descarga
-            setTimeout(() => {
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', url, true);
-                xhr.responseType = 'blob';
+        // Estrategia 1: Descarga directa con atributo download
+        downloadSuccess = await this.strategyDirectDownload(downloadUrl, fileName);
+        if (downloadSuccess) return;
+        
+        this.updateProgress(50, 'Probando método alternativo...');
+        
+        // Estrategia 2: Blob download
+        downloadSuccess = await this.strategyBlobDownload(downloadUrl, fileName);
+        if (downloadSuccess) return;
+        
+        this.updateProgress(70, 'Usando método de respaldo...');
+        
+        // Estrategia 3: Página de ayuda con iframe
+        downloadSuccess = await this.strategyHelpPage(helpUrl);
+        if (downloadSuccess) return;
+        
+        // Estrategia 4: Abrir en nueva pestaña
+        this.strategyNewTab(downloadUrl, fileName);
+    }
+
+    strategyDirectDownload(url, fileName) {
+        return new Promise((resolve) => {
+            try {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.style.display = 'none';
                 
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        const blob = xhr.response;
-                        const blobUrl = window.URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = blobUrl;
-                        link.download = fileName;
-                        link.click();
-                        window.URL.revokeObjectURL(blobUrl);
-                    }
-                };
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
                 
-                xhr.send();
-            }, 1000);
-            
-            resolve();
-        } else {
-            // Para desktop: comportamiento normal
+                setTimeout(() => {
+                    resolve(true);
+                    this.showSuccess('Descarga iniciada correctamente');
+                }, 2000);
+                
+            } catch (error) {
+                console.log('Estrategia directa falló:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    strategyBlobDownload(url, fileName) {
+        return new Promise(async (resolve) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network error');
+                
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Limpiar URL
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                
+                resolve(true);
+                this.showSuccess('Descarga completada via blob');
+                
+            } catch (error) {
+                console.log('Estrategia blob falló:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    strategyHelpPage(helpUrl) {
+        return new Promise((resolve) => {
+            try {
+                // Abrir página de ayuda en nueva pestaña
+                const helpWindow = window.open(helpUrl, '_blank');
+                
+                setTimeout(() => {
+                    // Crear iframe invisible para forzar descarga
+                    const iframe = document.createElement('iframe');
+                    iframe.src = helpUrl.replace('/download-help/', '/download/');
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                        resolve(true);
+                        this.showSuccess('Página de ayuda abierta');
+                    }, 3000);
+                }, 1000);
+                
+            } catch (error) {
+                console.log('Estrategia ayuda falló:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    strategyNewTab(url, fileName) {
+        try {
             window.open(url, '_blank');
-            resolve();
+            this.showSuccess(`Abriendo ${fileName} en nueva pestaña`);
+        } catch (error) {
+            this.showError('No se pudo abrir la descarga');
         }
-    });
+    }
+
+    // Métodos de UI del modal
+    showModal(fileName) {
+        document.getElementById('download-file-name').textContent = fileName;
+        document.getElementById('mobile-download-modal').classList.add('active');
+        this.startCountdown();
+    }
+
+    closeModal() {
+        document.getElementById('mobile-download-modal').classList.remove('active');
+        this.resetProgress();
+    }
+
+    updateProgress(percent, message) {
+        document.getElementById('download-progress-bar').style.width = percent + '%';
+        document.getElementById('download-message').textContent = message;
+    }
+
+    resetProgress() {
+        document.getElementById('download-progress-bar').style.width = '0%';
+        document.getElementById('download-message').textContent = 'Iniciando descarga...';
+        document.getElementById('download-timer').textContent = '';
+    }
+
+    startCountdown() {
+        let seconds = 3;
+        const timerElement = document.getElementById('download-timer');
+        
+        const countdown = setInterval(() => {
+            timerElement.textContent = `La descarga comenzará en ${seconds} segundos`;
+            seconds--;
+            
+            if (seconds < 0) {
+                clearInterval(countdown);
+                timerElement.textContent = '¡Descarga iniciada!';
+            }
+        }, 1000);
+    }
+
+    showSuccess(message) {
+        showNotification(message, 'success', 5000);
+        setTimeout(() => this.closeModal(), 3000);
+    }
+
+    showError(message) {
+        showNotification(message, 'error', 5000);
+        setTimeout(() => this.closeModal(), 3000);
+    }
+
+    forceDownload() {
+        const fileName = document.getElementById('download-file-name').textContent;
+        const currentUrl = window.location.href;
+        
+        // Crear enlace de descarga forzada
+        const link = document.createElement('a');
+        link.href = `${API_BASE}/download/force/${Date.now()}`;
+        link.download = fileName;
+        link.click();
+        
+        this.showSuccess('Descarga forzada iniciada');
+    }
 }
 
-
-
-// Función auxiliar para descarga directa
-function attemptDirectDownload(fileUrl, fileName) {
-    try {
-        if (!fileUrl) {
-            throw new Error('No hay URL de archivo disponible');
-        }
-        
-        ('📥 Descarga directa:', { fileUrl, fileName });
-        
-        // Asegurar que la URL sea absoluta
-        let absoluteUrl = fileUrl;
-        if (!fileUrl.startsWith('http')) {
-            absoluteUrl = `${window.location.origin}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
-        }
-        
-        const a = document.createElement('a');
-        a.href = absoluteUrl;
-        a.download = fileName || 'archivo';
-        a.target = '_blank'; // Abrir en nueva pestaña para evitar problemas de CORS
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        showNotification('Descarga directa iniciada', 'info');
-        
-    } catch (error) {
-        console.error('❌ Error en descarga directa:', error);
-        showNotification('No se pudo iniciar la descarga', 'error');
+// 3. Funciones de descarga actualizadas - REEMPLAZA LAS EXISTENTES
+window.downloadProjectFile = function(projectId, fileId, fileName) {
+    if (window.mobileDownloadManager.isMobile) {
+        window.mobileDownloadManager.handleDownload('project-file', fileId, fileName);
+    } else {
+        // Comportamiento normal para desktop
+        const downloadUrl = `${API_BASE}/files/download/${fileId}`;
+        window.open(downloadUrl, '_blank');
+        showNotification(`Descargando: ${fileName}`, 'success');
     }
+};
+
+window.downloadLibraryResource = function(resourceId, resourceName) {
+    if (window.mobileDownloadManager.isMobile) {
+        window.mobileDownloadManager.handleDownload('library-resource', resourceId, resourceName);
+    } else {
+        // Comportamiento normal para desktop
+        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
+        window.open(downloadUrl, '_blank');
+        showNotification(`Descargando: ${resourceName}`, 'success');
+    }
+};
+
+// 4. Función universal de descarga
+function universalDownload(type, id, fileName) {
+    if (window.mobileDownloadManager.isMobile) {
+        window.mobileDownloadManager.handleDownload(type, id, fileName);
+    } else {
+        const downloadUrl = `${API_BASE}/download/${type}/${id}`;
+        window.open(downloadUrl, '_blank');
+        showNotification(`Descargando: ${fileName}`, 'success');
+    }
+}
+
+// 5. Inicialización - AGREGA ESTO AL initializeApp()
+function initDownloadSystem() {
+    initMobileDownloadStyles();
+    window.mobileDownloadManager = new MobileDownloadManager();
+    console.log('✅ Sistema de descargas móviles inicializado');
 }
 
 function verifyToken() {

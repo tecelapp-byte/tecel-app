@@ -2548,6 +2548,126 @@ app.get('/download-help/:fileName', (req, res) => {
     res.send(html);
 });
 
+// Agregar en server.js - Ruta de ayuda para descargas móviles
+app.get('/download-help/:fileName', (req, res) => {
+    const { fileName } = req.params;
+    
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Descarga TECEL - ${fileName}</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container {
+                background: rgba(255,255,255,0.1);
+                padding: 30px;
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+                text-align: center;
+                max-width: 500px;
+            }
+            .success-icon {
+                font-size: 4rem;
+                margin-bottom: 1rem;
+            }
+            .filename {
+                background: rgba(255,255,255,0.2);
+                padding: 15px;
+                border-radius: 10px;
+                margin: 20px 0;
+                font-family: monospace;
+                word-break: break-all;
+            }
+            .instructions {
+                text-align: left;
+                margin: 20px 0;
+            }
+            .instruction-step {
+                margin: 10px 0;
+                padding: 10px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 8px;
+            }
+            .auto-download {
+                margin-top: 20px;
+                padding: 15px;
+                background: rgba(76, 175, 80, 0.3);
+                border-radius: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success-icon">✅</div>
+            <h1>¡Descarga Lista!</h1>
+            <div class="filename">${fileName}</div>
+            
+            <div class="auto-download">
+                <h3>📥 Descarga Automática</h3>
+                <p>Tu archivo debería comenzar a descargarse automáticamente.</p>
+            </div>
+            
+            <div class="instructions">
+                <h3>Si la descarga no inicia:</h3>
+                <div class="instruction-step">1. <strong>Toca aquí</strong> → 
+                    <a href="/download/file/${req.query.id || '0'}" download="${fileName}" 
+                       style="color: #4CAF50; text-decoration: underline;">
+                       Descargar ${fileName}
+                    </a>
+                </div>
+                <div class="instruction-step">2. <strong>Mantén presionado</strong> el enlace y selecciona "Descargar enlace"</div>
+                <div class="instruction-step">3. <strong>Revisa</strong> tu carpeta de Descargas</div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button onclick="window.close()" style="
+                    background: #ff4757;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                ">Cerrar</button>
+            </div>
+        </div>
+
+        <script>
+            // Intentar descarga automática
+            setTimeout(() => {
+                const downloadLink = document.querySelector('a[download]');
+                if (downloadLink) {
+                    downloadLink.click();
+                }
+            }, 1000);
+            
+            // Mostrar notificación si está disponible
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('TECEL - Descarga', {
+                    body: 'Descargando: ${fileName}',
+                    icon: '/favicon.ico'
+                });
+            }
+        </script>
+    </body>
+    </html>
+    `;
+    
+    res.send(html);
+});
+
 // Ruta CORREGIDA para subir archivos a proyectos - SIN VALIDACIÓN DE NOMBRE
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
