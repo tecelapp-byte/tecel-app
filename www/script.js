@@ -9227,36 +9227,97 @@ function debugSuggestionCounters() {
 }
 
 // ==================== FUNCIONES NUEVAS PARA DESCARGAS MÓVILES ====================
-
-// Función PRINCIPAL para descargar archivos de proyectos
-async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📱 INICIANDO DESCARGA:', fileName);
-    
-    // Mostrar notificación
-    showNotification(`⬇️ Descargando: ${fileName}`, 'info');
-    
-    // URL CORRECTA para descarga (usando la ruta que SÍ funciona)
-    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-    
-    console.log('🔗 URL de descarga:', downloadUrl);
-    
-    // Método que SÍ funciona en Android
-    triggerAndroidDownload(downloadUrl, fileName);
+// Función para detectar si está en WebView/APK
+function isInWebView() {
+    return /WebView|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && 
+           !/Chrome|Firefox|Safari/i.test(navigator.userAgent);
 }
 
+// Función para abrir en navegador externo
+function openInExternalBrowser(url) {
+    console.log('🔗 Abriendo en navegador externo:', url);
+    
+    // Intentar abrir en nueva pestaña
+    const newWindow = window.open(url, '_system');
+    
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        // Fallback: redirección forzada
+        window.location.href = url;
+    }
+}
 
-// Función PRINCIPAL para descargar recursos de biblioteca  
-async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📱 DESCARGANDO RECURSO:', resourceName);
+// Función PRINCIPAL para descargar archivos
+async function downloadProjectFile(projectId, fileId, fileName) {
+    console.log('📱 SOLICITANDO DESCARGA:', fileName);
     
-    showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
+    // Mostrar notificación inmediata
+    showNotification(`📥 Preparando descarga: ${fileName}`, 'info');
     
-    // URL CORRECTA para descarga
-    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+    // URL universal de descarga
+    const downloadUrl = `https://tecel-app.onrender.com/download/file/${fileId}`;
     
     console.log('🔗 URL de descarga:', downloadUrl);
     
-    triggerAndroidDownload(downloadUrl, resourceName);
+    // Estrategia para WebView/APK
+    if (isInWebView()) {
+        // En WebView, abrir en navegador externo
+        showNotification(
+            `🌐 Abriendo en navegador para descargar: ${fileName}`,
+            'info',
+            5000
+        );
+        
+        // Dar tiempo a que el usuario vea el mensaje
+        setTimeout(() => {
+            openInExternalBrowser(downloadUrl);
+        }, 1000);
+        
+    } else {
+        // En navegador normal, descarga directa
+        showNotification(`⬇️ Descargando: ${fileName}`, 'info');
+        window.location.href = downloadUrl;
+    }
+}
+
+// Función para recursos de biblioteca
+async function downloadLibraryResource(resourceId, resourceName) {
+    console.log('📱 SOLICITANDO DESCARGA DE RECURSO:', resourceName);
+    
+    showNotification(`📥 Preparando descarga: ${resourceName}`, 'info');
+    
+    const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+    
+    if (isInWebView()) {
+        showNotification(
+            `🌐 Abriendo en navegador para descargar: ${resourceName}`,
+            'info',
+            5000
+        );
+        
+        setTimeout(() => {
+            openInExternalBrowser(downloadUrl);
+        }, 1000);
+        
+    } else {
+        showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
+        window.location.href = downloadUrl;
+    }
+}
+
+// Función auxiliar para mostrar ayuda
+function showDownloadInstructions(fileName) {
+    const instructions = `
+📱 **INSTRUCCIONES DE DESCARGA:**
+
+1. **La descarga se abrirá en tu navegador**
+2. **Espera a que aparezca la notificación del sistema**
+3. **Toca la notificación para abrir el archivo**
+4. **El archivo se guardará en: ${fileName}**
+
+📍 *Si no funciona, mantén presionado el enlace y selecciona "Descargar"*
+    `;
+    
+    showNotification(instructions, 'info', 8000);
 }
 
 // Función que SÍ activa las notificaciones del sistema

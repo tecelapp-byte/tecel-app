@@ -2408,6 +2408,146 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== RUTA UNIVERSAL DE DESCARGA ====================
+app.get('/download/:type/:id', async (req, res) => {
+    try {
+        const { type, id } = req.params;
+        console.log('🌍 DESCARGA UNIVERSAL SOLICITADA:', { type, id });
+        
+        let fileData, fileName, fileType;
+
+        if (type === 'file') {
+            // Descargar archivo de proyecto
+            const result = await pool.query(
+                'SELECT * FROM project_files WHERE id = $1', 
+                [id]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).send('Archivo no encontrado');
+            }
+            const file = result.rows[0];
+            fileData = file.file_data;
+            fileName = file.original_name;
+            fileType = file.file_type;
+        } 
+        else if (type === 'library') {
+            // Descargar recurso de biblioteca
+            const result = await pool.query(
+                'SELECT * FROM library_resources WHERE id = $1',
+                [id]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).send('Recurso no encontrado');
+            }
+            const resource = result.rows[0];
+            fileData = resource.file_data;
+            fileName = resource.file_name || resource.title;
+            fileType = resource.file_type;
+        } 
+        else {
+            return res.status(400).send('Tipo de descarga inválido');
+        }
+
+        if (!fileData) {
+            return res.status(404).send('Datos de archivo no disponibles');
+        }
+
+        // Convertir base64 a buffer
+        const fileBuffer = Buffer.from(fileData, 'base64');
+        
+        // HEADERS SUPER AGRESIVOS para Android
+        res.setHeader('Content-Type', fileType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+        
+        console.log('✅ Enviando archivo para descarga universal:', fileName);
+        res.send(fileBuffer);
+
+    } catch (error) {
+        console.error('❌ Error en descarga universal:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// Página de ayuda para descargas
+app.get('/download-help/:fileName', (req, res) => {
+    const { fileName } = req.params;
+    
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Descarga TECEL - ${fileName}</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                text-align: center; 
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .container {
+                background: rgba(255,255,255,0.1);
+                padding: 30px;
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+                max-width: 500px;
+                margin: 0 auto;
+            }
+            .success { color: #4CAF50; font-size: 48px; }
+            .filename { 
+                background: rgba(255,255,255,0.2); 
+                padding: 10px; 
+                border-radius: 8px; 
+                margin: 15px 0;
+                font-family: monospace;
+            }
+            .steps { text-align: left; margin: 20px 0; }
+            .step { margin: 10px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="success">✅</div>
+            <h1>Descarga en Progreso</h1>
+            <div class="filename">${fileName}</div>
+            
+            <div class="steps">
+                <div class="step">1. <strong>Espera</strong> la notificación del sistema</div>
+                <div class="step">2. <strong>Toca</strong> la notificación para abrir el archivo</div>
+                <div class="step">3. <strong>Revisa</strong> la carpeta "Descargas" de tu dispositivo</div>
+            </div>
+            
+            <p><small>Si la descarga no inicia automáticamente, recarga esta página</small></p>
+        </div>
+        
+        <script>
+            // Mostrar notificación nativa si está disponible
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('TECEL - Descarga', {
+                    body: 'Descargando: ${fileName}',
+                    icon: '/favicon.ico'
+                });
+            }
+        </script>
+    </body>
+    </html>
+    `;
+    
+    res.send(html);
+});
+
 // Ruta CORREGIDA para subir archivos a proyectos - SIN VALIDACIÓN DE NOMBRE
 app.post('/api/projects/:id/files', authenticateToken, async (req, res) => {
     try {
