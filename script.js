@@ -9227,36 +9227,156 @@ function debugSuggestionCounters() {
 }
 
 // ==================== FUNCIONES NUEVAS PARA DESCARGAS MÓVILES ====================
-
-// Función PRINCIPAL para descargar archivos de proyectos
-async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📱 INICIANDO DESCARGA:', fileName);
-    
-    // Mostrar notificación
-    showNotification(`⬇️ Descargando: ${fileName}`, 'info');
-    
-    // URL CORRECTA para descarga (usando la ruta que SÍ funciona)
-    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-    
-    console.log('🔗 URL de descarga:', downloadUrl);
-    
-    // Método que SÍ funciona en Android
-    triggerAndroidDownload(downloadUrl, fileName);
+// Función para detectar si está en WebView/APK
+function isInWebView() {
+    return /WebView|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && 
+           !/Chrome|Firefox|Safari/i.test(navigator.userAgent);
 }
 
+// Función para abrir en navegador externo
+function openInExternalBrowser(url) {
+    console.log('🔗 Abriendo en navegador externo:', url);
+    
+    // Intentar abrir en nueva pestaña
+    const newWindow = window.open(url, '_system');
+    
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        // Fallback: redirección forzada
+        window.location.href = url;
+    }
+}
 
-// Función PRINCIPAL para descargar recursos de biblioteca  
-async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📱 DESCARGANDO RECURSO:', resourceName);
+// Reemplazar la función existente de descarga de archivos de proyecto
+window.downloadProjectFile = async function(projectId, fileId, fileName) {
+    try {
+        console.log('📥 Iniciando descarga:', fileName);
+        
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Estrategia móvil mejorada
+            const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+            
+            // Crear link temporal
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', fileName);
+            link.setAttribute('target', '_blank');
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Notificación mejorada para móviles
+            setTimeout(() => {
+                showNotification(
+                    `✅ ${fileName} - Descarga en progreso. ` +
+                    `Revisa las notificaciones de tu dispositivo.`,
+                    'success',
+                    6000
+                );
+            }, 1000);
+            
+        } else {
+            // Para desktop
+            const downloadUrl = `${API_BASE}/files/download/${fileId}`;
+            window.open(downloadUrl, '_blank');
+            showNotification(`Descargando: ${fileName}`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en descarga:', error);
+        showNotification(`Error al descargar: ${fileName}`, 'error');
+    }
+};
+
+// Reemplazar la función existente de descarga de biblioteca
+window.downloadLibraryResource = async function(resourceId, resourceName) {
+    try {
+        console.log('📚 Descargando recurso:', resourceName);
+        
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+            
+            // Método múltiple para móviles
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            link.target = '_blank';
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Notificación extendida
+            setTimeout(() => {
+                showNotification(
+                    `📥 ${resourceName} se está descargando. ` +
+                    `Busca el archivo en tu carpeta de Descargas.`,
+                    'success',
+                    7000
+                );
+            }, 1500);
+            
+        } else {
+            const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
+            window.open(downloadUrl, '_blank');
+            showNotification(`Descargando: ${resourceName}`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${resourceName}`, 'error');
+    }
+};
+
+// Función de diagnóstico - agrega esto temporalmente
+function diagnoseDownload() {
+    console.log('🔍 DIAGNÓSTICO DE DESCARGA:');
+    console.log('📍 URL actual:', window.location.href);
+    console.log('📍 Origen:', window.location.origin);
+    console.log('📍 User Agent:', navigator.userAgent);
+    console.log('📍 Es WebView:', /WebView/.test(navigator.userAgent));
     
-    showNotification(`⬇️ Descargando: ${resourceName}`, 'info');
+    // Probar una URL de descarga absoluta
+    const testUrl = getAbsoluteUrl('/api/download/file/1');
+    console.log('📍 URL absoluta de prueba:', testUrl);
     
-    // URL CORRECTA para descarga
-    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+    // Verificar si la URL es accesible
+    fetch(testUrl)
+        .then(response => {
+            console.log('📍 Test fetch - Status:', response.status);
+            console.log('📍 Test fetch - Headers:', {
+                contentType: response.headers.get('content-type'),
+                contentDisposition: response.headers.get('content-disposition')
+            });
+        })
+        .catch(error => {
+            console.log('📍 Test fetch - Error:', error);
+        });
+}
+
+// Ejecutar diagnóstico al cargar la página
+setTimeout(diagnoseDownload, 3000);
+
+// Función auxiliar para mostrar ayuda
+function showDownloadInstructions(fileName) {
+    const instructions = `
+📱 **INSTRUCCIONES DE DESCARGA:**
+
+1. **La descarga se abrirá en tu navegador**
+2. **Espera a que aparezca la notificación del sistema**
+3. **Toca la notificación para abrir el archivo**
+4. **El archivo se guardará en: ${fileName}**
+
+📍 *Si no funciona, mantén presionado el enlace y selecciona "Descargar"*
+    `;
     
-    console.log('🔗 URL de descarga:', downloadUrl);
-    
-    triggerAndroidDownload(downloadUrl, resourceName);
+    showNotification(instructions, 'info', 8000);
 }
 
 // Función que SÍ activa las notificaciones del sistema
@@ -9306,24 +9426,80 @@ function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// Función para mejorar las notificaciones en móvil
-function showMobileDownloadNotification(fileName, type = 'success') {
-    if (isMobileDevice()) {
-        // En móviles, hacer las notificaciones más persistentes
-        const message = type === 'success' 
-            ? `✅ ${fileName} descargado` 
-            : `❌ Error al descargar ${fileName}`;
-            
-        showNotification(message, type, 5000); // 5 segundos en móvil
-    } else {
-        // En desktop, comportamiento normal
-        const message = type === 'success'
-            ? `Descarga completada: ${fileName}`
-            : `Error al descargar: ${fileName}`;
-            
-        showNotification(message, type);
+// Función auxiliar para mejorar notificaciones en móviles
+function showMobileDownloadNotification(fileName) {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Notificación más larga y descriptiva para móviles
+        showNotification(
+            `📥 ${fileName} - La descarga ha comenzado. ` +
+            `Revisa la bandeja de notificaciones de tu dispositivo o la carpeta de Descargas.`,
+            'success',
+            8000 // Mostrar por más tiempo
+        );
+        
+        // Intentar usar notificaciones nativas del navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('TECEL - Descarga Completada', {
+                body: `El archivo "${fileName}" se ha descargado correctamente. Toca para abrir.`,
+                icon: '/favicon.ico',
+                tag: 'tecel-download'
+            });
+        }
     }
 }
+
+// Función UNIVERSAL de descarga como fallback
+function universalDownload(url, fileName) {
+    return new Promise((resolve, reject) => {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Estrategia móvil: múltiples métodos
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            
+            // Método 1: Click directo
+            link.click();
+            
+            // Método 2: Abrir en nueva ventana después de un delay
+            setTimeout(() => {
+                window.open(url, '_blank');
+            }, 500);
+            
+            // Método 3: Usar XMLHttpRequest para forzar descarga
+            setTimeout(() => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = 'blob';
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const blob = xhr.response;
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = fileName;
+                        link.click();
+                        window.URL.revokeObjectURL(blobUrl);
+                    }
+                };
+                
+                xhr.send();
+            }, 1000);
+            
+            resolve();
+        } else {
+            // Para desktop: comportamiento normal
+            window.open(url, '_blank');
+            resolve();
+        }
+    });
+}
+
+
 
 // Función auxiliar para descarga directa
 function attemptDirectDownload(fileUrl, fileName) {

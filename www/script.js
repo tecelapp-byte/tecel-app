@@ -9246,58 +9246,101 @@ function openInExternalBrowser(url) {
     }
 }
 
-// SOLUCIÓN ULTRA-DIRECTA - Reemplaza las funciones anteriores
+// Función MEJORADA para descargar archivos - COMPATIBLE CON MÓVILES
 async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('🚀 DESCARGA ULTRA-DIRECTA:', fileName);
-    
-    // URL ABSOLUTA EXPLÍCITA - sin dependencias
-    const downloadUrl = `https://tecel-app.onrender.com/api/download/file/${fileId}`;
-    
-    console.log('🔗 URL EXPLÍCITA:', downloadUrl);
-    
-    // Método más directo posible
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = fileName;
-    a.target = '_blank'; // Crucial para Android
-    a.style.display = 'none';
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    // No remover inmediatamente, dar tiempo
-    setTimeout(() => {
-        if (document.body.contains(a)) {
-            document.body.removeChild(a);
+    try {
+        console.log('📱 Iniciando descarga móvil para:', fileName);
+        
+        // Mostrar notificación de descarga iniciada
+        showNotification(`Iniciando descarga: ${fileName}`, 'info');
+        
+        // Para móviles, usar la ruta universal de descarga
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let downloadUrl;
+        
+        if (isMobile) {
+            // Usar ruta universal para mejor compatibilidad móvil
+            downloadUrl = `${API_BASE}/download/file/${fileId}`;
+            
+            // Estrategia móvil: abrir en nueva pestaña + notificación
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.target = '_blank';
+            link.download = fileName;
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Notificación adicional para móviles
+            setTimeout(() => {
+                showNotification(
+                    `Descarga iniciada: ${fileName}. Revisa las notificaciones de tu dispositivo.`, 
+                    'success', 
+                    5000
+                );
+            }, 1000);
+            
+        } else {
+            // Para desktop, comportamiento normal
+            downloadUrl = `${API_BASE}/files/download/${fileId}`;
+            window.open(downloadUrl, '_blank');
         }
-    }, 10000);
-    
-    showNotification(`📥 ${fileName} - Descarga iniciada`, 'info', 5000);
+        
+        console.log('✅ Descarga móvil iniciada:', fileName);
+        
+    } catch (error) {
+        console.error('❌ Error en descarga móvil:', error);
+        showNotification(`Error al descargar: ${fileName}`, 'error');
+    }
 }
 
+// Función MEJORADA para descargar recursos de biblioteca - COMPATIBLE CON MÓVILES
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('🚀 DESCARGA ULTRA-DIRECTA RECURSO:', resourceName);
-    
-    const downloadUrl = `https://tecel-app.onrender.com/api/download/library/${resourceId}`;
-    
-    console.log('🔗 URL EXPLÍCITA:', downloadUrl);
-    
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = resourceName;
-    a.target = '_blank';
-    a.style.display = 'none';
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-        if (document.body.contains(a)) {
-            document.body.removeChild(a);
+    try {
+        console.log('📱 Descargando recurso de biblioteca:', resourceName);
+        
+        // Mostrar notificación inmediata
+        showNotification(`Preparando descarga: ${resourceName}`, 'info');
+        
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let downloadUrl;
+        
+        if (isMobile) {
+            // Estrategia móvil mejorada
+            downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+            
+            // Crear iframe temporal para la descarga
+            const iframe = document.createElement('iframe');
+            iframe.src = downloadUrl;
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Notificación de éxito después de un tiempo
+            setTimeout(() => {
+                showNotification(
+                    `✅ ${resourceName} se está descargando. Revisa la bandeja de notificaciones de tu dispositivo.`,
+                    'success',
+                    6000
+                );
+                
+                // Remover el iframe después de un tiempo
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 5000);
+            }, 1500);
+            
+        } else {
+            // Para desktop
+            downloadUrl = `${API_BASE}/library/download/${resourceId}`;
+            window.open(downloadUrl, '_blank');
         }
-    }, 10000);
-    
-    showNotification(`📥 ${resourceName} - Descarga iniciada`, 'info', 5000);
+        
+    } catch (error) {
+        console.error('❌ Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${resourceName}`, 'error');
+    }
 }
 
 // Función de diagnóstico - agrega esto temporalmente
@@ -9392,23 +9435,77 @@ function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// Función para mejorar las notificaciones en móvil
-function showMobileDownloadNotification(fileName, type = 'success') {
-    if (isMobileDevice()) {
-        // En móviles, hacer las notificaciones más persistentes
-        const message = type === 'success' 
-            ? `✅ ${fileName} descargado` 
-            : `❌ Error al descargar ${fileName}`;
-            
-        showNotification(message, type, 5000); // 5 segundos en móvil
-    } else {
-        // En desktop, comportamiento normal
-        const message = type === 'success'
-            ? `Descarga completada: ${fileName}`
-            : `Error al descargar: ${fileName}`;
-            
-        showNotification(message, type);
+// Función auxiliar para mejorar notificaciones en móviles
+function showMobileDownloadNotification(fileName) {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Notificación más larga y descriptiva para móviles
+        showNotification(
+            `📥 ${fileName} - La descarga ha comenzado. ` +
+            `Revisa la bandeja de notificaciones de tu dispositivo o la carpeta de Descargas.`,
+            'success',
+            8000 // Mostrar por más tiempo
+        );
+        
+        // Intentar usar notificaciones nativas del navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('TECEL - Descarga Completada', {
+                body: `El archivo "${fileName}" se ha descargado correctamente. Toca para abrir.`,
+                icon: '/favicon.ico',
+                tag: 'tecel-download'
+            });
+        }
     }
+}
+
+// Función UNIVERSAL de descarga como fallback
+function universalDownload(url, fileName) {
+    return new Promise((resolve, reject) => {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Estrategia móvil: múltiples métodos
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            
+            // Método 1: Click directo
+            link.click();
+            
+            // Método 2: Abrir en nueva ventana después de un delay
+            setTimeout(() => {
+                window.open(url, '_blank');
+            }, 500);
+            
+            // Método 3: Usar XMLHttpRequest para forzar descarga
+            setTimeout(() => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = 'blob';
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const blob = xhr.response;
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = fileName;
+                        link.click();
+                        window.URL.revokeObjectURL(blobUrl);
+                    }
+                };
+                
+                xhr.send();
+            }, 1000);
+            
+            resolve();
+        } else {
+            // Para desktop: comportamiento normal
+            window.open(url, '_blank');
+            resolve();
+        }
+    });
 }
 
 // Función auxiliar para descarga directa
