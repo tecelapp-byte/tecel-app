@@ -363,6 +363,12 @@ function initializeApp() {
         initNewDesign();
         initNewSections();
         
+        // 🔥 INICIALIZAR FIX PARA ANDROID
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 Detectado Android - aplicando fixes...');
+            setupAndroidDownloadFix();
+        }
+
         // Inicializar sistema de descargas (solo estilos si es móvil)
         initDownloadSystem();
         
@@ -9290,106 +9296,190 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
-// FUNCIÓN DE RESPALDO PARA ANDROID APK
-function androidDownloadFallback(url, fileName) {
-    // Método específico para WebView de Android
+// 🔥 MÉTODO FALLBACK PARA PROYECTOS
+async function downloadFallback(fileId, fileName) {
     try {
-        // Intentar con JavaScript puro
+        console.log('🔄 Usando método fallback para:', fileName);
+        
+        // Método directo sin fetch
+        const downloadUrl = `${API_BASE}/download/file/${fileId}`;
         const link = document.createElement('a');
-        link.href = url;
+        link.href = downloadUrl;
         link.download = fileName;
-        link.target = '_system'; // Especial para Android WebView
+        link.target = '_blank'; // 🔥 EVITA REEMPLAZAR LA PÁGINA
+        link.style.display = 'none';
+        
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
-    } catch (e) {
-        // Si falla, abrir directamente
-        window.open(url, '_blank');
+        
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Fallback también falló:', error);
     }
 }
 
-// Función mejorada para descargar archivos de proyectos
+// 🔥 FUNCIÓN DE DIAGNÓSTICO PARA ANDROID
+function setupAndroidDownloadFix() {
+    console.log('🔧 Configurando fix para Android...');
+    
+    // Prevenir múltiples clics simultáneos
+    let isDownloading = false;
+    
+    // Sobrescribir la función de biblioteca con protección
+    const originalDownloadLibrary = window.downloadLibraryResource;
+    
+    window.downloadLibraryResource = async function(resourceId, resourceName) {
+        if (isDownloading) {
+            showNotification('⏳ Ya hay una descarga en curso...', 'info');
+            return;
+        }
+        
+        isDownloading = true;
+        
+        try {
+            console.log('📱 Iniciando descarga segura para Android...');
+            
+            // Método ultra-simple para Android
+            const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+            
+            // 🔥 MÉTODO ESPECIAL PARA ANDROID
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            link.target = '_self'; // 🔥 IMPORTANTE para Android
+            link.style.display = 'none';
+            
+            // Agregar eventos para limpiar
+            link.onclick = function() {
+                setTimeout(() => {
+                    isDownloading = false;
+                }, 3000);
+            };
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // Limpiar después
+            setTimeout(() => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+                isDownloading = false;
+            }, 5000);
+            
+        } catch (error) {
+            console.error('💥 Error crítico en Android:', error);
+            isDownloading = false;
+            showNotification('❌ Error en descarga', 'error');
+        }
+    };
+}
+
+// FUNCIÓN UNIFICADA MEJORADA PARA DESCARGAS
 async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📥 Iniciando descarga de archivo de proyecto:', { projectId, fileId, fileName });
+    console.log('📥 DESCARGANDO ARCHIVO:', { projectId, fileId, fileName });
     
     try {
         // Mostrar loading
         showDownloadLoading(fileName);
         
-        // Usar la ruta universal de descarga
+        // 🔥 USAR SOLO UN MÉTODO - Ruta universal directa
         const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-        console.log('🔗 URL de descarga:', downloadUrl);
+        console.log('🔗 URL final:', downloadUrl);
         
-        // Crear enlace de descarga
+        // 🔥 MÉTODO DIRECTO SIN CONFLICTOS
+        const response = await fetch(downloadUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        // Convertir a blob
+        const blob = await response.blob();
+        
+        // 🔥 CREAR ENLACE DE DESCARGA DIRECTO
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = fileName;
+        link.href = url;
+        link.download = fileName; // 🔥 NOMBRE ORIGINAL CORRECTO
         link.style.display = 'none';
         
-        // Agregar al DOM y hacer click
         document.body.appendChild(link);
         link.click();
         
-        // Limpiar después de un tiempo
+        // 🔥 LIMPIAR DESPUÉS DE DESCARGAR
         setTimeout(() => {
             document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
             hideDownloadLoading();
-            
-            // Mostrar notificación de éxito
-            showNotification(`Descarga iniciada: ${fileName}`, 'success');
-            
-            console.log('✅ Descarga iniciada correctamente');
-        }, 1000);
+            showNotification(`✅ Descargado: ${fileName}`, 'success');
+        }, 100);
         
     } catch (error) {
-        console.error('❌ Error en descarga de proyecto:', error);
+        console.error('❌ Error en descarga:', error);
         hideDownloadLoading();
         showNotification('Error al descargar el archivo', 'error');
+        
+        // 🔥 FALLBACK: Método alternativo si el principal falla
+        setTimeout(() => {
+            downloadFallback(fileId, fileName);
+        }, 500);
     }
 }
 
-// Función mejorada para descargar recursos de biblioteca
+// 🔥 FUNCIÓN PARA BIBLIOTECA - MÉTODO IDÉNTICO
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📥 Iniciando descarga de recurso de biblioteca:', { resourceId, resourceName });
+    console.log('📥 DESCARGANDO RECURSO:', { resourceId, resourceName });
     
     try {
-        // Mostrar loading
         showDownloadLoading(resourceName);
         
-        // Usar la ruta universal de descarga
         const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log('🔗 URL de descarga:', downloadUrl);
+        console.log('🔗 URL biblioteca:', downloadUrl);
         
-        // Crear enlace de descarga
+        const response = await fetch(downloadUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = downloadUrl;
-        
-        // Usar el nombre del recurso como nombre de archivo
-        const safeFileName = resourceName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        link.download = safeFileName;
+        link.href = url;
+        link.download = resourceName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
         link.style.display = 'none';
         
-        // Agregar al DOM y hacer click
         document.body.appendChild(link);
         link.click();
         
-        // Limpiar después de un tiempo
         setTimeout(() => {
             document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
             hideDownloadLoading();
-            
-            // Mostrar notificación de éxito
-            showNotification(`Descarga iniciada: ${resourceName}`, 'success');
-            
-            console.log('✅ Descarga de biblioteca iniciada correctamente');
-        }, 1000);
+            showNotification(`✅ Descargado: ${resourceName}`, 'success');
+        }, 100);
         
     } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
+        console.error('❌ Error en biblioteca:', error);
         hideDownloadLoading();
         showNotification('Error al descargar el recurso', 'error');
     }
 }
+
 
 // 4. Función universal de descarga
 function universalDownload(type, id, fileName) {
