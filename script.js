@@ -9308,122 +9308,150 @@ function androidDownloadFallback(url, fileName) {
 }
 
 async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📥 INICIANDO DESCARGA DE PROYECTO:', { projectId, fileId, fileName });
-    
     try {
-        // Mostrar loading en móvil
-        if (isAndroid) {
-            showDownloadLoading(fileName);
-        }
-
-        // Usar la ruta universal de descarga
-        const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-        console.log('🔗 URL de descarga:', downloadUrl);
-
-        // Crear enlace temporal para descarga
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = fileName; // Usar el nombre original del archivo
-        link.target = '_blank'; // Abrir en nueva pestaña/ventana
+        (`📥 Descargando archivo - Proyecto: ${projectId}, Archivo ID: ${fileId}`);
         
-        // Configurar atributos para móvil
-        link.setAttribute('download', fileName);
-        link.setAttribute('type', 'application/octet-stream');
+        // Obtener información del archivo
+        const projectResponse = await fetch(`${API_BASE}/projects/${projectId}`, {
+            headers: authToken ? {
+                'Authorization': `Bearer ${authToken}`
+            } : {}
+        });
         
-        // Agregar al DOM temporalmente
-        document.body.appendChild(link);
-        
-        // Disparar el click programáticamente
-        link.click();
-        
-        // Limpiar después de un tiempo
-        setTimeout(() => {
-            document.body.removeChild(link);
-            if (isAndroid) {
-                hideDownloadLoading();
-            }
-            console.log('✅ Descarga iniciada para:', fileName);
-        }, 1000);
-
-        // Mostrar notificación de éxito
-        showNotification(`Descargando: ${fileName}`, 'success');
-
-    } catch (error) {
-        console.error('❌ Error en descarga de proyecto:', error);
-        
-        if (isAndroid) {
-            hideDownloadLoading();
+        if (!projectResponse.ok) {
+            throw new Error('No se pudo obtener información del proyecto');
         }
         
-        // Fallback: abrir en nueva ventana
+        const project = await projectResponse.json();
+        const file = project.files.find(f => f.id === fileId);
+        
+        if (!file) {
+            throw new Error('Archivo no encontrado en el proyecto');
+        }
+        
+        ('📄 Información del archivo:', file);
+        
+        // Crear URL de descarga con timestamp para evitar cache
+        const timestamp = new Date().getTime();
+        const downloadUrl = `${API_BASE}/files/download/${fileId}?t=${timestamp}`;
+        const originalName = file.original_name || fileName || 'archivo_descargado';
+        
+        ('🔗 URL de descarga:', downloadUrl);
+        
+        // MÉTODO 1: Usar fetch y Blob (más confiable)
         try {
-            const fallbackUrl = `${API_BASE}/download/file/${fileId}`;
-            window.open(fallbackUrl, '_blank');
-            showNotification(`Abriendo descarga: ${fileName}`, 'info');
-        } catch (fallbackError) {
-            console.error('❌ Error en fallback:', fallbackError);
-            showNotification('Error al descargar el archivo', 'error');
+            const response = await fetch(downloadUrl, {
+                method: 'GET',
+                headers: authToken ? {
+                    'Authorization': `Bearer ${authToken}`
+                } : {}
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            const blob = await response.blob();
+            
+            if (blob.size === 0) {
+                throw new Error('El archivo recibido está vacío');
+            }
+            
+            // Crear URL del blob
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Crear enlace de descarga
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = originalName;
+            a.style.display = 'none';
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Liberar la URL después de un tiempo
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+                ('✅ URL del blob liberada');
+            }, 1000);
+            
+            ('✅ Descarga mediante Blob exitosa');
+            showNotification(`Descargando: ${originalName}`, 'success');
+            return;
+            
+        } catch (fetchError) {
+            ('❌ Método Blob falló, intentando método directo:', fetchError);
         }
+        
+        // MÉTODO 2: Enlace directo (fallback)
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = originalName;
+        a.target = '_blank'; // Abrir en nueva pestaña si falla la descarga
+        a.style.display = 'none';
+        
+        // Agregar headers de autorización para el enlace
+        if (authToken) {
+            a.setAttribute('data-token', authToken);
+        }
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        ('✅ Descarga mediante enlace directo iniciada');
+        showNotification(`Iniciando descarga: ${originalName}`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error en descarga:', error);
+        showNotification(`Error al descargar: ${error.message}`, 'error');
     }
 }
 
-async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📥 INICIANDO DESCARGA DE BIBLIOTECA:', { resourceId, resourceName });
-    
+// Función para descargar recursos de biblioteca
+async function downloadLibraryResource(resourceId, fileName) {
     try {
-        // Mostrar loading en móvil
-        if (isAndroid) {
-            showDownloadLoading(resourceName);
-        }
-
-        // Usar la ruta universal de descarga
-        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log('🔗 URL de descarga biblioteca:', downloadUrl);
-
-        // Crear enlace temporal para descarga
-        const link = document.createElement('a');
-        link.href = downloadUrl;
+        showNotification(`Iniciando descarga de ${fileName}...`, 'info');
         
-        // Generar nombre seguro para el archivo
-        const safeFileName = generateSafeFileName(resourceName);
-        link.download = safeFileName;
-        link.target = '_blank';
-        
-        // Configurar atributos
-        link.setAttribute('download', safeFileName);
-        link.setAttribute('type', 'application/octet-stream');
-        
-        // Agregar al DOM y disparar click
-        document.body.appendChild(link);
-        link.click();
-        
-        // Limpiar
-        setTimeout(() => {
-            document.body.removeChild(link);
-            if (isAndroid) {
-                hideDownloadLoading();
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
             }
-            console.log('✅ Descarga de biblioteca iniciada:', safeFileName);
-        }, 1000);
-
-        showNotification(`Descargando: ${resourceName}`, 'success');
-
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al descargar el recurso');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Obtener nombre de archivo del header o usar el título
+        const contentDisposition = response.headers.get('content-disposition');
+        let downloadFileName = fileName;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+            if (filenameMatch && filenameMatch[1]) {
+                downloadFileName = filenameMatch[1];
+            }
+        }
+        
+        a.download = downloadFileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showNotification(`"${fileName}" descargado exitosamente`, 'success');
+        
     } catch (error) {
-        console.error('❌ Error en descarga de biblioteca:', error);
-        
-        if (isAndroid) {
-            hideDownloadLoading();
-        }
-        
-        // Fallback para biblioteca
-        try {
-            const fallbackUrl = `${API_BASE}/download/library/${resourceId}`;
-            window.open(fallbackUrl, '_blank');
-            showNotification(`Abriendo recurso: ${resourceName}`, 'info');
-        } catch (fallbackError) {
-            console.error('❌ Error en fallback biblioteca:', fallbackError);
-            showNotification('Error al descargar el recurso', 'error');
-        }
+        console.error('Error descargando recurso:', error);
+        showNotification(`Error al descargar: ${error.message}`, 'error');
     }
 }
 
