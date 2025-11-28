@@ -3076,48 +3076,48 @@ function createLibraryCard(resource) {
     const categoryLabel = getCategoryLabel(resource.main_category);
     
     card.innerHTML = `
-        <div class="library-card-header">
-            <h3 class="library-card-title">${resource.title}</h3>
-            <span class="library-type-badge">${typeLabel}</span>
-        </div>
-        
-        <div class="library-card-category">
-            <i class="fas fa-folder"></i>
-            ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
-        </div>
-        
-        <p class="library-card-description">${resource.description}</p>
-        
-        <div class="library-card-meta">
-            <span class="library-uploader">
-                <i class="fas fa-user"></i>
-                ${resource.uploader_name || 'Usuario'}
-            </span>
-            <span class="library-date">
-                <i class="fas fa-calendar"></i>
-                ${new Date(resource.created_at).toLocaleDateString('es-ES')}
-            </span>
-        </div>
-        
-        <div class="library-card-actions">
-            ${isFileResource ? 
-                `<button class="btn-primary btn-sm" 
-                         onclick="event.stopPropagation(); downloadLibraryResource(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
-                    <i class="fas fa-download"></i> Descargar
-                </button>` : ''}
-                
-            ${isLinkResource ? 
-                `<button class="btn-outline btn-sm" 
-                         onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
-                    <i class="fas fa-external-link-alt"></i> Visitar
-                </button>` : ''}
-                
-            <button class="btn-outline btn-sm" 
-                    onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
-                <i class="fas fa-eye"></i> Detalles
-            </button>
-        </div>
-    `;
+    <div class="library-card-header">
+        <h3 class="library-card-title">${resource.title}</h3>
+        <span class="library-type-badge">${typeLabel}</span>
+    </div>
+    
+    <div class="library-card-category">
+        <i class="fas fa-folder"></i>
+        ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
+    </div>
+    
+    <p class="library-card-description">${resource.description}</p>
+    
+    <div class="library-card-meta">
+        <span class="library-uploader">
+            <i class="fas fa-user"></i>
+            ${resource.uploader_name || 'Usuario'}
+        </span>
+        <span class="library-date">
+            <i class="fas fa-calendar"></i>
+            ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+        </span>
+    </div>
+    
+    <div class="library-card-actions">
+        ${isFileResource ? 
+            `<button class="btn-primary btn-sm" 
+                     onclick="event.stopPropagation(); downloadLibraryResourceDirect(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
+                <i class="fas fa-download"></i> Descargar
+            </button>` : ''}
+            
+        ${isLinkResource ? 
+            `<button class="btn-outline btn-sm" 
+                     onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
+                <i class="fas fa-external-link-alt"></i> Visitar
+            </button>` : ''}
+            
+        <button class="btn-outline btn-sm" 
+                onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
+            <i class="fas fa-eye"></i> Detalles
+        </button>
+    </div>
+`;
     
     // Mismo comportamiento clickeable que proyectos
     card.style.cursor = 'pointer';
@@ -12507,82 +12507,6 @@ class DownloadManager {
             showNotification('❌ Error al descargar archivo', 'error');
         }
     }
-    
-// VERSIÓN PASO A PASO - MÁS SEGURA
-async downloadLibraryResource(resourceId, resourceName) {
-    console.log('🚀 INICIANDO DESCARGA PASO A PASO');
-    
-    // Paso 1: Mostrar loading
-    showDownloadLoading(resourceName);
-    
-    // Paso 2: Pequeño delay para estabilizar
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Paso 3: Construir URL (usando el endpoint simple)
-    const downloadUrl = `${API_BASE}/simple-download/library/${resourceId}`;
-    console.log('📍 URL de descarga:', downloadUrl);
-    
-    // Paso 4: Método super seguro - solo redirección
-    try {
-        // Redirigir directamente sin complicaciones
-        window.location.assign(downloadUrl);
-        
-        // Paso 5: Ocultar loading después de un tiempo
-        setTimeout(() => {
-            hideDownloadLoading();
-            console.log('✅ Redirección completada');
-        }, 3000);
-        
-    } catch (error) {
-        console.error('💥 ERROR CRÍTICO:', error);
-        hideDownloadLoading();
-        showNotification('No se pudo iniciar la descarga', 'error');
-    }
-}
-
-// 🔥 AGREGAR función de respaldo IDÉNTICA a la de proyectos
-async downloadLibraryResourceDirect(resourceId, resourceName) {
-    console.log(`📥 Descarga directa de recurso: ${resourceName}`);
-    
-    try {
-        showDownloadLoading(resourceName);
-        
-        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-            }
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            
-            // MISMA LÓGICA EXACTA que proyectos
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = resourceName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            window.URL.revokeObjectURL(url);
-            
-            setTimeout(() => {
-                hideDownloadLoading();
-                showNotification(`✅ Descargado: ${resourceName}`, 'success');
-            }, 1500);
-            
-        } else {
-            throw new Error(`Error ${response.status}`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error en descarga directa biblioteca:', error);
-        hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
-    }
-}
 
 // 🔥 MÉTODO SEGURO PARA ANDROID
 async androidSafeDownload(downloadUrl, fileName) {
@@ -12681,6 +12605,168 @@ function initDownloadSystem() {
     
     console.log('✅ Nuevo sistema de descargas listo');
 }
+
+// REEMPLAZA completamente la función downloadLibraryResource con esta:
+async function downloadLibraryResource(resourceId, resourceName) {
+    console.log(`📥 DESCARGANDO DESDE BIBLIOTECA: ${resourceName}`);
+    
+    try {
+        // Mostrar loading igual que proyectos
+        showDownloadLoading(resourceName);
+        
+        // Para Android WebView, necesitamos un enfoque diferente
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 ANDROID - Usando método compatible WebView');
+            await downloadForAndroidWebView(resourceId, resourceName, 'library');
+        } else {
+            // Para desktop usar método normal
+            console.log('💻 DESKTOP - Método normal');
+            await downloadForDesktop(resourceId, resourceName, 'library');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en descarga biblioteca:', error);
+        hideDownloadLoading();
+        showNotification('Error al descargar el recurso', 'error');
+    }
+}
+
+// Función específica para Android WebView
+async function downloadForAndroidWebView(resourceId, fileName, type = 'library') {
+    console.log(`📱 Descarga Android WebView: ${fileName}`);
+    
+    try {
+        // Método 1: Usar el sistema de intent de Android
+        const downloadUrl = `${API_BASE}/simple-download/${type}/${resourceId}`;
+        
+        // Crear un enlace y simular click (más compatible)
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.setAttribute('download', fileName);
+        
+        // Para Android WebView, necesitamos agregar target _blank
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        
+        // Agregar al DOM y hacer click
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Esperar y mostrar notificación
+        setTimeout(() => {
+            hideDownloadLoading();
+            showNotification(`✅ Descarga iniciada: ${fileName}`, 'success');
+        }, 3000);
+        
+    } catch (error) {
+        console.error('❌ Error método Android:', error);
+        throw error;
+    }
+}
+
+// Función para desktop (más simple)
+async function downloadForDesktop(resourceId, fileName, type = 'library') {
+    console.log(`💻 Descarga Desktop: ${fileName}`);
+    
+    const downloadUrl = `${API_BASE}/download/${type}/${resourceId}`;
+    
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setTimeout(() => {
+        hideDownloadLoading();
+        showNotification(`✅ Descargado: ${fileName}`, 'success');
+    }, 2000);
+}
+
+// ALTERNATIVA - Método usando fetch (más controlado)
+async function downloadLibraryResourceSafe(resourceId, resourceName) {
+    console.log(`🛡️ DESCARGA SEGURA BIBLIOTECA: ${resourceName}`);
+    
+    try {
+        showDownloadLoading(resourceName);
+        
+        // Paso 1: Obtener el archivo como blob
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/octet-stream'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        // Paso 2: Convertir a blob
+        const blob = await response.blob();
+        
+        // Paso 3: Crear URL del blob
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // Paso 4: Crear enlace de descarga
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = resourceName;
+        
+        // Paso 5: Para Android, usar approach diferente
+        if (/Android/i.test(navigator.userAgent)) {
+            // Abrir en nueva pestaña/popup
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        }
+        
+        // Paso 6: Trigger descarga
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Paso 7: Limpiar
+        setTimeout(() => {
+            window.URL.revokeObjectURL(blobUrl);
+            hideDownloadLoading();
+            showNotification(`✅ ${resourceName} descargado`, 'success');
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error descarga segura:', error);
+        hideDownloadLoading();
+        showNotification('Error en la descarga', 'error');
+        
+        // Fallback: intentar método directo
+        console.log('🔄 Intentando método fallback...');
+        downloadLibraryResourceDirect(resourceId, resourceName);
+    }
+}
+
+// MÉTODO DIRECTO - Sin complicaciones
+async function downloadLibraryResourceDirect(resourceId, resourceName) {
+    console.log(`🎯 DESCARGA DIRECTA: ${resourceName}`);
+    
+    showDownloadLoading(resourceName);
+    
+    // Simplemente redirigir a la URL de descarga
+    const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+    
+    // Pequeño delay para que se vea el loading
+    setTimeout(() => {
+        // Usar location.assign en lugar de window.open (más estable)
+        window.location.assign(downloadUrl);
+        
+        // Ocultar loading después de un tiempo
+        setTimeout(() => {
+            hideDownloadLoading();
+            showNotification('Descarga en progreso...', 'info');
+        }, 2000);
+    }, 500);
+}
+
 
 // Función para actualizar contador de descargas
 async function updateDownloadCount(resourceId) {
