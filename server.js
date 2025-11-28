@@ -1329,6 +1329,51 @@ app.get('/api/files/download/:fileId', authenticateToken, async (req, res) => {
     }
 });
 
+// 🔥 RUTA ALTERNATIVA TEMPORAL PARA DESCARGAS
+app.get('/api/simple-download/:type/:id', async (req, res) => {
+    try {
+        const { type, id } = req.params;
+        console.log('🔥 DESCARGA SIMPLE SOLICITADA:', { type, id });
+        
+        let fileData, fileName;
+        
+        if (type === 'file') {
+            const result = await pool.query(
+                'SELECT * FROM project_files WHERE id = $1', [id]
+            );
+            if (result.rows.length === 0) return res.status(404).send('No encontrado');
+            
+            const file = result.rows[0];
+            fileData = file.file_data;
+            fileName = file.original_name;
+        } else if (type === 'library') {
+            const result = await pool.query(
+                'SELECT * FROM library_resources WHERE id = $1', [id]
+            );
+            if (result.rows.length === 0) return res.status(404).send('No encontrado');
+            
+            const resource = result.rows[0];
+            fileData = resource.file_data;
+            fileName = resource.file_name || resource.title;
+        }
+        
+        if (!fileData) return res.status(404).send('Sin datos');
+        
+        // 🔥 HEADERS MÍNIMOS Y FUNCIONALES
+        const fileBuffer = Buffer.from(fileData, 'base64');
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        
+        console.log('✅ Enviando archivo simple:', fileName);
+        res.send(fileBuffer);
+        
+    } catch (error) {
+        console.error('❌ Error descarga simple:', error);
+        res.status(500).send('Error');
+    }
+});
+
 // Rutas de biblioteca
 app.get('/api/library', async (req, res) => {
     try {

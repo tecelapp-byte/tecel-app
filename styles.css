@@ -11006,3 +11006,86 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* 🔥 ESTILOS PARA NUEVO SISTEMA DE DESCARGAS */
+.download-manager-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 10000;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, sans-serif;
+}
+
+.download-manager-loading.active {
+    display: flex;
+    animation: downloadFadeIn 0.3s ease;
+}
+
+.download-manager-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2.5rem;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 350px;
+    margin: 1rem;
+    color: white;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+}
+
+.download-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top: 4px solid #4CAF50;
+    border-radius: 50%;
+    animation: downloadSpin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+.download-manager-content h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.download-filename {
+    background: rgba(255,255,255,0.2);
+    padding: 0.8rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    font-family: monospace;
+    word-break: break-word;
+    font-size: 0.9rem;
+}
+
+.download-help {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+@keyframes downloadFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes downloadSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 🔥 PREVENIR DOBLES CLICS */
+button[onclick*="download"] {
+    position: relative;
+}
+
+button[onclick*="download"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

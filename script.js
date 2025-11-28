@@ -353,6 +353,12 @@ function initializeApp() {
     try {
         ('🚀 Inicializando aplicación...');
         
+        // 🔥 INICIALIZAR NUEVO SISTEMA DE DESCARGAS
+        setTimeout(() => {
+            initDownloadSystem();
+            debugDownloadSystem(); // Para diagnóstico
+        }, 1000);
+
         // Primero verificar estado de autenticación
         checkAuthStatus();
         
@@ -9266,281 +9272,41 @@ function switchAuthForm(formType) {
     }
 }
 
-// Función de debug para los contadores de sugerencias
-function debugSuggestionCounters() {
-    console.log('=== DEBUG CONTADORES SUGERENCIAS ===');
-    console.log('suggestions array:', suggestions);
-    console.log('Total de sugerencias:', suggestions.length);
+// 🔍 FUNCIÓN DE DIAGNÓSTICO COMPLETO
+function debugDownloadSystem() {
+    console.log('=== 🕵️ DIAGNÓSTICO SISTEMA DESCARGAS ===');
     
-    const pendientes = suggestions.filter(s => s.status === 'pendiente').length;
-    const enProgreso = suggestions.filter(s => s.status === 'en_progreso').length;
-    const realizadas = suggestions.filter(s => s.status === 'realizada').length;
+    // Verificar todas las funciones de descarga
+    const downloadFunctions = [
+        'downloadProjectFile',
+        'downloadLibraryResource', 
+        'downloadFile',
+        'downloadResource',
+        'handleDownload'
+    ];
     
-    console.log('Pendientes:', pendientes);
-    console.log('En progreso:', enProgreso);
-    console.log('Realizadas:', realizadas);
-    console.log('===============================');
+    downloadFunctions.forEach(funcName => {
+        if (typeof window[funcName] === 'function') {
+            console.log(`🔍 ${funcName}: EXISTE`);
+        }
+    });
     
-    // También verificar los elementos HTML
-    const totalElement = document.getElementById('suggestions-total');
-    const pendientesElement = document.getElementById('suggestions-pendientes');
-    const realizadasElement = document.getElementById('suggestions-realizadas');
+    // Verificar event listeners en botones
+    const downloadButtons = document.querySelectorAll('[onclick*="download"], [class*="download"], button');
+    console.log(`📋 Botones encontrados: ${downloadButtons.length}`);
     
-    console.log('Elementos HTML:');
-    console.log('Total element:', totalElement);
-    console.log('Pendientes element:', pendientesElement);
-    console.log('Realizadas element:', realizadasElement);
+    downloadButtons.forEach(btn => {
+        const onclick = btn.getAttribute('onclick');
+        if (onclick && onclick.includes('download')) {
+            console.log('🔘 Botón download:', onclick);
+        }
+    });
     
-    if (totalElement) console.log('Total text:', totalElement.textContent);
-    if (pendientesElement) console.log('Pendientes text:', pendientesElement.textContent);
-    if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
+    console.log('========================================');
 }
 
-// 🔥 MÉTODO FALLBACK PARA PROYECTOS
-async function downloadFallback(fileId, fileName) {
-    try {
-        console.log('🔄 Usando método fallback para:', fileName);
-        
-        // Método directo sin fetch
-        const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = fileName;
-        link.target = '_blank'; // 🔥 EVITA REEMPLAZAR LA PÁGINA
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(link);
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Fallback también falló:', error);
-    }
-}
-
-// 🔥 FUNCIÓN DE DIAGNÓSTICO PARA ANDROID
-function setupAndroidDownloadFix() {
-    console.log('🔧 Configurando fix para Android...');
-    
-    // Prevenir múltiples clics simultáneos
-    let isDownloading = false;
-    
-    // Sobrescribir la función de biblioteca con protección
-    const originalDownloadLibrary = window.downloadLibraryResource;
-    
-    window.downloadLibraryResource = async function(resourceId, resourceName) {
-        if (isDownloading) {
-            showNotification('⏳ Ya hay una descarga en curso...', 'info');
-            return;
-        }
-        
-        isDownloading = true;
-        
-        try {
-            console.log('📱 Iniciando descarga segura para Android...');
-            
-            // Método ultra-simple para Android
-            const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-            
-            // 🔥 MÉTODO ESPECIAL PARA ANDROID
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-            link.target = '_self'; // 🔥 IMPORTANTE para Android
-            link.style.display = 'none';
-            
-            // Agregar eventos para limpiar
-            link.onclick = function() {
-                setTimeout(() => {
-                    isDownloading = false;
-                }, 3000);
-            };
-            
-            document.body.appendChild(link);
-            link.click();
-            
-            // Limpiar después
-            setTimeout(() => {
-                if (document.body.contains(link)) {
-                    document.body.removeChild(link);
-                }
-                isDownloading = false;
-            }, 5000);
-            
-        } catch (error) {
-            console.error('💥 Error crítico en Android:', error);
-            isDownloading = false;
-            showNotification('❌ Error en descarga', 'error');
-        }
-    };
-}
-
-// FUNCIÓN UNIFICADA MEJORADA PARA DESCARGAS
-async function downloadProjectFile(projectId, fileId, fileName) {
-    console.log('📥 DESCARGANDO ARCHIVO:', { projectId, fileId, fileName });
-    
-    try {
-        // Mostrar loading
-        showDownloadLoading(fileName);
-        
-        // 🔥 USAR SOLO UN MÉTODO - Ruta universal directa
-        const downloadUrl = `${API_BASE}/download/file/${fileId}`;
-        console.log('🔗 URL final:', downloadUrl);
-        
-        // 🔥 MÉTODO DIRECTO SIN CONFLICTOS
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        
-        // Convertir a blob
-        const blob = await response.blob();
-        
-        // 🔥 CREAR ENLACE DE DESCARGA DIRECTO
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName; // 🔥 NOMBRE ORIGINAL CORRECTO
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        // 🔥 LIMPIAR DESPUÉS DE DESCARGAR
-        setTimeout(() => {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            hideDownloadLoading();
-            showNotification(`✅ Descargado: ${fileName}`, 'success');
-        }, 100);
-        
-    } catch (error) {
-        console.error('❌ Error en descarga:', error);
-        hideDownloadLoading();
-        showNotification('Error al descargar el archivo', 'error');
-        
-        // 🔥 FALLBACK: Método alternativo si el principal falla
-        setTimeout(() => {
-            downloadFallback(fileId, fileName);
-        }, 500);
-    }
-}
-
-// 🔥 FUNCIÓN PARA BIBLIOTECA - MÉTODO IDÉNTICO
-async function downloadLibraryResource(resourceId, resourceName) {
-    console.log('📥 DESCARGANDO RECURSO:', { resourceId, resourceName });
-    
-    try {
-        showDownloadLoading(resourceName);
-        
-        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log('🔗 URL biblioteca:', downloadUrl);
-        
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = resourceName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            hideDownloadLoading();
-            showNotification(`✅ Descargado: ${resourceName}`, 'success');
-        }, 100);
-        
-    } catch (error) {
-        console.error('❌ Error en biblioteca:', error);
-        hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
-    }
-}
-
-
-// 4. Función universal de descarga
-function universalDownload(type, id, fileName) {
-    if (window.mobileDownloadManager.isMobile) {
-        window.mobileDownloadManager.handleDownload(type, id, fileName);
-    } else {
-        const downloadUrl = `${API_BASE}/download/${type}/${id}`;
-        window.open(downloadUrl, '_blank');
-        showNotification(`Descargando: ${fileName}`, 'success');
-    }
-}
-
-// Sistema de loading mejorado para móviles
-function initDownloadSystem() {
-    const style = document.createElement('style');
-    style.textContent = `
-        .download-loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 10000;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
-        }
-        
-        .download-loading.active {
-            display: flex;
-        }
-        
-        .download-loading-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 300px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        
-        .download-loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
+// Ejecutar diagnóstico después de cargar
+setTimeout(debugDownloadSystem, 2000);
 
 function addWebViewMetaTags() {
     // Meta tags para mejor compatibilidad con WebView
@@ -9583,60 +9349,6 @@ function verifyToken() {
 // Llamar esta función periódicamente o antes de operaciones críticas
 setInterval(verifyToken, 60000); // Verificar cada minuto
 
-// Función de descarga directa mejorada
-async function downloadResourceDirect(fileUrl, fileName = 'archivo') {
-    ('📥 Descarga directa:', { fileUrl, fileName });
-    
-    return new Promise((resolve, reject) => {
-        // Crear elemento anchor
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = fileUrl;
-        a.download = fileName;
-        
-        // Agregar al documento y hacer click
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        setTimeout(() => {
-            document.body.removeChild(a);
-            resolve();
-        }, 100);
-        
-        // Verificar si la descarga inició
-        setTimeout(() => {
-            // Si después de 2 segundos no hay error, asumimos éxito
-            ('✅ Descarga directa iniciada');
-        }, 2000);
-    });
-}
-
-// Función para diagnosticar problemas de archivos
-async function debugLibraryFile(resourceId) {
-    try {
-        ('🔍 Diagnosticando archivo de recurso:', resourceId);
-        
-        const response = await fetch(`${API_BASE}/library/debug/${resourceId}`, {
-            headers: authToken ? {
-                'Authorization': `Bearer ${authToken}`
-            } : {}
-        });
-        
-        if (response.ok) {
-            const debugInfo = await response.json();
-            ('📊 Información de debug:', debugInfo);
-            return debugInfo;
-        } else {
-            console.error('❌ Error en diagnóstico:', response.status);
-        }
-    } catch (error) {
-        console.error('❌ Error en diagnóstico:', error);
-    }
-}
-
-// Hacerla global para testing
-window.debugFile = debugLibraryFile;
 
 // Helper para obtener extensión desde MIME type
 function getFileExtensionFromMimeType(mimeType) {
@@ -12640,6 +12352,221 @@ async function downloadResource(resourceId, fileName = null) {
             btn.disabled = false;
         });
     }
+}
+
+// ==================== SISTEMA DE DESCARGAS MEJORADO ====================
+
+// 🔥 DESACTIVAR TODAS LAS DESCARGAS VIEJAS TEMPORALMENTE
+window.downloadProjectFile = null;
+window.downloadLibraryResource = null;
+window.downloadFile = null;
+
+// 🔥 NUEVO SISTEMA UNIFICADO DE DESCARGAS
+class DownloadManager {
+    constructor() {
+        this.isDownloading = false;
+        this.setupEventListeners();
+    }
+    
+    setupEventListeners() {
+        // Prevenir clics múltiples
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            
+            // Detectar clics en botones de descarga de proyectos
+            if (target.closest('[onclick*="downloadProjectFile"]')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleProjectDownloadClick(target);
+                return false;
+            }
+            
+            // Detectar clics en botones de descarga de biblioteca
+            if (target.closest('[onclick*="downloadLibraryResource"]')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleLibraryDownloadClick(target);
+                return false;
+            }
+        });
+    }
+    
+    handleProjectDownloadClick(element) {
+        if (this.isDownloading) {
+            showNotification('⏳ Espera a que termine la descarga actual', 'info');
+            return;
+        }
+        
+        try {
+            // Extraer parámetros del onclick
+            const onclick = element.closest('[onclick]').getAttribute('onclick');
+            const matches = onclick.match(/downloadProjectFile\(([^)]+)\)/);
+            
+            if (matches && matches[1]) {
+                const params = matches[1].split(',').map(p => p.trim().replace(/'/g, ''));
+                const [projectId, fileId, fileName] = params;
+                
+                console.log('📥 Descargando proyecto:', { projectId, fileId, fileName });
+                this.downloadProjectFile(parseInt(projectId), parseInt(fileId), fileName);
+            }
+        } catch (error) {
+            console.error('Error procesando descarga de proyecto:', error);
+        }
+    }
+    
+    handleLibraryDownloadClick(element) {
+        if (this.isDownloading) {
+            showNotification('⏳ Espera a que termine la descarga actual', 'info');
+            return;
+        }
+        
+        try {
+            const onclick = element.closest('[onclick]').getAttribute('onclick');
+            const matches = onclick.match(/downloadLibraryResource\(([^)]+)\)/);
+            
+            if (matches && matches[1]) {
+                const params = matches[1].split(',').map(p => p.trim().replace(/'/g, ''));
+                const [resourceId, resourceName] = params;
+                
+                console.log('📥 Descargando biblioteca:', { resourceId, resourceName });
+                this.downloadLibraryResource(parseInt(resourceId), resourceName);
+            }
+        } catch (error) {
+            console.error('Error procesando descarga de biblioteca:', error);
+        }
+    }
+    
+    // 🔥 NUEVO MÉTODO PARA PROYECTOS - SIMPLE Y DIRECTO
+    async downloadProjectFile(projectId, fileId, fileName) {
+        this.isDownloading = true;
+        this.showDownloadLoader(fileName);
+        
+        try {
+            console.log('🚀 INICIANDO DESCARGA PROYECTO:', { fileId, fileName });
+            
+            // 🔥 USAR EL ENDPOINT UNIVERSAL QUE SÍ FUNCIONA
+            const downloadUrl = `https://tecel-app.onrender.com/download/file/${fileId}`;
+            
+            // 🔥 MÉTODO DIRECTO SIN COMPLICACIONES
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.style.display = 'none';
+            
+            // 🔥 AGREGAR Y HACER CLIC RÁPIDAMENTE
+            document.body.appendChild(link);
+            setTimeout(() => {
+                link.click();
+            }, 100);
+            
+            // 🔥 LIMPIAR DESPUÉS
+            setTimeout(() => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+                this.hideDownloadLoader();
+                this.isDownloading = false;
+                showNotification(`✅ Descargado: ${fileName}`, 'success');
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Error en descarga proyecto:', error);
+            this.hideDownloadLoader();
+            this.isDownloading = false;
+            showNotification('❌ Error al descargar archivo', 'error');
+        }
+    }
+    
+    // 🔥 NUEVO MÉTODO PARA BIBLIOTECA - EXTRA SEGURO
+    async downloadLibraryResource(resourceId, resourceName) {
+        this.isDownloading = true;
+        this.showDownloadLoader(resourceName);
+        
+        try {
+            console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
+            
+            // 🔥 MÉTODO SUPER SIMPLE PARA ANDROID
+            const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+            
+            // 🔥 CREAR IFRAME PARA DESCARGA (MÁS SEGURO)
+            const iframe = document.createElement('iframe');
+            iframe.src = downloadUrl;
+            iframe.style.display = 'none';
+            iframe.onload = () => {
+                console.log('📦 Iframe cargado - descarga debería iniciar');
+                setTimeout(() => {
+                    this.cleanupDownload();
+                }, 3000);
+            };
+            
+            document.body.appendChild(iframe);
+            
+            // 🔥 TIMEOUT DE SEGURIDAD
+            setTimeout(() => {
+                this.cleanupDownload();
+            }, 5000);
+            
+        } catch (error) {
+            console.error('❌ Error en descarga biblioteca:', error);
+            this.cleanupDownload();
+        }
+    }
+    
+    cleanupDownload() {
+        // Limpiar iframes
+        const iframes = document.querySelectorAll('iframe[style*="display: none"]');
+        iframes.forEach(iframe => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+        });
+        
+        this.hideDownloadLoader();
+        this.isDownloading = false;
+    }
+    
+    showDownloadLoader(fileName) {
+        this.hideDownloadLoader();
+        
+        const loaderHTML = `
+            <div class="download-manager-loading active">
+                <div class="download-manager-content">
+                    <div class="download-spinner"></div>
+                    <h3>📥 Descargando...</h3>
+                    <p class="download-filename">${fileName}</p>
+                    <p class="download-help">El archivo se guardará en Descargas</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', loaderHTML);
+    }
+    
+    hideDownloadLoader() {
+        const loader = document.querySelector('.download-manager-loading');
+        if (loader) {
+            loader.remove();
+        }
+    }
+}
+
+// 🔥 INICIALIZAR EL NUEVO SISTEMA
+let downloadManager;
+
+function initDownloadSystem() {
+    console.log('🔧 Inicializando nuevo sistema de descargas...');
+    downloadManager = new DownloadManager();
+    
+    // Reemplazar funciones globales
+    window.downloadProjectFile = (projectId, fileId, fileName) => {
+        downloadManager.downloadProjectFile(projectId, fileId, fileName);
+    };
+    
+    window.downloadLibraryResource = (resourceId, resourceName) => {
+        downloadManager.downloadLibraryResource(resourceId, resourceName);
+    };
+    
+    console.log('✅ Nuevo sistema de descargas listo');
 }
 
 // Función para actualizar contador de descargas
