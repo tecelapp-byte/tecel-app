@@ -12509,7 +12509,7 @@ class DownloadManager {
     }
     
     async downloadLibraryResource(resourceId, resourceName) {
-    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
+    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA ANDROID:', { resourceId, resourceName });
     
     if (this.isDownloading) {
         showNotification('⏳ Ya hay una descarga en curso', 'info');
@@ -12517,38 +12517,42 @@ class DownloadManager {
     }
     
     this.isDownloading = true;
-    showNotification(`📥 Iniciando descarga: ${resourceName}`, 'info');
+    this.showDownloadLoader(resourceName);
     
     try {
-        // 🔥 MÉTODO MÁS SIMPLE POSIBLE
+        // 🔥 MÉTODO 1: USAR EL ENDPOINT UNIVERSAL CON FETCH + BLOB (Más seguro)
         const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+        console.log('🔗 URL Biblioteca:', downloadUrl);
         
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = resourceName;
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        // Limpiar después
-        setTimeout(() => {
-            if (document.body.contains(link)) {
-                document.body.removeChild(link);
+        // 🔥 PRIMERO VERIFICAR QUE EL RECURSO EXISTE
+        const checkResponse = await fetch(`${API_BASE}/library/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
             }
-            
-            // Notificar éxito después de un tiempo
-            setTimeout(() => {
-                showNotification(`✅ Descarga completada: ${resourceName}`, 'success');
-                this.isDownloading = false;
-            }, 3000);
-            
-        }, 1000);
+        });
+        
+        if (!checkResponse.ok) {
+            throw new Error('Recurso no encontrado');
+        }
+        
+        const resourceInfo = await checkResponse.json();
+        console.log('✅ Recurso verificado:', resourceInfo.title);
+        
+        // 🔥 MÉTODO ANDROID-SAFE: Descarga por pasos con timeouts
+        await this.androidSafeDownload(downloadUrl, resourceName);
         
     } catch (error) {
-        console.error('❌ Error en biblioteca:', error);
-        showNotification('❌ Error al descargar recurso', 'error');
-        this.isDownloading = false;
+        console.error('❌ Error en biblioteca (Método 1):', error);
+        
+        // 🔥 MÉTODO 2: FALLBACK - Descarga directa super simple
+        try {
+            await this.androidFallbackDownload(resourceId, resourceName);
+        } catch (fallbackError) {
+            console.error('❌ Fallback también falló:', fallbackError);
+            this.handleDownloadError(resourceName);
+        }
+    } finally {
+        this.cleanupDownload();
     }
 }
     
