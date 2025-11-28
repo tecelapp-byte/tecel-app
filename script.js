@@ -353,12 +353,6 @@ function initializeApp() {
     try {
         ('🚀 Inicializando aplicación...');
         
-        // 🔥 INICIALIZAR NUEVO SISTEMA DE DESCARGAS
-        setTimeout(() => {
-            initDownloadSystem();
-            debugDownloadSystem(); // Para diagnóstico
-        }, 1000);
-
         // Primero verificar estado de autenticación
         checkAuthStatus();
         
@@ -369,11 +363,11 @@ function initializeApp() {
         initNewDesign();
         initNewSections();
         
-        // 🔥 INICIALIZAR FIX PARA ANDROID
-        if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Detectado Android - aplicando fixes...');
-            setupAndroidDownloadFix();
-        }
+        // 🔥 INICIALIZAR NUEVO SISTEMA DE DESCARGAS
+        setTimeout(() => {
+            initDownloadSystem();
+            debugDownloadSystem(); // Para diagnóstico
+        }, 1000);
 
         // Inicializar sistema de descargas (solo estilos si es móvil)
         initDownloadSystem();
@@ -12275,40 +12269,56 @@ function displayResourceDetails(resource) {
     openModal('resource-detail-modal');
 }
 
-// REEMPLAZA la función downloadLibraryResource con ESTA:
+// REEMPLAZA downloadLibraryResource con ESTA versión que copia EXACTAMENTE downloadProjectFile:
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
+    console.log(`📥 DESCARGANDO RECURSO BIBLIOTECA: ${resourceName} (ID: ${resourceId})`);
     
     try {
+        // 🔥 COPIAR EXACTAMENTE lo que hace downloadProjectFile
         showDownloadLoading(resourceName);
         
-        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
-        // En Android WebView, no podemos usar window.open ni crear elementos <a>
-        // Tenemos que usar el sistema de descargas nativo de Android
+        // USAR LA MISMA URL que proyectos pero para biblioteca
+        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+        console.log('🔗 URL descarga biblioteca:', downloadUrl);
         
-        // Paso 1: Obtener la URL de descarga
-        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-        console.log('🔗 URL para Android:', downloadUrl);
+        // 🔥 COPIAR EXACTAMENTE EL MÉTODO DE PROYECTOS
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 Android - Método proyectos');
+            // Abrir en nueva pestaña/popup (igual que proyectos)
+            const newWindow = window.open(downloadUrl, '_blank');
+            
+            if (!newWindow) {
+                console.log('❌ Popup bloqueado, usando método alternativo');
+                // Método alternativo (igual que proyectos)
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = resourceName;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } else {
+            // Para desktop (igual que proyectos)
+            console.log('💻 Desktop - Método proyectos');
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
         
-        // Paso 2: Para Android WebView, necesitamos usar un Intent
-        // Esto se hace a través del WebViewClient
+        // MISMO TIMEOUT que proyectos
         setTimeout(() => {
-            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
-            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
-            window.location.href = downloadUrl;
-            
-            // Ocultar loading después de un tiempo
-            setTimeout(() => {
-                hideDownloadLoading();
-                showNotification('Descarga iniciada en segundo plano', 'info');
-            }, 3000);
-            
-        }, 1000);
+            hideDownloadLoading();
+            showNotification(`✅ Descarga iniciada: ${resourceName}`, 'success');
+        }, 2500);
         
     } catch (error) {
-        console.error('❌ Error Android:', error);
+        console.error('❌ Error descarga biblioteca:', error);
         hideDownloadLoading();
-        showNotification('Error en descarga', 'error');
+        showNotification('Error al descargar el recurso', 'error');
     }
 }
 
@@ -12482,40 +12492,55 @@ class DownloadManager {
         }
     }
 
-    // REEMPLAZA la función downloadLibraryResource con ESTA:
 async downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
+    console.log(`📥 DESCARGANDO RECURSO BIBLIOTECA: ${resourceName} (ID: ${resourceId})`);
     
     try {
+        // 🔥 COPIAR EXACTAMENTE lo que hace downloadProjectFile
         showDownloadLoading(resourceName);
         
-        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
-        // En Android WebView, no podemos usar window.open ni crear elementos <a>
-        // Tenemos que usar el sistema de descargas nativo de Android
+        // USAR LA MISMA URL que proyectos pero para biblioteca
+        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+        console.log('🔗 URL descarga biblioteca:', downloadUrl);
         
-        // Paso 1: Obtener la URL de descarga
-        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-        console.log('🔗 URL para Android:', downloadUrl);
+        // 🔥 COPIAR EXACTAMENTE EL MÉTODO DE PROYECTOS
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 Android - Método proyectos');
+            // Abrir en nueva pestaña/popup (igual que proyectos)
+            const newWindow = window.open(downloadUrl, '_blank');
+            
+            if (!newWindow) {
+                console.log('❌ Popup bloqueado, usando método alternativo');
+                // Método alternativo (igual que proyectos)
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = resourceName;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } else {
+            // Para desktop (igual que proyectos)
+            console.log('💻 Desktop - Método proyectos');
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
         
-        // Paso 2: Para Android WebView, necesitamos usar un Intent
-        // Esto se hace a través del WebViewClient
+        // MISMO TIMEOUT que proyectos
         setTimeout(() => {
-            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
-            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
-            window.location.href = downloadUrl;
-            
-            // Ocultar loading después de un tiempo
-            setTimeout(() => {
-                hideDownloadLoading();
-                showNotification('Descarga iniciada en segundo plano', 'info');
-            }, 3000);
-            
-        }, 1000);
+            hideDownloadLoading();
+            showNotification(`✅ Descarga iniciada: ${resourceName}`, 'success');
+        }, 2500);
         
     } catch (error) {
-        console.error('❌ Error Android:', error);
+        console.error('❌ Error descarga biblioteca:', error);
         hideDownloadLoading();
-        showNotification('Error en descarga', 'error');
+        showNotification('Error al descargar el recurso', 'error');
     }
 }
 
