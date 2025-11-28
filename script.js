@@ -353,9 +353,6 @@ function initializeApp() {
     try {
         ('🚀 Inicializando aplicación...');
         
-         // 🔥 SOLICITAR PERMISOS DE NOTIFICACIÓN
-        requestNotificationPermission();
-        
         // 🔥 INICIALIZAR NUEVO SISTEMA DE DESCARGAS
         setTimeout(() => {
             initDownloadSystem();
@@ -12512,60 +12509,48 @@ class DownloadManager {
     }
     
     async downloadLibraryResource(resourceId, resourceName) {
-        console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
+    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
+    
+    if (this.isDownloading) {
+        showNotification('⏳ Ya hay una descarga en curso', 'info');
+        return;
+    }
+    
+    this.isDownloading = true;
+    showNotification(`📥 Iniciando descarga: ${resourceName}`, 'info');
+    
+    try {
+        // 🔥 MÉTODO MÁS SIMPLE POSIBLE
+        const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
         
-        if (this.isDownloading) {
-            showNotification('⏳ Ya hay una descarga en curso', 'info');
-            return;
-        }
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = resourceName;
+        link.style.display = 'none';
         
-        this.isDownloading = true;
+        document.body.appendChild(link);
+        link.click();
         
-        try {
-            // 🔥 MÉTODO SUPER SIMPLE - DEJA QUE ANDROID MANEJE LA DESCARGA
-            const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
-            console.log('🔗 URL Biblioteca:', downloadUrl);
+        // Limpiar después
+        setTimeout(() => {
+            if (document.body.contains(link)) {
+                document.body.removeChild(link);
+            }
             
-            // 🔥 MÉTODO DIRECTO QUE PERMITE NOTIFICACIONES NATIVAS
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName;
-            link.style.display = 'none';
-            
-            // 🔥 EVENTOS PARA DETECTAR CUÁNDO SE COMPLETA
-            link.addEventListener('click', () => {
-                console.log('✅ Click en enlace - descarga debería iniciar');
-                
-                // Mostrar notificación inmediatamente después del click
-                setTimeout(() => {
-                    showNotification(`📥 Descargando: ${resourceName}`, 'info');
-                }, 500);
-            });
-            
-            document.body.appendChild(link);
-            
-            // 🔥 HACER CLIC Y LIMPIAR RÁPIDAMENTE
-            link.click();
-            
+            // Notificar éxito después de un tiempo
             setTimeout(() => {
-                if (document.body.contains(link)) {
-                    document.body.removeChild(link);
-                }
-                
-                // 🔥 NOTIFICACIÓN DE ÉXITO DESPUÉS DE UN TIEMPO
-            setTimeout(() => {
-                showNotification(`✅ Descargado: ${resourceName}`, 'success'); // 🔥 CAMBIADO
+                showNotification(`✅ Descarga completada: ${resourceName}`, 'success');
                 this.isDownloading = false;
             }, 3000);
-                
-            }, 1000);
             
-        } catch (error) {
-            console.error('❌ Error en biblioteca:', error);
-            showNotification('❌ Error al descargar recurso', 'error');
-            this.isDownloading = false;
-        }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error en biblioteca:', error);
+        showNotification('❌ Error al descargar recurso', 'error');
+        this.isDownloading = false;
     }
+}
     
 // 🔥 MÉTODO SEGURO PARA ANDROID
 async androidSafeDownload(downloadUrl, fileName) {
@@ -12749,41 +12734,6 @@ function initDownloadSystem() {
     };
     
     console.log('✅ Sistema de descargas listo');
-}
-
-// 🔥 SISTEMA MEJORADO DE NOTIFICACIONES PARA ANDROID
-function showNotification(message, type = 'info') {
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    
-    if (isAndroid) {
-        // 🔥 INTENTAR NOTIFICACIÓN NATIVA DE ANDROID PRIMERO
-        if ('Notification' in window && Notification.permission === 'granted') {
-            try {
-                const notification = new Notification('TECEL App', {
-                    body: message,
-                    icon: '/favicon.ico',
-                    tag: 'tecel-download'
-                });
-                
-                notification.onclick = () => {
-                    window.focus();
-                    notification.close();
-                };
-                
-                // Cerrar después de 4 segundos
-                setTimeout(() => {
-                    notification.close();
-                }, 4000);
-                
-                return; // Salir si la notificación nativa funciona
-            } catch (error) {
-                console.log('❌ Notificación nativa falló, usando alternativa');
-            }
-        }
-    }
-    
-    // 🔥 FALLBACK: Usar el sistema de notificaciones existente
-    showNotification(message, type);
 }
 
 // 🔥 CONFIGURACIONES ESPECÍFICAS ANDROID
@@ -13596,27 +13546,6 @@ function updateSuggestionStats() {
     if (pendingElement) pendingElement.textContent = pending;
     if (doneElement) doneElement.textContent = done;
 }
-
-// 🔥 SOLICITAR PERMISOS DE NOTIFICACIÓN AL INICIAR
-function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        console.log('🔔 Solicitando permisos de notificación...');
-        
-        // Esperar a que el usuario interactúe con la app primero
-        const askPermission = () => {
-            Notification.requestPermission().then(permission => {
-                console.log('📢 Permiso de notificación:', permission);
-            });
-        };
-        
-        // Solicitar después de que el usuario haga clic en algún lugar
-        document.addEventListener('click', function once() {
-            setTimeout(askPermission, 1000);
-            document.removeEventListener('click', once);
-        });
-    }
-}
-
 
 function updateLibraryStats() {
     if (!libraryResources || libraryResources.length === 0) {
