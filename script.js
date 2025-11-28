@@ -12275,6 +12275,43 @@ function displayResourceDetails(resource) {
     openModal('resource-detail-modal');
 }
 
+// REEMPLAZA la función downloadLibraryResource con ESTA:
+async function downloadLibraryResource(resourceId, resourceName) {
+    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
+    
+    try {
+        showDownloadLoading(resourceName);
+        
+        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
+        // En Android WebView, no podemos usar window.open ni crear elementos <a>
+        // Tenemos que usar el sistema de descargas nativo de Android
+        
+        // Paso 1: Obtener la URL de descarga
+        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+        console.log('🔗 URL para Android:', downloadUrl);
+        
+        // Paso 2: Para Android WebView, necesitamos usar un Intent
+        // Esto se hace a través del WebViewClient
+        setTimeout(() => {
+            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
+            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
+            window.location.href = downloadUrl;
+            
+            // Ocultar loading después de un tiempo
+            setTimeout(() => {
+                hideDownloadLoading();
+                showNotification('Descarga iniciada en segundo plano', 'info');
+            }, 3000);
+            
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error Android:', error);
+        hideDownloadLoading();
+        showNotification('Error en descarga', 'error');
+    }
+}
+
 // Función para crear item de archivo
 function createResourceFileItem(resource) {
     const fileName = resource.file_url ? resource.file_url.split('/').pop() : 'Archivo';
@@ -12444,7 +12481,44 @@ class DownloadManager {
             console.error('Error procesando descarga de proyecto:', error);
         }
     }
+
+    // REEMPLAZA la función downloadLibraryResource con ESTA:
+async downloadLibraryResource(resourceId, resourceName) {
+    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
     
+    try {
+        showDownloadLoading(resourceName);
+        
+        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
+        // En Android WebView, no podemos usar window.open ni crear elementos <a>
+        // Tenemos que usar el sistema de descargas nativo de Android
+        
+        // Paso 1: Obtener la URL de descarga
+        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+        console.log('🔗 URL para Android:', downloadUrl);
+        
+        // Paso 2: Para Android WebView, necesitamos usar un Intent
+        // Esto se hace a través del WebViewClient
+        setTimeout(() => {
+            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
+            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
+            window.location.href = downloadUrl;
+            
+            // Ocultar loading después de un tiempo
+            setTimeout(() => {
+                hideDownloadLoading();
+                showNotification('Descarga iniciada en segundo plano', 'info');
+            }, 3000);
+            
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error Android:', error);
+        hideDownloadLoading();
+        showNotification('Error en descarga', 'error');
+    }
+}
+
     handleLibraryDownloadClick(element) {
         if (this.isDownloading) {
             showNotification('⏳ Espera a que termine la descarga actual', 'info');
@@ -12587,6 +12661,7 @@ async androidSafeDownload(downloadUrl, fileName) {
     }
 }
 
+
 // 🔥 INICIALIZAR EL NUEVO SISTEMA
 let downloadManager;
 
@@ -12606,42 +12681,6 @@ function initDownloadSystem() {
     console.log('✅ Nuevo sistema de descargas listo');
 }
 
-// REEMPLAZA la función downloadLibraryResource con ESTA:
-async function downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
-    
-    try {
-        showDownloadLoading(resourceName);
-        
-        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
-        // En Android WebView, no podemos usar window.open ni crear elementos <a>
-        // Tenemos que usar el sistema de descargas nativo de Android
-        
-        // Paso 1: Obtener la URL de descarga
-        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-        console.log('🔗 URL para Android:', downloadUrl);
-        
-        // Paso 2: Para Android WebView, necesitamos usar un Intent
-        // Esto se hace a través del WebViewClient
-        setTimeout(() => {
-            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
-            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
-            window.location.href = downloadUrl;
-            
-            // Ocultar loading después de un tiempo
-            setTimeout(() => {
-                hideDownloadLoading();
-                showNotification('Descarga iniciada en segundo plano', 'info');
-            }, 3000);
-            
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Error Android:', error);
-        hideDownloadLoading();
-        showNotification('Error en descarga', 'error');
-    }
-}
 
 // Función específica para Android WebView
 async function downloadForAndroidWebView(resourceId, fileName, type = 'library') {
@@ -12695,90 +12734,6 @@ async function downloadForDesktop(resourceId, fileName, type = 'library') {
         showNotification(`✅ Descargado: ${fileName}`, 'success');
     }, 2000);
 }
-
-// ALTERNATIVA - Método usando fetch (más controlado)
-async function downloadLibraryResourceSafe(resourceId, resourceName) {
-    console.log(`🛡️ DESCARGA SEGURA BIBLIOTECA: ${resourceName}`);
-    
-    try {
-        showDownloadLoading(resourceName);
-        
-        // Paso 1: Obtener el archivo como blob
-        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/octet-stream'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        // Paso 2: Convertir a blob
-        const blob = await response.blob();
-        
-        // Paso 3: Crear URL del blob
-        const blobUrl = window.URL.createObjectURL(blob);
-        
-        // Paso 4: Crear enlace de descarga
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = resourceName;
-        
-        // Paso 5: Para Android, usar approach diferente
-        if (/Android/i.test(navigator.userAgent)) {
-            // Abrir en nueva pestaña/popup
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-        }
-        
-        // Paso 6: Trigger descarga
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Paso 7: Limpiar
-        setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-            hideDownloadLoading();
-            showNotification(`✅ ${resourceName} descargado`, 'success');
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Error descarga segura:', error);
-        hideDownloadLoading();
-        showNotification('Error en la descarga', 'error');
-        
-        // Fallback: intentar método directo
-        console.log('🔄 Intentando método fallback...');
-        downloadLibraryResourceDirect(resourceId, resourceName);
-    }
-}
-
-// MÉTODO DIRECTO - Sin complicaciones
-async function downloadLibraryResourceDirect(resourceId, resourceName) {
-    console.log(`🎯 DESCARGA DIRECTA: ${resourceName}`);
-    
-    showDownloadLoading(resourceName);
-    
-    // Simplemente redirigir a la URL de descarga
-    const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-    
-    // Pequeño delay para que se vea el loading
-    setTimeout(() => {
-        // Usar location.assign en lugar de window.open (más estable)
-        window.location.assign(downloadUrl);
-        
-        // Ocultar loading después de un tiempo
-        setTimeout(() => {
-            hideDownloadLoading();
-            showNotification('Descarga en progreso...', 'info');
-        }, 2000);
-    }, 500);
-}
-
 
 // Función para actualizar contador de descargas
 async function updateDownloadCount(resourceId) {
