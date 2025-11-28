@@ -12593,83 +12593,6 @@ async androidSafeDownload(downloadUrl, fileName) {
     });
 }
 
-// 🔥 MÉTODO FALLBACK ULTRA-SIMPLE
-async androidFallbackDownload(resourceId, fileName) {
-    return new Promise((resolve) => {
-        console.log('🔄 Usando fallback ultra-simple...');
-        
-        // El método más básico posible
-        const link = document.createElement('a');
-        link.href = `https://tecel-app.onrender.com/download/library/${resourceId}`;
-        link.download = fileName;
-        link.style.display = 'none';
-        link.target = '_blank'; // 🔥 CRÍTICO: Abrir en nueva pestaña/pestaña background
-        
-        document.body.appendChild(link);
-        
-        // Hacer click muy rápidamente
-        setTimeout(() => {
-            link.click();
-        }, 100);
-        
-        // Limpiar rápidamente
-        setTimeout(() => {
-            if (document.body.contains(link)) {
-                document.body.removeChild(link);
-            }
-            resolve();
-        }, 1000);
-    });
-}
-
-// 🔥 MANEJO DE ERRORES MEJORADO
-handleDownloadError(fileName) {
-    console.error('💥 Error crítico en descarga:', fileName);
-    
-    // Mostrar ayuda específica para Android
-    if (/Android/i.test(navigator.userAgent)) {
-        showNotification(
-            '📱 Para Android: Mantén presionado el enlace y selecciona "Descargar"', 
-            'info',
-            5000
-        );
-        
-        // Crear enlace manual como último recurso
-        this.createManualDownloadLink(fileName);
-    } else {
-        showNotification('❌ Error en descarga', 'error');
-    }
-}
-
-// 🔥 CREAR ENLACE MANUAL COMO ÚLTIMO RECURSO
-createManualDownloadLink(fileName) {
-    const manualDiv = document.createElement('div');
-    manualDiv.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        z-index: 10001;
-        text-align: center;
-        max-width: 300px;
-    `;
-    
-    manualDiv.innerHTML = `
-        <h3>📥 Descarga Manual</h3>
-        <p>Para <strong>${fileName}</strong></p>
-        <button onclick="this.parentElement.remove()" 
-                style="background: #ff4757; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 10px;">
-            Cerrar
-        </button>
-    `;
-    
-    document.body.appendChild(manualDiv);
-}
-
     cleanupDownload() {
         // Limpiar iframes
         const iframes = document.querySelectorAll('iframe[style*="display: none"]');
@@ -12712,17 +12635,8 @@ createManualDownloadLink(fileName) {
 let downloadManager;
 
 function initDownloadSystem() {
-    console.log('🔧 Inicializando sistema de descargas...');
+    console.log('🔧 Inicializando nuevo sistema de descargas...');
     downloadManager = new DownloadManager();
-    
-    // Detectar Android específicamente
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    console.log('📱 Dispositivo Android:', isAndroid);
-    
-    if (isAndroid) {
-        console.log('🔧 Aplicando configuraciones específicas para Android...');
-        setupAndroidSpecificFixes();
-    }
     
     // Reemplazar funciones globales
     window.downloadProjectFile = (projectId, fileId, fileName) => {
@@ -12733,26 +12647,9 @@ function initDownloadSystem() {
         downloadManager.downloadLibraryResource(resourceId, resourceName);
     };
     
-    console.log('✅ Sistema de descargas listo');
+    console.log('✅ Nuevo sistema de descargas listo');
 }
 
-// 🔥 CONFIGURACIONES ESPECÍFICAS ANDROID
-function setupAndroidSpecificFixes() {
-    console.log('📱 Configurando fixes Android...');
-    
-    // Prevenir comportamiento por defecto en enlaces
-    document.addEventListener('click', (e) => {
-        if (e.target.matches('a[download]') || e.target.closest('a[download]')) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    }, true);
-    
-    // Reducir uso de memoria
-    if (window.performance && window.performance.memory) {
-        console.log('🧠 Límite memoria:', Math.round(performance.memory.jsHeapSizeLimit / 1048576), 'MB');
-    }
-}
 // Función para actualizar contador de descargas
 async function updateDownloadCount(resourceId) {
     try {
