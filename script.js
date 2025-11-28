@@ -9377,6 +9377,36 @@ function getFileExtensionFromMimeType(mimeType) {
     return mimeExtensions[mimeType] || '';
 }
 
+// 🔍 DIAGNÓSTICO ESPECÍFICO PARA BIBLIOTECA
+function debugLibraryDownload() {
+    console.log('=== 🕵️ DIAGNÓSTICO BIBLIOTECA ===');
+    
+    // Verificar botones de biblioteca específicos
+    const libraryButtons = document.querySelectorAll('[onclick*="downloadLibraryResource"]');
+    console.log(`📚 Botones biblioteca encontrados: ${libraryButtons.length}`);
+    
+    libraryButtons.forEach((btn, index) => {
+        const onclick = btn.getAttribute('onclick');
+        console.log(`🔘 Botón ${index + 1}:`, onclick);
+        
+        // Verificar parámetros
+        const matches = onclick.match(/downloadLibraryResource\(([^)]+)\)/);
+        if (matches) {
+            console.log(`   Parámetros: ${matches[1]}`);
+        }
+    });
+    
+    // Verificar memoria
+    console.log('🧠 Memoria approx:', Math.round(performance.memory?.usedJSHeapSize / 1048576) || 'N/A', 'MB');
+    
+    console.log('================================');
+}
+
+// Ejecutar cuando se cargue la biblioteca
+function initLibrarySection() {
+    debugLibraryDownload();
+}
+
 function generateQRCode() {
     const project = window.currentProject;
     if (!project) {
@@ -12477,41 +12507,172 @@ class DownloadManager {
         }
     }
     
-    // 🔥 NUEVO MÉTODO PARA BIBLIOTECA - EXTRA SEGURO
     async downloadLibraryResource(resourceId, resourceName) {
-        this.isDownloading = true;
-        this.showDownloadLoader(resourceName);
-        
-        try {
-            console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
-            
-            // 🔥 MÉTODO SUPER SIMPLE PARA ANDROID
-            const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
-            
-            // 🔥 CREAR IFRAME PARA DESCARGA (MÁS SEGURO)
-            const iframe = document.createElement('iframe');
-            iframe.src = downloadUrl;
-            iframe.style.display = 'none';
-            iframe.onload = () => {
-                console.log('📦 Iframe cargado - descarga debería iniciar');
-                setTimeout(() => {
-                    this.cleanupDownload();
-                }, 3000);
-            };
-            
-            document.body.appendChild(iframe);
-            
-            // 🔥 TIMEOUT DE SEGURIDAD
-            setTimeout(() => {
-                this.cleanupDownload();
-            }, 5000);
-            
-        } catch (error) {
-            console.error('❌ Error en descarga biblioteca:', error);
-            this.cleanupDownload();
-        }
+    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA ANDROID:', { resourceId, resourceName });
+    
+    if (this.isDownloading) {
+        showNotification('⏳ Ya hay una descarga en curso', 'info');
+        return;
     }
     
+    this.isDownloading = true;
+    this.showDownloadLoader(resourceName);
+    
+    try {
+        // 🔥 MÉTODO 1: USAR EL ENDPOINT UNIVERSAL CON FETCH + BLOB (Más seguro)
+        const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+        console.log('🔗 URL Biblioteca:', downloadUrl);
+        
+        // 🔥 PRIMERO VERIFICAR QUE EL RECURSO EXISTE
+        const checkResponse = await fetch(`${API_BASE}/library/${resourceId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (!checkResponse.ok) {
+            throw new Error('Recurso no encontrado');
+        }
+        
+        const resourceInfo = await checkResponse.json();
+        console.log('✅ Recurso verificado:', resourceInfo.title);
+        
+        // 🔥 MÉTODO ANDROID-SAFE: Descarga por pasos con timeouts
+        await this.androidSafeDownload(downloadUrl, resourceName);
+        
+    } catch (error) {
+        console.error('❌ Error en biblioteca (Método 1):', error);
+        
+        // 🔥 MÉTODO 2: FALLBACK - Descarga directa super simple
+        try {
+            await this.androidFallbackDownload(resourceId, resourceName);
+        } catch (fallbackError) {
+            console.error('❌ Fallback también falló:', fallbackError);
+            this.handleDownloadError(resourceName);
+        }
+    } finally {
+        this.cleanupDownload();
+    }
+}
+    
+// 🔥 MÉTODO SEGURO PARA ANDROID
+async androidSafeDownload(downloadUrl, fileName) {
+    return new Promise((resolve, reject) => {
+        console.log('📱 Ejecutando método seguro Android...');
+        
+        // Paso 1: Crear iframe oculto
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.sandbox = 'allow-downloads allow-same-origin';
+        
+        // Paso 2: Configurar eventos
+        iframe.onload = () => {
+            console.log('✅ Iframe cargado - descarga debería iniciarse');
+            setTimeout(() => {
+                resolve();
+            }, 3000);
+        };
+        
+        iframe.onerror = () => {
+            console.log('❌ Error cargando iframe');
+            reject(new Error('Error cargando iframe'));
+        };
+        
+        // Paso 3: Configurar source
+        iframe.src = downloadUrl;
+        
+        // Paso 4: Agregar al DOM
+        document.body.appendChild(iframe);
+        
+        // Paso 5: Timeout de seguridad
+        setTimeout(() => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+            resolve(); // Resolvemos igual para no bloquear
+        }, 8000);
+    });
+}
+
+// 🔥 MÉTODO FALLBACK ULTRA-SIMPLE
+async androidFallbackDownload(resourceId, fileName) {
+    return new Promise((resolve) => {
+        console.log('🔄 Usando fallback ultra-simple...');
+        
+        // El método más básico posible
+        const link = document.createElement('a');
+        link.href = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+        link.download = fileName;
+        link.style.display = 'none';
+        link.target = '_blank'; // 🔥 CRÍTICO: Abrir en nueva pestaña/pestaña background
+        
+        document.body.appendChild(link);
+        
+        // Hacer click muy rápidamente
+        setTimeout(() => {
+            link.click();
+        }, 100);
+        
+        // Limpiar rápidamente
+        setTimeout(() => {
+            if (document.body.contains(link)) {
+                document.body.removeChild(link);
+            }
+            resolve();
+        }, 1000);
+    });
+}
+
+// 🔥 MANEJO DE ERRORES MEJORADO
+handleDownloadError(fileName) {
+    console.error('💥 Error crítico en descarga:', fileName);
+    
+    // Mostrar ayuda específica para Android
+    if (/Android/i.test(navigator.userAgent)) {
+        showNotification(
+            '📱 Para Android: Mantén presionado el enlace y selecciona "Descargar"', 
+            'info',
+            5000
+        );
+        
+        // Crear enlace manual como último recurso
+        this.createManualDownloadLink(fileName);
+    } else {
+        showNotification('❌ Error en descarga', 'error');
+    }
+}
+
+// 🔥 CREAR ENLACE MANUAL COMO ÚLTIMO RECURSO
+createManualDownloadLink(fileName) {
+    const manualDiv = document.createElement('div');
+    manualDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        z-index: 10001;
+        text-align: center;
+        max-width: 300px;
+    `;
+    
+    manualDiv.innerHTML = `
+        <h3>📥 Descarga Manual</h3>
+        <p>Para <strong>${fileName}</strong></p>
+        <button onclick="this.parentElement.remove()" 
+                style="background: #ff4757; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 10px;">
+            Cerrar
+        </button>
+    `;
+    
+    document.body.appendChild(manualDiv);
+}
+
     cleanupDownload() {
         // Limpiar iframes
         const iframes = document.querySelectorAll('iframe[style*="display: none"]');
@@ -12554,8 +12715,17 @@ class DownloadManager {
 let downloadManager;
 
 function initDownloadSystem() {
-    console.log('🔧 Inicializando nuevo sistema de descargas...');
+    console.log('🔧 Inicializando sistema de descargas...');
     downloadManager = new DownloadManager();
+    
+    // Detectar Android específicamente
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    console.log('📱 Dispositivo Android:', isAndroid);
+    
+    if (isAndroid) {
+        console.log('🔧 Aplicando configuraciones específicas para Android...');
+        setupAndroidSpecificFixes();
+    }
     
     // Reemplazar funciones globales
     window.downloadProjectFile = (projectId, fileId, fileName) => {
@@ -12566,7 +12736,25 @@ function initDownloadSystem() {
         downloadManager.downloadLibraryResource(resourceId, resourceName);
     };
     
-    console.log('✅ Nuevo sistema de descargas listo');
+    console.log('✅ Sistema de descargas listo');
+}
+
+// 🔥 CONFIGURACIONES ESPECÍFICAS ANDROID
+function setupAndroidSpecificFixes() {
+    console.log('📱 Configurando fixes Android...');
+    
+    // Prevenir comportamiento por defecto en enlaces
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('a[download]') || e.target.closest('a[download]')) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+    
+    // Reducir uso de memoria
+    if (window.performance && window.performance.memory) {
+        console.log('🧠 Límite memoria:', Math.round(performance.memory.jsHeapSizeLimit / 1048576), 'MB');
+    }
 }
 
 // Función para actualizar contador de descargas

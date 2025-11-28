@@ -11089,3 +11089,33 @@ button[onclick*="download"]:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* 🔥 ESTILOS ESPECÍFICOS PARA ANDROID */
+.android-download-help {
+    display: none;
+}
+
+/* Mostrar solo en Android */
+@media only screen and (max-width: 768px) {
+    .android-download-help {
+        display: block;
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Prevenir zoom en inputs para Android */
+input, select, textarea {
+    font-size: 16px !important; /* Previene zoom en Android */
+}
+
+/* Mejorar rendimiento en Android */
+.download-manager-loading {
+    -webkit-transform: translateZ(0); /* Aceleración hardware */
+    transform: translateZ(0);
+    will-change: transform;
+}
