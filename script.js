@@ -2025,8 +2025,8 @@ function initMobileDownloadStyles() {
 }
 
 // Función auxiliar para mostrar estado de descarga
+// ESTAS FUNCIONES YA EXISTEN Y FUNCIONAN - NO MODIFICAR
 function showDownloadLoading(fileName) {
-    // Remover loading existente
     hideDownloadLoading();
     
     const loadingHTML = `
@@ -3063,17 +3063,15 @@ function verifyDetailModalElements() {
     ('============================================');
 }
 
-// En la función que renderiza los recursos, haz las tarjetas clickeables
+// REEMPLAZAR solo la parte de acciones en createLibraryCard:
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
     card.setAttribute('data-resource-id', resource.id);
     
-    // Determinar tipo de recurso y acciones disponibles
     const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
     const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
     
-    // Obtener etiquetas
     const typeLabel = getResourceTypeLabel(resource.resource_type);
     const categoryLabel = getCategoryLabel(resource.main_category);
     
@@ -3103,25 +3101,27 @@ function createLibraryCard(resource) {
         
         <div class="library-card-actions">
             ${isFileResource ? 
-                `<button class="btn-primary btn-sm" onclick="downloadLibraryResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
+                `<button class="btn-primary btn-sm" 
+                         onclick="event.stopPropagation(); downloadLibraryResource(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
                     <i class="fas fa-download"></i> Descargar
                 </button>` : ''}
                 
             ${isLinkResource ? 
-                `<button class="btn-outline btn-sm" onclick="window.open('${resource.external_url}', '_blank')">
+                `<button class="btn-outline btn-sm" 
+                         onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
                     <i class="fas fa-external-link-alt"></i> Visitar
                 </button>` : ''}
                 
-            <button class="btn-outline btn-sm" onclick="showResourceDetails(${resource.id})">
+            <button class="btn-outline btn-sm" 
+                    onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
                 <i class="fas fa-eye"></i> Detalles
             </button>
         </div>
     `;
     
-    // Hacer toda la tarjeta clickeable para detalles
+    // Mismo comportamiento clickeable que proyectos
     card.style.cursor = 'pointer';
     card.addEventListener('click', function(e) {
-        // Solo abrir detalles si no se hizo click en un botón
         if (!e.target.closest('button')) {
             showResourceDetails(resource.id);
         }
@@ -12508,54 +12508,103 @@ class DownloadManager {
         }
     }
     
-    async downloadLibraryResource(resourceId, resourceName) {
-    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA ANDROID:', { resourceId, resourceName });
-    
-    if (this.isDownloading) {
-        showNotification('⏳ Ya hay una descarga en curso', 'info');
-        return;
-    }
-    
-    this.isDownloading = true;
-    this.showDownloadLoader(resourceName);
+async downloadLibraryResource(resourceId, resourceName) {
+    console.log(`📥 Iniciando descarga de recurso biblioteca: ${resourceName} (ID: ${resourceId})`);
     
     try {
-        // 🔥 MÉTODO 1: USAR EL ENDPOINT UNIVERSAL CON FETCH + BLOB (Más seguro)
-        const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
-        console.log('🔗 URL Biblioteca:', downloadUrl);
+        // 🔥 USAR EXACTAMENTE EL MISMO SISTEMA QUE PROYECTOS
+        showDownloadLoading(resourceName);
         
-        // 🔥 PRIMERO VERIFICAR QUE EL RECURSO EXISTE
-        const checkResponse = await fetch(`${API_BASE}/library/${resourceId}`, {
+        // MISMA URL que proyectos pero cambiando el tipo
+        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+        console.log(`🔗 URL de descarga biblioteca: ${downloadUrl}`);
+        
+        // 🔥 MÉTODO EXACTO COMO EN downloadProjectFile
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 Dispositivo Android detectado - usando método especial');
+            
+            // Abrir en nueva pestaña (mismo método que proyectos)
+            const newWindow = window.open(downloadUrl, '_blank');
+            
+            if (!newWindow) {
+                console.log('❌ Popup bloqueado, usando método alternativo');
+                // Método alternativo igual que en proyectos
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = resourceName;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } else {
+            // Para desktop - mismo método exacto
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // MISMO TIMEOUT que proyectos
+        setTimeout(() => {
+            hideDownloadLoading();
+            showNotification(`📥 Descarga iniciada: ${resourceName}`, 'success');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('❌ Error en descarga de recurso biblioteca:', error);
+        hideDownloadLoading();
+        showNotification('Error al descargar el recurso', 'error');
+    }
+}
+
+// 🔥 AGREGAR función de respaldo IDÉNTICA a la de proyectos
+async downloadLibraryResourceDirect(resourceId, resourceName) {
+    console.log(`📥 Descarga directa de recurso: ${resourceName}`);
+    
+    try {
+        showDownloadLoading(resourceName);
+        
+        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
+            method: 'GET',
             headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${authToken}`,
             }
         });
         
-        if (!checkResponse.ok) {
-            throw new Error('Recurso no encontrado');
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            
+            // MISMA LÓGICA EXACTA que proyectos
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = resourceName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            window.URL.revokeObjectURL(url);
+            
+            setTimeout(() => {
+                hideDownloadLoading();
+                showNotification(`✅ Descargado: ${resourceName}`, 'success');
+            }, 1500);
+            
+        } else {
+            throw new Error(`Error ${response.status}`);
         }
-        
-        const resourceInfo = await checkResponse.json();
-        console.log('✅ Recurso verificado:', resourceInfo.title);
-        
-        // 🔥 MÉTODO ANDROID-SAFE: Descarga por pasos con timeouts
-        await this.androidSafeDownload(downloadUrl, resourceName);
         
     } catch (error) {
-        console.error('❌ Error en biblioteca (Método 1):', error);
-        
-        // 🔥 MÉTODO 2: FALLBACK - Descarga directa super simple
-        try {
-            await this.androidFallbackDownload(resourceId, resourceName);
-        } catch (fallbackError) {
-            console.error('❌ Fallback también falló:', fallbackError);
-            this.handleDownloadError(resourceName);
-        }
-    } finally {
-        this.cleanupDownload();
+        console.error('❌ Error en descarga directa biblioteca:', error);
+        hideDownloadLoading();
+        showNotification('Error al descargar el recurso', 'error');
     }
 }
-    
+
 // 🔥 MÉTODO SEGURO PARA ANDROID
 async androidSafeDownload(downloadUrl, fileName) {
     return new Promise((resolve, reject) => {
