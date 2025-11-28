@@ -12508,41 +12508,35 @@ class DownloadManager {
         }
     }
     
+// VERSIÓN PASO A PASO - MÁS SEGURA
 async downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 BIBLIOTECA - Copiando método de proyectos: ${resourceName}`);
+    console.log('🚀 INICIANDO DESCARGA PASO A PASO');
     
+    // Paso 1: Mostrar loading
+    showDownloadLoading(resourceName);
+    
+    // Paso 2: Pequeño delay para estabilizar
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Paso 3: Construir URL (usando el endpoint simple)
+    const downloadUrl = `${API_BASE}/simple-download/library/${resourceId}`;
+    console.log('📍 URL de descarga:', downloadUrl);
+    
+    // Paso 4: Método super seguro - solo redirección
     try {
-        showDownloadLoading(resourceName);
+        // Redirigir directamente sin complicaciones
+        window.location.assign(downloadUrl);
         
-        // 🔥 USAR EXACTAMENTE LA MISMA LÓGICA QUE downloadProjectFile
-        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        
-        // Pequeña modificación: agregar timestamp para evitar cache
-        const timestamp = Date.now();
-        const finalUrl = `${downloadUrl}?t=${timestamp}`;
-        
-        console.log('🔗 URL final:', finalUrl);
-        
-        // Método que ya funciona en proyectos
-        const link = document.createElement('a');
-        link.href = finalUrl;
-        link.setAttribute('download', resourceName);
-        link.setAttribute('target', '_blank');
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Mismo timeout que proyectos
+        // Paso 5: Ocultar loading después de un tiempo
         setTimeout(() => {
             hideDownloadLoading();
-            showNotification(`✅ Descarga de biblioteca iniciada`, 'success');
-        }, 2500);
+            console.log('✅ Redirección completada');
+        }, 3000);
         
     } catch (error) {
-        console.error('❌ Error descarga biblioteca:', error);
+        console.error('💥 ERROR CRÍTICO:', error);
         hideDownloadLoading();
-        showNotification('Error al descargar recurso de biblioteca', 'error');
+        showNotification('No se pudo iniciar la descarga', 'error');
     }
 }
 
