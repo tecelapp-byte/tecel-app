@@ -12269,27 +12269,22 @@ function displayResourceDetails(resource) {
     openModal('resource-detail-modal');
 }
 
-// REEMPLAZA downloadLibraryResource con ESTA versión que copia EXACTAMENTE downloadProjectFile:
+// ALTERNATIVA: Usar el endpoint de proyectos que SÍ funciona
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 DESCARGANDO RECURSO BIBLIOTECA: ${resourceName} (ID: ${resourceId})`);
+    console.log(`📥 BIBLIOTECA usando endpoint de proyectos: ${resourceName}`);
     
     try {
-        // 🔥 COPIAR EXACTAMENTE lo que hace downloadProjectFile
         showDownloadLoading(resourceName);
         
-        // USAR LA MISMA URL que proyectos pero para biblioteca
-        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log('🔗 URL descarga biblioteca:', downloadUrl);
+        // 🔥 PRUEBA: Usar el endpoint de PROYECTOS que sabemos funciona
+        // pero para recursos de biblioteca
+        const downloadUrl = `${API_BASE}/download/file/${resourceId}`;
+        console.log('🔗 Usando endpoint de proyectos:', downloadUrl);
         
-        // 🔥 COPIAR EXACTAMENTE EL MÉTODO DE PROYECTOS
+        // Método IDÉNTICO a proyectos
         if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Android - Método proyectos');
-            // Abrir en nueva pestaña/popup (igual que proyectos)
             const newWindow = window.open(downloadUrl, '_blank');
-            
             if (!newWindow) {
-                console.log('❌ Popup bloqueado, usando método alternativo');
-                // Método alternativo (igual que proyectos)
                 const link = document.createElement('a');
                 link.href = downloadUrl;
                 link.download = resourceName;
@@ -12299,8 +12294,6 @@ async function downloadLibraryResource(resourceId, resourceName) {
                 document.body.removeChild(link);
             }
         } else {
-            // Para desktop (igual que proyectos)
-            console.log('💻 Desktop - Método proyectos');
             const link = document.createElement('a');
             link.href = downloadUrl;
             link.download = resourceName;
@@ -12309,16 +12302,15 @@ async function downloadLibraryResource(resourceId, resourceName) {
             document.body.removeChild(link);
         }
         
-        // MISMO TIMEOUT que proyectos
         setTimeout(() => {
             hideDownloadLoading();
-            showNotification(`✅ Descarga iniciada: ${resourceName}`, 'success');
+            showNotification(`✅ Descarga biblioteca iniciada`, 'success');
         }, 2500);
         
     } catch (error) {
-        console.error('❌ Error descarga biblioteca:', error);
+        console.error('❌ Error con endpoint proyectos:', error);
         hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
+        showNotification('Error en descarga', 'error');
     }
 }
 
@@ -12492,26 +12484,22 @@ class DownloadManager {
         }
     }
 
+// ALTERNATIVA: Usar el endpoint de proyectos que SÍ funciona
 async downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 DESCARGANDO RECURSO BIBLIOTECA: ${resourceName} (ID: ${resourceId})`);
+    console.log(`📥 BIBLIOTECA usando endpoint de proyectos: ${resourceName}`);
     
     try {
-        // 🔥 COPIAR EXACTAMENTE lo que hace downloadProjectFile
         showDownloadLoading(resourceName);
         
-        // USAR LA MISMA URL que proyectos pero para biblioteca
-        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log('🔗 URL descarga biblioteca:', downloadUrl);
+        // 🔥 PRUEBA: Usar el endpoint de PROYECTOS que sabemos funciona
+        // pero para recursos de biblioteca
+        const downloadUrl = `${API_BASE}/download/file/${resourceId}`;
+        console.log('🔗 Usando endpoint de proyectos:', downloadUrl);
         
-        // 🔥 COPIAR EXACTAMENTE EL MÉTODO DE PROYECTOS
+        // Método IDÉNTICO a proyectos
         if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Android - Método proyectos');
-            // Abrir en nueva pestaña/popup (igual que proyectos)
             const newWindow = window.open(downloadUrl, '_blank');
-            
             if (!newWindow) {
-                console.log('❌ Popup bloqueado, usando método alternativo');
-                // Método alternativo (igual que proyectos)
                 const link = document.createElement('a');
                 link.href = downloadUrl;
                 link.download = resourceName;
@@ -12521,8 +12509,6 @@ async downloadLibraryResource(resourceId, resourceName) {
                 document.body.removeChild(link);
             }
         } else {
-            // Para desktop (igual que proyectos)
-            console.log('💻 Desktop - Método proyectos');
             const link = document.createElement('a');
             link.href = downloadUrl;
             link.download = resourceName;
@@ -12531,16 +12517,15 @@ async downloadLibraryResource(resourceId, resourceName) {
             document.body.removeChild(link);
         }
         
-        // MISMO TIMEOUT que proyectos
         setTimeout(() => {
             hideDownloadLoading();
-            showNotification(`✅ Descarga iniciada: ${resourceName}`, 'success');
+            showNotification(`✅ Descarga biblioteca iniciada`, 'success');
         }, 2500);
         
     } catch (error) {
-        console.error('❌ Error descarga biblioteca:', error);
+        console.error('❌ Error con endpoint proyectos:', error);
         hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
+        showNotification('Error en descarga', 'error');
     }
 }
 
