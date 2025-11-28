@@ -9063,11 +9063,7 @@ function getFileIcon(filename) {
 // ==================== FUNCIONES DE PRESENTACIÓN ====================
 
 function showNotification(message, type = 'info', duration = 5000) {
-    // Si es Android y es una descarga, usar notificación mejorada
-    if (/Android/i.test(navigator.userAgent) && message.includes('Descargando') || message.includes('Descargado')) {
-        showAndroidNotification(message, type);
-        return;
-    }
+
     // Remover notificación existente si hay una
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
@@ -12431,7 +12427,7 @@ class DownloadManager {
     
     handleProjectDownloadClick(element) {
         if (this.isDownloading) {
-            showAndroidNotification('⏳ Espera a que termine la descarga actual', 'info');
+            showNotification('⏳ Espera a que termine la descarga actual', 'info');
             return;
         }
 
@@ -12504,14 +12500,14 @@ class DownloadManager {
                 }
                 this.hideDownloadLoader();
                 this.isDownloading = false;
-                showAndroidNotification(`✅ Descargado: ${fileName}`, 'success'); // 🔥 CAMBIADO
+                showNotification(`✅ Descargado: ${fileName}`, 'success'); // 🔥 CAMBIADO
             }, 2000);
             
         } catch (error) {
             console.error('❌ Error en descarga proyecto:', error);
             this.hideDownloadLoader();
             this.isDownloading = false;
-            showAndroidNotification('❌ Error al descargar archivo', 'error');
+            showNotification('❌ Error al descargar archivo', 'error');
         }
     }
     
@@ -12519,7 +12515,7 @@ class DownloadManager {
         console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
         
         if (this.isDownloading) {
-            showAndroidNotification('⏳ Ya hay una descarga en curso', 'info');
+            showNotification('⏳ Ya hay una descarga en curso', 'info');
             return;
         }
         
@@ -12558,7 +12554,7 @@ class DownloadManager {
                 
                 // 🔥 NOTIFICACIÓN DE ÉXITO DESPUÉS DE UN TIEMPO
             setTimeout(() => {
-                showAndroidNotification(`✅ Descargado: ${resourceName}`, 'success'); // 🔥 CAMBIADO
+                showNotification(`✅ Descargado: ${resourceName}`, 'success'); // 🔥 CAMBIADO
                 this.isDownloading = false;
             }, 3000);
                 
@@ -12566,7 +12562,7 @@ class DownloadManager {
             
         } catch (error) {
             console.error('❌ Error en biblioteca:', error);
-            showAndroidNotification('❌ Error al descargar recurso', 'error');
+            showNotification('❌ Error al descargar recurso', 'error');
             this.isDownloading = false;
         }
     }
@@ -12756,7 +12752,7 @@ function initDownloadSystem() {
 }
 
 // 🔥 SISTEMA MEJORADO DE NOTIFICACIONES PARA ANDROID
-function showAndroidNotification(message, type = 'info') {
+function showNotification(message, type = 'info') {
     const isAndroid = /Android/i.test(navigator.userAgent);
     
     if (isAndroid) {
