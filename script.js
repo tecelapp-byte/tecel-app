@@ -353,6 +353,9 @@ function initializeApp() {
     try {
         ('🚀 Inicializando aplicación...');
         
+         // 🔥 SOLICITAR PERMISOS DE NOTIFICACIÓN
+        requestNotificationPermission();
+        
         // 🔥 INICIALIZAR NUEVO SISTEMA DE DESCARGAS
         setTimeout(() => {
             initDownloadSystem();
@@ -9060,6 +9063,11 @@ function getFileIcon(filename) {
 // ==================== FUNCIONES DE PRESENTACIÓN ====================
 
 function showNotification(message, type = 'info', duration = 5000) {
+    // Si es Android y es una descarga, usar notificación mejorada
+    if (/Android/i.test(navigator.userAgent) && message.includes('Descargando') || message.includes('Descargado')) {
+        showAndroidNotification(message, type);
+        return;
+    }
     // Remover notificación existente si hay una
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
@@ -12423,10 +12431,10 @@ class DownloadManager {
     
     handleProjectDownloadClick(element) {
         if (this.isDownloading) {
-            showNotification('⏳ Espera a que termine la descarga actual', 'info');
+            showAndroidNotification('⏳ Espera a que termine la descarga actual', 'info');
             return;
         }
-        
+
         try {
             // Extraer parámetros del onclick
             const onclick = element.closest('[onclick]').getAttribute('onclick');
@@ -12496,64 +12504,72 @@ class DownloadManager {
                 }
                 this.hideDownloadLoader();
                 this.isDownloading = false;
-                showNotification(`✅ Descargado: ${fileName}`, 'success');
+                showAndroidNotification(`✅ Descargado: ${fileName}`, 'success'); // 🔥 CAMBIADO
             }, 2000);
             
         } catch (error) {
             console.error('❌ Error en descarga proyecto:', error);
             this.hideDownloadLoader();
             this.isDownloading = false;
-            showNotification('❌ Error al descargar archivo', 'error');
+            showAndroidNotification('❌ Error al descargar archivo', 'error');
         }
     }
     
     async downloadLibraryResource(resourceId, resourceName) {
-    console.log('🚀 INICIANDO DESCARGA BIBLIOTECA ANDROID:', { resourceId, resourceName });
-    
-    if (this.isDownloading) {
-        showNotification('⏳ Ya hay una descarga en curso', 'info');
-        return;
-    }
-    
-    this.isDownloading = true;
-    this.showDownloadLoader(resourceName);
-    
-    try {
-        // 🔥 MÉTODO 1: USAR EL ENDPOINT UNIVERSAL CON FETCH + BLOB (Más seguro)
-        const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
-        console.log('🔗 URL Biblioteca:', downloadUrl);
+        console.log('🚀 INICIANDO DESCARGA BIBLIOTECA:', { resourceId, resourceName });
         
-        // 🔥 PRIMERO VERIFICAR QUE EL RECURSO EXISTE
-        const checkResponse = await fetch(`${API_BASE}/library/${resourceId}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            }
-        });
-        
-        if (!checkResponse.ok) {
-            throw new Error('Recurso no encontrado');
+        if (this.isDownloading) {
+            showAndroidNotification('⏳ Ya hay una descarga en curso', 'info');
+            return;
         }
         
-        const resourceInfo = await checkResponse.json();
-        console.log('✅ Recurso verificado:', resourceInfo.title);
+        this.isDownloading = true;
         
-        // 🔥 MÉTODO ANDROID-SAFE: Descarga por pasos con timeouts
-        await this.androidSafeDownload(downloadUrl, resourceName);
-        
-    } catch (error) {
-        console.error('❌ Error en biblioteca (Método 1):', error);
-        
-        // 🔥 MÉTODO 2: FALLBACK - Descarga directa super simple
         try {
-            await this.androidFallbackDownload(resourceId, resourceName);
-        } catch (fallbackError) {
-            console.error('❌ Fallback también falló:', fallbackError);
-            this.handleDownloadError(resourceName);
+            // 🔥 MÉTODO SUPER SIMPLE - DEJA QUE ANDROID MANEJE LA DESCARGA
+            const downloadUrl = `https://tecel-app.onrender.com/download/library/${resourceId}`;
+            console.log('🔗 URL Biblioteca:', downloadUrl);
+            
+            // 🔥 MÉTODO DIRECTO QUE PERMITE NOTIFICACIONES NATIVAS
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            link.style.display = 'none';
+            
+            // 🔥 EVENTOS PARA DETECTAR CUÁNDO SE COMPLETA
+            link.addEventListener('click', () => {
+                console.log('✅ Click en enlace - descarga debería iniciar');
+                
+                // Mostrar notificación inmediatamente después del click
+                setTimeout(() => {
+                    showNotification(`📥 Descargando: ${resourceName}`, 'info');
+                }, 500);
+            });
+            
+            document.body.appendChild(link);
+            
+            // 🔥 HACER CLIC Y LIMPIAR RÁPIDAMENTE
+            link.click();
+            
+            setTimeout(() => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+                
+                // 🔥 NOTIFICACIÓN DE ÉXITO DESPUÉS DE UN TIEMPO
+            setTimeout(() => {
+                showAndroidNotification(`✅ Descargado: ${resourceName}`, 'success'); // 🔥 CAMBIADO
+                this.isDownloading = false;
+            }, 3000);
+                
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ Error en biblioteca:', error);
+            showAndroidNotification('❌ Error al descargar recurso', 'error');
+            this.isDownloading = false;
         }
-    } finally {
-        this.cleanupDownload();
     }
-}
     
 // 🔥 MÉTODO SEGURO PARA ANDROID
 async androidSafeDownload(downloadUrl, fileName) {
@@ -12739,6 +12755,41 @@ function initDownloadSystem() {
     console.log('✅ Sistema de descargas listo');
 }
 
+// 🔥 SISTEMA MEJORADO DE NOTIFICACIONES PARA ANDROID
+function showAndroidNotification(message, type = 'info') {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    if (isAndroid) {
+        // 🔥 INTENTAR NOTIFICACIÓN NATIVA DE ANDROID PRIMERO
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                const notification = new Notification('TECEL App', {
+                    body: message,
+                    icon: '/favicon.ico',
+                    tag: 'tecel-download'
+                });
+                
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+                
+                // Cerrar después de 4 segundos
+                setTimeout(() => {
+                    notification.close();
+                }, 4000);
+                
+                return; // Salir si la notificación nativa funciona
+            } catch (error) {
+                console.log('❌ Notificación nativa falló, usando alternativa');
+            }
+        }
+    }
+    
+    // 🔥 FALLBACK: Usar el sistema de notificaciones existente
+    showNotification(message, type);
+}
+
 // 🔥 CONFIGURACIONES ESPECÍFICAS ANDROID
 function setupAndroidSpecificFixes() {
     console.log('📱 Configurando fixes Android...');
@@ -12756,7 +12807,6 @@ function setupAndroidSpecificFixes() {
         console.log('🧠 Límite memoria:', Math.round(performance.memory.jsHeapSizeLimit / 1048576), 'MB');
     }
 }
-
 // Función para actualizar contador de descargas
 async function updateDownloadCount(resourceId) {
     try {
@@ -13550,6 +13600,27 @@ function updateSuggestionStats() {
     if (pendingElement) pendingElement.textContent = pending;
     if (doneElement) doneElement.textContent = done;
 }
+
+// 🔥 SOLICITAR PERMISOS DE NOTIFICACIÓN AL INICIAR
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        console.log('🔔 Solicitando permisos de notificación...');
+        
+        // Esperar a que el usuario interactúe con la app primero
+        const askPermission = () => {
+            Notification.requestPermission().then(permission => {
+                console.log('📢 Permiso de notificación:', permission);
+            });
+        };
+        
+        // Solicitar después de que el usuario haga clic en algún lugar
+        document.addEventListener('click', function once() {
+            setTimeout(askPermission, 1000);
+            document.removeEventListener('click', once);
+        });
+    }
+}
+
 
 function updateLibraryStats() {
     if (!libraryResources || libraryResources.length === 0) {
