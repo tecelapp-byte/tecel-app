@@ -363,11 +363,8 @@ function initializeApp() {
         initNewDesign();
         initNewSections();
         
-        // Inicializar sistema de descargas (con manejo de errores)
-        const downloadSystemReady = initDownloadSystem();
-        if (!downloadSystemReady) {
-            console.warn('⚠️ Sistema de descargas usando modo fallback');
-        }
+        // Inicializar sistema de descargas (solo estilos si es móvil)
+        initDownloadSystem();
         
         // Iniciar verificador de token
         startTokenChecker();
@@ -1986,177 +1983,55 @@ function setupIdeaStudentSearch() {
 }
 
 function initMobileDownloadStyles() {
-    try {
-        const style = document.createElement('style');
-        style.textContent = `
-            .mobile-download-modal {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.95);
-                z-index: 10000;
-                justify-content: center;
-                align-items: center;
-                font-family: 'Roboto', -apple-system, sans-serif;
-            }
-            
-            .mobile-download-modal.active {
-                display: flex;
-            }
-            
-            .mobile-download-content {
-                background: linear-gradient(135deg, #ffffff, #f8f9fa);
-                padding: 2rem;
-                border-radius: 20px;
-                text-align: center;
-                max-width: 95%;
-                max-height: 95%;
-                overflow-y: auto;
-                box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-                border: 2px solid #e0e0e0;
-            }
-            
-            .download-icon {
-                font-size: 3.5rem;
-                margin-bottom: 1rem;
-                animation: pulse 2s infinite;
-            }
-            
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.1); }
-                100% { transform: scale(1); }
-            }
-            
-            .download-progress {
-                width: 100%;
-                height: 10px;
-                background: #e0e0e0;
-                border-radius: 5px;
-                margin: 1.5rem 0;
-                overflow: hidden;
-                box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-            }
-            
-            .download-progress-bar {
-                height: 100%;
-                background: linear-gradient(90deg, #2196F3, #1976D2);
-                width: 0%;
-                transition: width 0.4s ease;
-                border-radius: 5px;
-            }
-            
-            #apk-download-info {
-                background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-                border-left: 4px solid #2196F3;
-                animation: slideInUp 0.5s ease-out;
-            }
-            
-            @keyframes slideInUp {
-                from { 
-                    opacity: 0; 
-                    transform: translateY(30px); 
-                }
-                to { 
-                    opacity: 1; 
-                    transform: translateY(0); 
-                }
-            }
-            
-            .btn-primary {
-                background: linear-gradient(135deg, #2196F3, #1976D2);
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 25px;
-                font-size: 1rem;
-                font-weight: 600;
-                cursor: pointer;
-                margin: 5px;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-            }
-            
-            .btn-primary:active {
-                transform: translateY(2px);
-                box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
-            }
-            
-            .btn-outline {
-                background: transparent;
-                color: #666;
-                border: 2px solid #bdbdbd;
-                padding: 10px 20px;
-                border-radius: 25px;
-                font-size: 1rem;
-                cursor: pointer;
-                margin: 5px;
-                transition: all 0.3s ease;
-            }
-            
-            .btn-outline:active {
-                background: #f5f5f5;
-                transform: translateY(2px);
-            }
-        `;
-        document.head.appendChild(style);
-        console.log('✅ Estilos de descarga móvil cargados');
-    } catch (error) {
-        console.error('❌ Error cargando estilos:', error);
-    }
+    const style = document.createElement('style');
+    style.textContent = `
+        .download-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .download-loading.active {
+            display: flex;
+        }
+        
+        .download-loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
-// Agrega esta función para ayudar a encontrar archivos
-function showFileSearchHelp(fileName) {
-    const helpHTML = `
-        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                   background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                   z-index: 10001; max-width: 90%; text-align: center;">
-            <h3>🔍 ¿No encuentras el archivo?</h3>
-            <p><strong>"${fileName}"</strong></p>
-            
-            <div style="text-align: left; margin: 1rem 0; background: #f8f9fa; padding: 1rem; border-radius: 10px;">
-                <h4>📁 Busca en estas ubicaciones:</h4>
-                <ul style="margin-left: 1.5rem;">
-                    <li><strong>Internal Storage/Download/</strong></li>
-                    <li><strong>Internal Storage/Downloads/</strong></li>
-                    <li><strong>Internal Storage/DCIM/Download/</strong></li>
-                    <li><strong>Internal Storage/Documents/</strong></li>
-                </ul>
-                
-                <h4>💡 Cómo buscar:</h4>
-                <ol style="margin-left: 1.5rem;">
-                    <li>Abre la app <strong>"Archivos"</strong> o <strong>"Mi archivo"</strong></li>
-                    <li>Toca en <strong>"Internal Storage"</strong></li>
-                    <li>Busca la carpeta <strong>"Download"</strong></li>
-                    <li>O usa la lupa 🔍 para buscar: <strong>"${fileName}"</strong></li>
-                </ol>
+function showDownloadLoading(fileName) {
+    const loadingHTML = `
+        <div class="download-loading active">
+            <div class="download-loading-content">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📥</div>
+                <h3>Descargando...</h3>
+                <p>${fileName}</p>
+                <p style="color: #666; font-size: 0.9rem;">El archivo se guardará en tu carpeta de Descargas</p>
             </div>
-            
-            <button onclick="this.parentElement.remove()" class="btn-primary" 
-                    style="margin-top: 1rem;">Entendido</button>
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', helpHTML);
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
 }
 
-// Agrega este botón adicional en el modal (opcional)
-function addSearchHelpButton() {
-    const helpButton = document.createElement('button');
-    helpButton.textContent = '¿No encuentras el archivo?';
-    helpButton.className = 'btn-outline';
-    helpButton.style.marginTop = '1rem';
-    helpButton.onclick = () => {
-        const fileName = document.getElementById('download-file-name').textContent;
-        showFileSearchHelp(fileName);
-    };
-    
-    const modalContent = document.querySelector('.mobile-download-content');
-    modalContent.appendChild(helpButton);
+function hideDownloadLoading() {
+    const loading = document.querySelector('.download-loading');
+    if (loading) {
+        loading.remove();
+    }
 }
 
 // Función para cancelar selección en ideas
@@ -9406,451 +9281,68 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
-// REEMPLAZA completamente la clase MobileDownloadManager con esta versión corregida
-class MobileDownloadManager {
-    constructor() {
-        this.isAndroid = /Android/i.test(navigator.userAgent);
-        this.isWebView = this.detectWebView();
-        this.currentDownload = null;
-        this.init();
-    }
-
-    detectWebView() {
-        try {
-            const userAgent = navigator.userAgent.toLowerCase();
-            return userAgent.includes('wv') || 
-                   (userAgent.includes('android') && !userAgent.includes('chrome'));
-        } catch (error) {
-            return false;
-        }
-    }
-
-    init() {
-        console.log('🔄 Inicializando MobileDownloadManager...');
-        try {
-            this.createDownloadModal();
-            this.setupGlobalListeners();
-            this.setupWebViewBridge();
-            console.log('✅ MobileDownloadManager inicializado correctamente');
-        } catch (error) {
-            console.error('❌ Error en init:', error);
-        }
-    }
-
-    setupGlobalListeners() {
-        console.log('🔧 Configurando listeners globales...');
-        try {
-            // Interceptar clicks en enlaces de descarga
-            document.addEventListener('click', (e) => {
-                const downloadBtn = e.target.closest('[data-download]');
-                if (downloadBtn && this.isAndroid) {
-                    e.preventDefault();
-                    const type = downloadBtn.dataset.downloadType;
-                    const id = downloadBtn.dataset.downloadId;
-                    const name = downloadBtn.dataset.downloadName;
-                    
-                    if (type && id && name) {
-                        this.handleDownload(type, id, name);
-                    }
-                }
-            });
-            console.log('✅ Listeners globales configurados');
-        } catch (error) {
-            console.error('❌ Error configurando listeners:', error);
-        }
-    }
-
-    setupWebViewBridge() {
-        try {
-            if (window.AndroidInterface) {
-                console.log('✅ Interfaz Android disponible');
-            } else {
-                console.log('⚠️ Ejecutando en modo WebView estándar');
-            }
-        } catch (error) {
-            console.error('❌ Error en WebView bridge:', error);
-        }
-    }
-
-    createDownloadModal() {
-        try {
-            const modalHTML = `
-                <div id="mobile-download-modal" class="mobile-download-modal">
-                    <div class="mobile-download-content">
-                        <div class="download-icon">📥</div>
-                        <h3 id="download-file-name">Preparando descarga...</h3>
-                        <div class="download-progress">
-                            <div id="download-progress-bar" class="download-progress-bar"></div>
-                        </div>
-                        <p id="download-message">Iniciando descarga...</p>
-                        
-                        <div id="apk-download-info" style="display: none; margin-top: 1rem; padding: 1rem; background: #e3f2fd; border-radius: 8px; text-align: left;">
-                            <h4 style="margin: 0 0 0.5rem 0; color: #1565c0;">📱 Descarga en APK</h4>
-                            <div id="apk-file-location" style="font-family: monospace; font-size: 0.9rem; color: #1976d2;"></div>
-                            <div id="apk-instructions" style="font-size: 0.8rem; color: #424242; margin-top: 0.5rem;"></div>
-                        </div>
-
-                        <div style="margin-top: 1.5rem;">
-                            <button id="cancel-download" class="btn-outline" style="margin-right: 1rem;">Cerrar</button>
-                            <button id="open-downloads" class="btn-primary" style="display: none;">Abrir Descargas</button>
-                            <button id="retry-download" class="btn-primary" style="display: none;">Reintentar</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            this.setupModalEvents();
-            console.log('✅ Modal de descarga creado');
-        } catch (error) {
-            console.error('❌ Error creando modal:', error);
-        }
-    }
-
-    setupModalEvents() {
-        try {
-            document.getElementById('cancel-download').addEventListener('click', () => {
-                this.closeModal();
-            });
-
-            document.getElementById('open-downloads').addEventListener('click', () => {
-                this.openDownloadsFolder();
-            });
-
-            document.getElementById('retry-download').addEventListener('click', () => {
-                this.retryDownload();
-            });
-            console.log('✅ Eventos del modal configurados');
-        } catch (error) {
-            console.error('❌ Error configurando eventos del modal:', error);
-        }
-    }
-
-    async handleDownload(type, id, fileName) {
-        console.log('📱 Descarga en APK:', { type, id, fileName });
-        
-        this.currentDownload = { type, id, fileName };
-        this.showModal(fileName);
-        
-        try {
-            const downloadUrl = this.getDownloadUrl(type, id);
-            await this.webViewDownloadStrategy(downloadUrl, fileName);
-            
-        } catch (error) {
-            console.error('❌ Error en descarga APK:', error);
-            this.showDownloadError('Error: ' + error.message);
-        }
-    }
-
-    async webViewDownloadStrategy(downloadUrl, fileName) {
-        this.updateProgress(20, 'Solicitando permiso...');
-        
-        // Intentar método nativo primero
-        if (await this.tryNativeDownload(downloadUrl, fileName)) {
-            return;
-        }
-        
-        this.updateProgress(40, 'Usando método WebView...');
-        
-        // Método para WebView estándar
-        await this.standardWebViewDownload(downloadUrl, fileName);
-    }
-
-    async tryNativeDownload(downloadUrl, fileName) {
-        return new Promise((resolve) => {
-            try {
-                if (window.AndroidInterface && typeof window.AndroidInterface.downloadFile === 'function') {
-                    window.AndroidInterface.downloadFile(downloadUrl, fileName);
-                    this.updateProgress(60, 'Descargando vía nativa...');
-                    
-                    setTimeout(() => {
-                        this.updateProgress(100, '¡Descarga completada!');
-                        this.showAPKDownloadSuccess(fileName);
-                        resolve(true);
-                    }, 2000);
-                } else {
-                    resolve(false);
-                }
-            } catch (error) {
-                console.log('Método nativo falló:', error);
-                resolve(false);
-            }
-        });
-    }
-
-    async standardWebViewDownload(downloadUrl, fileName) {
-        this.updateProgress(60, 'Preparando archivo...');
-        
-        try {
-            const response = await fetch(downloadUrl);
-            if (!response.ok) throw new Error('Error del servidor');
-            
-            const blob = await response.blob();
-            
-            this.updateProgress(80, 'Guardando archivo...');
-            
-            const blobUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = fileName;
-            link.style.display = 'none';
-            link.setAttribute('target', '_blank');
-            link.setAttribute('rel', 'noopener noreferrer');
-            
-            document.body.appendChild(link);
-            
-            const clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
-                cancelable: true
-            });
-            
-            link.dispatchEvent(clickEvent);
-            link.click();
-            
-            document.body.removeChild(link);
-            
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-            
-            this.updateProgress(100, '¡Descarga iniciada!');
-            this.showAPKDownloadSuccess(fileName);
-            
-        } catch (error) {
-            console.log('Método blob falló, intentando descarga directa...');
-            this.fallbackWebViewDownload(downloadUrl, fileName);
-        }
-    }
-
-    fallbackWebViewDownload(downloadUrl, fileName) {
-        const iframe = document.createElement('iframe');
-        iframe.src = downloadUrl;
-        iframe.style.display = 'none';
-        iframe.onload = () => {
-            this.updateProgress(100, '¡Descarga en segundo plano!');
-            this.showAPKDownloadSuccess(fileName);
-        };
-        
-        document.body.appendChild(iframe);
-        
-        setTimeout(() => {
-            window.open(downloadUrl, '_blank');
-        }, 1000);
-        
-        setTimeout(() => {
-            if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
-            }
-        }, 10000);
-    }
-
-    showAPKDownloadSuccess(fileName) {
-        this.showAPKFileLocation(fileName);
-        document.getElementById('open-downloads').style.display = 'inline-block';
-        document.getElementById('cancel-download').textContent = 'Continuar';
-        this.showAPKNotification(fileName);
-    }
-
-    showAPKFileLocation(fileName) {
-        try {
-            const apkInfo = document.getElementById('apk-download-info');
-            const locationElement = document.getElementById('apk-file-location');
-            const instructionsElement = document.getElementById('apk-instructions');
-            
-            locationElement.innerHTML = `
-                <strong>📍 Ruta en WebView:</strong><br>
-                • <strong>/storage/emulated/0/Download/${fileName}</strong><br>
-                • <strong>/storage/emulated/0/Android/data/[app-package]/files/Download/${fileName}</strong>
-            `;
-            
-            instructionsElement.innerHTML = `
-                💡 <strong>En tu APK TECEL:</strong><br>
-                1. El archivo se descarga en segundo plano<br>
-                2. Revisa la carpeta <strong>"Descargas"</strong> de tu dispositivo<br>
-                3. Busca: <strong>"${fileName}"</strong><br>
-                4. Si no aparece, usa el botón <strong>"Abrir Descargas"</strong>
-            `;
-            
-            apkInfo.style.display = 'block';
-        } catch (error) {
-            console.error('Error mostrando ubicación:', error);
-        }
-    }
-
-    showAPKNotification(fileName) {
-        try {
-            if (navigator.vibrate) {
-                navigator.vibrate([300, 100, 300]);
-            }
-            
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('✅ TECEL - Descarga APK', {
-                    body: `${fileName} descargado\nRevisa tu carpeta de Descargas`,
-                    icon: '/favicon.ico',
-                    tag: 'tecel-apk-download'
-                });
-            }
-            
-            showNotification(`📱 ${fileName} - Descarga en progreso`, 'success', 5000);
-        } catch (error) {
-            console.error('Error en notificación:', error);
-        }
-    }
-
-    openDownloadsFolder() {
-        try {
-            const methods = [
-                () => window.open('content://downloads/all_downloads', '_blank'),
-                () => window.open('file:///storage/emulated/0/Download', '_blank'),
-                () => window.open('intent://filemanager/#Intent;action=android.intent.action.VIEW;end', '_blank')
-            ];
-            
-            methods.forEach(method => {
-                try {
-                    method();
-                } catch (e) {
-                    console.log('Método falló:', e);
-                }
-            });
-            
-            showNotification('🔍 Abriendo administrador de archivos...', 'info', 3000);
-        } catch (error) {
-            console.error('Error abriendo descargas:', error);
-        }
-    }
-
-    showDownloadError(message) {
-        try {
-            document.getElementById('retry-download').style.display = 'inline-block';
-            document.getElementById('download-message').textContent = message;
-            document.getElementById('download-message').style.color = '#f44336';
-            
-            showNotification('❌ ' + message, 'error', 5000);
-        } catch (error) {
-            console.error('Error mostrando error:', error);
-        }
-    }
-
-    retryDownload() {
-        if (this.currentDownload) {
-            const { type, id, fileName } = this.currentDownload;
-            this.handleDownload(type, id, fileName);
-        }
-    }
-
-    showModal(fileName) {
-        try {
-            document.getElementById('download-file-name').textContent = fileName;
-            document.getElementById('mobile-download-modal').classList.add('active');
-            this.resetProgress();
-        } catch (error) {
-            console.error('Error mostrando modal:', error);
-        }
-    }
-
-    closeModal() {
-        try {
-            document.getElementById('mobile-download-modal').classList.remove('active');
-            this.resetProgress();
-        } catch (error) {
-            console.error('Error cerrando modal:', error);
-        }
-    }
-
-    updateProgress(percent, message) {
-        try {
-            document.getElementById('download-progress-bar').style.width = percent + '%';
-            document.getElementById('download-message').textContent = message;
-            document.getElementById('download-message').style.color = '#333';
-        } catch (error) {
-            console.error('Error actualizando progreso:', error);
-        }
-    }
-
-    resetProgress() {
-        try {
-            document.getElementById('download-progress-bar').style.width = '0%';
-            document.getElementById('download-message').textContent = 'Iniciando descarga...';
-            document.getElementById('download-message').style.color = '#333';
-            document.getElementById('apk-download-info').style.display = 'none';
-            document.getElementById('open-downloads').style.display = 'none';
-            document.getElementById('retry-download').style.display = 'none';
-            document.getElementById('cancel-download').textContent = 'Cerrar';
-        } catch (error) {
-            console.error('Error reseteando progreso:', error);
-        }
-    }
-
-    getDownloadUrl(type, id) {
-        const baseUrl = `${API_BASE}/download`;
-        switch(type) {
-            case 'project-file':
-                return `${baseUrl}/file/${id}`;
-            case 'library-resource':
-                return `${baseUrl}/library/${id}`;
-            default:
-                return `${baseUrl}/${type}/${id}`;
-        }
-    }
-}
-
-// REEMPLAZA las funciones de descarga con estas versiones seguras
+// FUNCIONES UNIVERSALES DE DESCARGA - FUNCIONAN EN TODOS LOS DISPOSITIVOS
 window.downloadProjectFile = function(projectId, fileId, fileName) {
-    try {
-        console.log('📥 Iniciando descarga de proyecto:', { projectId, fileId, fileName });
-        
-        // Verificar si el sistema de descargas está inicializado
-        if (!window.mobileDownloadManager) {
-            console.error('❌ MobileDownloadManager no inicializado');
-            // Fallback: descarga directa
-            const downloadUrl = `${API_BASE}/files/download/${fileId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${fileName}`, 'success');
-            return;
-        }
-        
-        // Usar el sistema de descargas móviles si es Android
-        if (window.mobileDownloadManager.isAndroid) {
-            window.mobileDownloadManager.handleDownload('project-file', fileId, fileName);
-        } else {
-            // Comportamiento normal para desktop
-            const downloadUrl = `${API_BASE}/files/download/${fileId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${fileName}`, 'success');
-        }
-    } catch (error) {
-        console.error('❌ Error en downloadProjectFile:', error);
-        // Fallback seguro
-        const downloadUrl = `${API_BASE}/files/download/${fileId}`;
-        window.open(downloadUrl, '_blank');
-        showNotification(`Descargando: ${fileName}`, 'success');
+    console.log('📥 Descargando archivo:', fileName);
+    
+    // Mostrar loading solo en móviles
+    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        showDownloadLoading(fileName);
     }
+    
+    // URL de descarga universal - igual para todos los dispositivos
+    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+    
+    // Método universal que funciona en APK, navegador móvil y desktop
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName; // Esto fuerza la descarga en la mayoría de navegadores
+    link.target = '_blank';   // Esto ayuda en WebView de Android
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // También abrir en nueva pestaña como fallback
+    setTimeout(() => {
+        window.open(downloadUrl, '_blank');
+    }, 100);
+    
+    // Ocultar loading después de un tiempo
+    setTimeout(() => {
+        hideDownloadLoading();
+        showNotification(`✅ ${fileName} - Descarga iniciada`, 'success', 3000);
+    }, 2000);
 };
 
 window.downloadLibraryResource = function(resourceId, resourceName) {
-    try {
-        console.log('📚 Iniciando descarga de biblioteca:', { resourceId, resourceName });
-        
-        if (!window.mobileDownloadManager) {
-            console.error('❌ MobileDownloadManager no inicializado');
-            const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${resourceName}`, 'success');
-            return;
-        }
-        
-        if (window.mobileDownloadManager.isAndroid) {
-            window.mobileDownloadManager.handleDownload('library-resource', resourceId, resourceName);
-        } else {
-            const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-            window.open(downloadUrl, '_blank');
-            showNotification(`Descargando: ${resourceName}`, 'success');
-        }
-    } catch (error) {
-        console.error('❌ Error en downloadLibraryResource:', error);
-        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-        window.open(downloadUrl, '_blank');
-        showNotification(`Descargando: ${resourceName}`, 'success');
+    console.log('📚 Descargando recurso:', resourceName);
+    
+    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        showDownloadLoading(resourceName);
     }
+    
+    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+    
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = resourceName;
+    link.target = '_blank';
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setTimeout(() => {
+        window.open(downloadUrl, '_blank');
+    }, 100);
+    
+    setTimeout(() => {
+        hideDownloadLoading();
+        showNotification(`✅ ${resourceName} - Descarga iniciada`, 'success', 3000);
+    }, 2000);
 };
 
 // 4. Función universal de descarga
@@ -9864,30 +9356,16 @@ function universalDownload(type, id, fileName) {
     }
 }
 
+// SISTEMA SIMPLIFICADO DE DESCARGAS PARA APK
 function initDownloadSystem() {
-    try {
-        console.log('🔄 Inicializando sistema de descargas...');
+    console.log('📱 Configurando descargas para APK...');
+    
+    // Solo agregar estilos básicos si es móvil
+    if (/Android/i.test(navigator.userAgent)) {
         initMobileDownloadStyles();
-        
-        // Crear instancia del gestor de descargas
-        window.mobileDownloadManager = new MobileDownloadManager();
-        
-        console.log('✅ Sistema de descargas inicializado correctamente');
-        return true;
-    } catch (error) {
-        console.error('❌ Error inicializando sistema de descargas:', error);
-        // Fallback: crear un objeto básico para evitar errores
-        window.mobileDownloadManager = {
-            isAndroid: /Android/i.test(navigator.userAgent),
-            handleDownload: function(type, id, fileName) {
-                const downloadUrl = `${API_BASE}/download/${type}/${id}`;
-                window.open(downloadUrl, '_blank');
-                showNotification(`Descargando: ${fileName}`, 'success');
-            }
-        };
-        return false;
     }
 }
+
 
 function addWebViewMetaTags() {
     // Meta tags para mejor compatibilidad con WebView

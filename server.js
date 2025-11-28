@@ -2408,26 +2408,56 @@ app.get('/api/debug/db-structure', authenticateToken, async (req, res) => {
   }
 });
 
-// Ruta de descarga universal optimizada para WebView
 app.get('/download/:type/:id', async (req, res) => {
     try {
         const { type, id } = req.params;
+        console.log('📥 Descarga solicitada:', { type, id });
         
-        console.log('📱 Descarga WebView solicitada:', { type, id });
+        let fileData, fileName, fileType;
         
-        // Headers optimizados para WebView de Android
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${req.query.filename || 'file'}"`);
+        if (type === 'file') {
+            // Descargar archivo de proyecto
+            const result = await pool.query('SELECT * FROM project_files WHERE id = $1', [id]);
+            if (result.rows.length === 0) return res.status(404).send('Archivo no encontrado');
+            
+            const file = result.rows[0];
+            fileData = file.file_data;
+            fileName = file.original_name;
+            fileType = file.file_type;
+            
+        } else if (type === 'library') {
+            // Descargar recurso de biblioteca
+            const result = await pool.query('SELECT * FROM library_resources WHERE id = $1', [id]);
+            if (result.rows.length === 0) return res.status(404).send('Recurso no encontrado');
+            
+            const resource = result.rows[0];
+            fileData = resource.file_data;
+            fileName = resource.file_name || resource.title;
+            fileType = resource.file_type;
+        }
+        
+        if (!fileData) return res.status(404).send('Datos no disponibles');
+        
+        // HEADERS CRÍTICOS PARA ANDROID APK
+        const fileBuffer = Buffer.from(fileData, 'base64');
+        
+        res.setHeader('Content-Type', fileType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         res.setHeader('Access-Control-Allow-Origin', '*');
         
-        // Lógica para servir el archivo según el tipo...
-        // (tu código existente aquí)
+        // Headers adicionales para Android WebView
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Accept-Ranges', 'bytes');
+        
+        console.log('✅ Enviando archivo:', fileName);
+        res.send(fileBuffer);
         
     } catch (error) {
-        console.error('❌ Error en descarga WebView:', error);
+        console.error('❌ Error en descarga:', error);
         res.status(500).send('Error en descarga');
     }
 });
