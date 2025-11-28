@@ -12509,55 +12509,40 @@ class DownloadManager {
     }
     
 async downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 Iniciando descarga de recurso biblioteca: ${resourceName} (ID: ${resourceId})`);
+    console.log(`📥 BIBLIOTECA - Copiando método de proyectos: ${resourceName}`);
     
     try {
-        // 🔥 USAR EXACTAMENTE EL MISMO SISTEMA QUE PROYECTOS
         showDownloadLoading(resourceName);
         
-        // MISMA URL que proyectos pero cambiando el tipo
+        // 🔥 USAR EXACTAMENTE LA MISMA LÓGICA QUE downloadProjectFile
         const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-        console.log(`🔗 URL de descarga biblioteca: ${downloadUrl}`);
         
-        // 🔥 MÉTODO EXACTO COMO EN downloadProjectFile
-        if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Dispositivo Android detectado - usando método especial');
-            
-            // Abrir en nueva pestaña (mismo método que proyectos)
-            const newWindow = window.open(downloadUrl, '_blank');
-            
-            if (!newWindow) {
-                console.log('❌ Popup bloqueado, usando método alternativo');
-                // Método alternativo igual que en proyectos
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = resourceName;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        } else {
-            // Para desktop - mismo método exacto
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName;
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        // Pequeña modificación: agregar timestamp para evitar cache
+        const timestamp = Date.now();
+        const finalUrl = `${downloadUrl}?t=${timestamp}`;
         
-        // MISMO TIMEOUT que proyectos
+        console.log('🔗 URL final:', finalUrl);
+        
+        // Método que ya funciona en proyectos
+        const link = document.createElement('a');
+        link.href = finalUrl;
+        link.setAttribute('download', resourceName);
+        link.setAttribute('target', '_blank');
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Mismo timeout que proyectos
         setTimeout(() => {
             hideDownloadLoading();
-            showNotification(`📥 Descarga iniciada: ${resourceName}`, 'success');
-        }, 2000);
+            showNotification(`✅ Descarga de biblioteca iniciada`, 'success');
+        }, 2500);
         
     } catch (error) {
-        console.error('❌ Error en descarga de recurso biblioteca:', error);
+        console.error('❌ Error descarga biblioteca:', error);
         hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
+        showNotification('Error al descargar recurso de biblioteca', 'error');
     }
 }
 
