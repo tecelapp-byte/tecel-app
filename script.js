@@ -3102,7 +3102,7 @@ function createLibraryCard(resource) {
     <div class="library-card-actions">
         ${isFileResource ? 
             `<button class="btn-primary btn-sm" 
-                     onclick="event.stopPropagation(); downloadLibraryResourceDirect(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
+                     onclick="event.stopPropagation(); downloadLibraryResource(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
                 <i class="fas fa-download"></i> Descargar
             </button>` : ''}
             
@@ -12606,28 +12606,40 @@ function initDownloadSystem() {
     console.log('✅ Nuevo sistema de descargas listo');
 }
 
-// REEMPLAZA completamente la función downloadLibraryResource con esta:
+// REEMPLAZA la función downloadLibraryResource con ESTA:
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 DESCARGANDO DESDE BIBLIOTECA: ${resourceName}`);
+    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
     
     try {
-        // Mostrar loading igual que proyectos
         showDownloadLoading(resourceName);
         
-        // Para Android WebView, necesitamos un enfoque diferente
-        if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 ANDROID - Usando método compatible WebView');
-            await downloadForAndroidWebView(resourceId, resourceName, 'library');
-        } else {
-            // Para desktop usar método normal
-            console.log('💻 DESKTOP - Método normal');
-            await downloadForDesktop(resourceId, resourceName, 'library');
-        }
+        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
+        // En Android WebView, no podemos usar window.open ni crear elementos <a>
+        // Tenemos que usar el sistema de descargas nativo de Android
+        
+        // Paso 1: Obtener la URL de descarga
+        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+        console.log('🔗 URL para Android:', downloadUrl);
+        
+        // Paso 2: Para Android WebView, necesitamos usar un Intent
+        // Esto se hace a través del WebViewClient
+        setTimeout(() => {
+            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
+            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
+            window.location.href = downloadUrl;
+            
+            // Ocultar loading después de un tiempo
+            setTimeout(() => {
+                hideDownloadLoading();
+                showNotification('Descarga iniciada en segundo plano', 'info');
+            }, 3000);
+            
+        }, 1000);
         
     } catch (error) {
-        console.error('❌ Error en descarga biblioteca:', error);
+        console.error('❌ Error Android:', error);
         hideDownloadLoading();
-        showNotification('Error al descargar el recurso', 'error');
+        showNotification('Error en descarga', 'error');
     }
 }
 
