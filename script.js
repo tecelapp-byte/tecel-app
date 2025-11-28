@@ -83,9 +83,9 @@ window.uploadedFiles = [];
 
 // CONFIGURACIÓN PARA PRODUCCIÓN/ANDROID
 const isAndroid = /Android/i.test(navigator.userAgent);
-const isLocalhost = window.location.hostname === 'localhost' || 
-                    window.location.hostname === '127.0.0.1' ||
-                    window.location.hostname === '192.168.1.34';
+const isLocalhost = window.location.hostname === 'https://tecel-app.onrender.com/api' || 
+                    window.location.hostname === 'https://tecel-app.onrender.com/api' ||
+                    window.location.hostname === 'https://tecel-app.onrender.com/api';
 
 // URL base dinámica
 const API_BASE = isAndroid ? 'https://tecel-app.onrender.com/api' : 
