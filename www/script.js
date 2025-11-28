@@ -85,12 +85,10 @@ window.uploadedFiles = [];
 const isAndroid = /Android/i.test(navigator.userAgent);
 const isLocalhost = window.location.hostname === 'localhost' || 
                     window.location.hostname === '127.0.0.1' ||
-                    window.location.hostname === '192.168.1.34';
+                    window.location.hostname === '';
 
-// URL base dinámica
-const API_BASE = isAndroid ? 'https://tecel-app.onrender.com/api' : 
-                 isLocalhost ? 'http://localhost:3000/api' : 
-                 '/api';
+// URL base dinámica - CORREGIDA
+const API_BASE = isAndroid || !isLocalhost ? 'https://tecel-app.onrender.com/api' : 'http://localhost:3000/api';
 
 console.log('🚀 Entorno detectado:', {
     userAgent: navigator.userAgent,
@@ -109,7 +107,7 @@ window.APP_CONFIG = {
 
 const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000' 
-    : 'https://tecel-app.onrender/api.com';
+    : 'https://tecel-app.onrender.com'; // ← CORREGIDO
 
 // Override global para manejar FormData correctamente
 const originalFetch = window.fetch;

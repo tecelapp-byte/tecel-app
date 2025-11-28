@@ -3,7 +3,8 @@
   "appName": "APP TECEL",
   "webDir": "www",
   "server": {
-    "androidScheme": "https"
+    "url": "https://tecel-app.onrender.com",
+    "cleartext": true
   },
   "plugins": {
     "SplashScreen": {

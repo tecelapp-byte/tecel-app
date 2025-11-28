@@ -2013,13 +2013,16 @@ function initMobileDownloadStyles() {
 }
 
 function showDownloadLoading(fileName) {
+    // Remover loading existente
+    hideDownloadLoading();
+    
     const loadingHTML = `
         <div class="download-loading active">
             <div class="download-loading-content">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">📥</div>
-                <h3>Descargando...</h3>
-                <p>${fileName}</p>
-                <p style="color: #666; font-size: 0.9rem;">El archivo se guardará en tu carpeta de Descargas</p>
+                <div class="download-loading-spinner"></div>
+                <h3 style="margin-bottom: 0.5rem; color: #333;">📥 Descargando...</h3>
+                <p style="color: #666; margin-bottom: 0.5rem; word-break: break-word;">${fileName}</p>
+                <p style="color: #888; font-size: 0.8rem;">El archivo se guardará en tu carpeta de Descargas</p>
             </div>
         </div>
     `;
@@ -6296,6 +6299,11 @@ function generateSafeFileName(originalName) {
   return finalName;
 }
 
+// Función para verificar si es Android
+function isAndroidDevice() {
+    return /Android/i.test(navigator.userAgent);
+}
+
 // Función para verificar que todos los sistemas de conversión estén funcionando
 function verifyConversionSystems() {
     ('=== VERIFICACIÓN SISTEMAS DE CONVERSIÓN ===');
@@ -9299,45 +9307,125 @@ function androidDownloadFallback(url, fileName) {
     }
 }
 
-// Versión mejorada de las funciones de descarga
-window.downloadProjectFile = function(projectId, fileId, fileName) {
-    const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+async function downloadProjectFile(projectId, fileId, fileName) {
+    console.log('📥 INICIANDO DESCARGA DE PROYECTO:', { projectId, fileId, fileName });
     
-    if (/Android/i.test(navigator.userAgent)) {
-        showDownloadLoading(fileName);
-        androidDownloadFallback(downloadUrl, fileName);
-    } else {
-        // Para desktop y otros dispositivos
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = fileName;
-        link.click();
-    }
-    
-    setTimeout(() => {
-        hideDownloadLoading();
-        showNotification(`📥 ${fileName} descargándose`, 'success', 3000);
-    }, 1500);
-};
+    try {
+        // Mostrar loading en móvil
+        if (isAndroid) {
+            showDownloadLoading(fileName);
+        }
 
-window.downloadLibraryResource = function(resourceId, resourceName) {
-    const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
-    
-    if (/Android/i.test(navigator.userAgent)) {
-        showDownloadLoading(resourceName);
-        androidDownloadFallback(downloadUrl, resourceName);
-    } else {
+        // Usar la ruta universal de descarga
+        const downloadUrl = `${API_BASE}/download/file/${fileId}`;
+        console.log('🔗 URL de descarga:', downloadUrl);
+
+        // Crear enlace temporal para descarga
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = resourceName;
+        link.download = fileName; // Usar el nombre original del archivo
+        link.target = '_blank'; // Abrir en nueva pestaña/ventana
+        
+        // Configurar atributos para móvil
+        link.setAttribute('download', fileName);
+        link.setAttribute('type', 'application/octet-stream');
+        
+        // Agregar al DOM temporalmente
+        document.body.appendChild(link);
+        
+        // Disparar el click programáticamente
         link.click();
+        
+        // Limpiar después de un tiempo
+        setTimeout(() => {
+            document.body.removeChild(link);
+            if (isAndroid) {
+                hideDownloadLoading();
+            }
+            console.log('✅ Descarga iniciada para:', fileName);
+        }, 1000);
+
+        // Mostrar notificación de éxito
+        showNotification(`Descargando: ${fileName}`, 'success');
+
+    } catch (error) {
+        console.error('❌ Error en descarga de proyecto:', error);
+        
+        if (isAndroid) {
+            hideDownloadLoading();
+        }
+        
+        // Fallback: abrir en nueva ventana
+        try {
+            const fallbackUrl = `${API_BASE}/download/file/${fileId}`;
+            window.open(fallbackUrl, '_blank');
+            showNotification(`Abriendo descarga: ${fileName}`, 'info');
+        } catch (fallbackError) {
+            console.error('❌ Error en fallback:', fallbackError);
+            showNotification('Error al descargar el archivo', 'error');
+        }
     }
+}
+
+async function downloadLibraryResource(resourceId, resourceName) {
+    console.log('📥 INICIANDO DESCARGA DE BIBLIOTECA:', { resourceId, resourceName });
     
-    setTimeout(() => {
-        hideDownloadLoading();
-        showNotification(`📥 ${resourceName} descargándose`, 'success', 3000);
-    }, 1500);
-};
+    try {
+        // Mostrar loading en móvil
+        if (isAndroid) {
+            showDownloadLoading(resourceName);
+        }
+
+        // Usar la ruta universal de descarga
+        const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
+        console.log('🔗 URL de descarga biblioteca:', downloadUrl);
+
+        // Crear enlace temporal para descarga
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        
+        // Generar nombre seguro para el archivo
+        const safeFileName = generateSafeFileName(resourceName);
+        link.download = safeFileName;
+        link.target = '_blank';
+        
+        // Configurar atributos
+        link.setAttribute('download', safeFileName);
+        link.setAttribute('type', 'application/octet-stream');
+        
+        // Agregar al DOM y disparar click
+        document.body.appendChild(link);
+        link.click();
+        
+        // Limpiar
+        setTimeout(() => {
+            document.body.removeChild(link);
+            if (isAndroid) {
+                hideDownloadLoading();
+            }
+            console.log('✅ Descarga de biblioteca iniciada:', safeFileName);
+        }, 1000);
+
+        showNotification(`Descargando: ${resourceName}`, 'success');
+
+    } catch (error) {
+        console.error('❌ Error en descarga de biblioteca:', error);
+        
+        if (isAndroid) {
+            hideDownloadLoading();
+        }
+        
+        // Fallback para biblioteca
+        try {
+            const fallbackUrl = `${API_BASE}/download/library/${resourceId}`;
+            window.open(fallbackUrl, '_blank');
+            showNotification(`Abriendo recurso: ${resourceName}`, 'info');
+        } catch (fallbackError) {
+            console.error('❌ Error en fallback biblioteca:', fallbackError);
+            showNotification('Error al descargar el recurso', 'error');
+        }
+    }
+}
 
 // 4. Función universal de descarga
 function universalDownload(type, id, fileName) {
@@ -9350,14 +9438,53 @@ function universalDownload(type, id, fileName) {
     }
 }
 
-// SISTEMA SIMPLIFICADO DE DESCARGAS PARA APK
+// Sistema de loading mejorado para móviles
 function initDownloadSystem() {
-    console.log('📱 Configurando descargas para APK...');
-    
-    // Solo agregar estilos básicos si es móvil
-    if (/Android/i.test(navigator.userAgent)) {
-        initMobileDownloadStyles();
-    }
+    const style = document.createElement('style');
+    style.textContent = `
+        .download-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .download-loading.active {
+            display: flex;
+        }
+        
+        .download-loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .download-loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 
