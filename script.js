@@ -9281,68 +9281,62 @@ function debugSuggestionCounters() {
     if (realizadasElement) console.log('Realizadas text:', realizadasElement.textContent);
 }
 
-// FUNCIONES UNIVERSALES DE DESCARGA - FUNCIONAN EN TODOS LOS DISPOSITIVOS
-window.downloadProjectFile = function(projectId, fileId, fileName) {
-    console.log('📥 Descargando archivo:', fileName);
-    
-    // Mostrar loading solo en móviles
-    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        showDownloadLoading(fileName);
+// FUNCIÓN DE RESPALDO PARA ANDROID APK
+function androidDownloadFallback(url, fileName) {
+    // Método específico para WebView de Android
+    try {
+        // Intentar con JavaScript puro
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.target = '_system'; // Especial para Android WebView
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        // Si falla, abrir directamente
+        window.open(url, '_blank');
     }
-    
-    // URL de descarga universal - igual para todos los dispositivos
+}
+
+// Versión mejorada de las funciones de descarga
+window.downloadProjectFile = function(projectId, fileId, fileName) {
     const downloadUrl = `${API_BASE}/download/file/${fileId}`;
     
-    // Método universal que funciona en APK, navegador móvil y desktop
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = fileName; // Esto fuerza la descarga en la mayoría de navegadores
-    link.target = '_blank';   // Esto ayuda en WebView de Android
-    link.style.display = 'none';
+    if (/Android/i.test(navigator.userAgent)) {
+        showDownloadLoading(fileName);
+        androidDownloadFallback(downloadUrl, fileName);
+    } else {
+        // Para desktop y otros dispositivos
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.click();
+    }
     
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // También abrir en nueva pestaña como fallback
-    setTimeout(() => {
-        window.open(downloadUrl, '_blank');
-    }, 100);
-    
-    // Ocultar loading después de un tiempo
     setTimeout(() => {
         hideDownloadLoading();
-        showNotification(`✅ ${fileName} - Descarga iniciada`, 'success', 3000);
-    }, 2000);
+        showNotification(`📥 ${fileName} descargándose`, 'success', 3000);
+    }, 1500);
 };
 
 window.downloadLibraryResource = function(resourceId, resourceName) {
-    console.log('📚 Descargando recurso:', resourceName);
-    
-    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        showDownloadLoading(resourceName);
-    }
-    
     const downloadUrl = `${API_BASE}/download/library/${resourceId}`;
     
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = resourceName;
-    link.target = '_blank';
-    link.style.display = 'none';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setTimeout(() => {
-        window.open(downloadUrl, '_blank');
-    }, 100);
+    if (/Android/i.test(navigator.userAgent)) {
+        showDownloadLoading(resourceName);
+        androidDownloadFallback(downloadUrl, resourceName);
+    } else {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = resourceName;
+        link.click();
+    }
     
     setTimeout(() => {
         hideDownloadLoading();
-        showNotification(`✅ ${resourceName} - Descarga iniciada`, 'success', 3000);
-    }, 2000);
+        showNotification(`📥 ${resourceName} descargándose`, 'success', 3000);
+    }, 1500);
 };
 
 // 4. Función universal de descarga
