@@ -12331,87 +12331,65 @@ function createResourceFileItem(resource) {
     `;
 }
 
-// Función para descargar recurso
+// REEMPLAZA la función downloadResource con esta versión compatible:
 async function downloadResource(resourceId, fileName = null) {
     try {
-        console.log('📥 Iniciando descarga del recurso:', resourceId);
+        console.log('📥 DESCARGANDO RECURSO (COMPATIBLE ANDROID):', resourceId);
         
-        // Mostrar loading en el botón
-        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
-        downloadBtns.forEach(btn => {
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando...';
-            btn.disabled = true;
+        // Mostrar loading simple (sin modificar muchos botones)
+        showNotification('Preparando descarga...', 'info');
+        
+        // 🔥 MÉTODO COMPATIBLE CON ANDROID:
+        // En lugar de fetch+blob, usar redirección directa
+        
+        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
+        console.log('🔗 URL directa:', downloadUrl);
+        
+        // Para Android WebView, necesitamos un enfoque especial
+        if (/Android/i.test(navigator.userAgent)) {
+            console.log('📱 Android - Método seguro');
             
-            // Restaurar después de 3 segundos (por si falla)
+            // Método 1: Intentar con redirección simple
             setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-            }, 3000);
-        });
-        
-        const response = await fetch(`${API_BASE}/library/download/${resourceId}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
+                window.location.href = downloadUrl;
+            }, 300);
+            
+        } else {
+            // Para desktop - usar el método blob (que ya funciona)
+            console.log('💻 Desktop - Método blob');
+            
+            const response = await fetch(downloadUrl, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Error al descargar el recurso');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName || `recurso-${resourceId}`;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }, 1000);
         }
         
-        // Obtener el blob del archivo
-        const blob = await response.blob();
-        
-        // Crear URL temporal para descarga
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        // Usar el nombre del archivo del recurso o generar uno
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let downloadFileName = fileName;
-        
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch && filenameMatch[1]) {
-                downloadFileName = filenameMatch[1].replace(/['"]/g, '');
-            }
-        }
-        
-        // Si no tenemos nombre, usar un nombre por defecto
-        if (!downloadFileName) {
-            downloadFileName = `recurso-${resourceId}.${blob.type.split('/')[1] || 'bin'}`;
-        }
-        
-        a.download = downloadFileName;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('✅ Descarga completada:', downloadFileName);
-        showNotification('Descarga iniciada', 'success');
-        
-        // Restaurar botones
-        downloadBtns.forEach(btn => {
-            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
-            btn.disabled = false;
-        });
+        // Mostrar notificación después de iniciar
+        setTimeout(() => {
+            showNotification('Descarga iniciada', 'success');
+        }, 1500);
         
     } catch (error) {
-        console.error('❌ Error descargando recurso:', error);
-        showNotification(`Error al descargar: ${error.message}`, 'error');
-        
-        // Restaurar botones en caso de error
-        const downloadBtns = document.querySelectorAll(`.download-resource[data-resource-id="${resourceId}"], .download-resource-detailed[data-resource-id="${resourceId}"]`);
-        downloadBtns.forEach(btn => {
-            btn.innerHTML = '<i class="fas fa-download"></i> Descargar';
-            btn.disabled = false;
-        });
+        console.error('❌ Error descarga recurso:', error);
+        showNotification(`Error: ${error.message}`, 'error');
     }
 }
 
