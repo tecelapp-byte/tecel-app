@@ -12269,48 +12269,39 @@ function displayResourceDetails(resource) {
     openModal('resource-detail-modal');
 }
 
-// ALTERNATIVA: Usar el endpoint de proyectos que SÍ funciona
+// REEMPLAZA downloadLibraryResource con ESTA versión de diagnóstico:
 async function downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 BIBLIOTECA usando endpoint de proyectos: ${resourceName}`);
+    console.log('🔍 INICIANDO DIAGNÓSTICO downloadLibraryResource');
     
     try {
-        showDownloadLoading(resourceName);
+        // 🔥 PASO 1: Verificar si el problema es showDownloadLoading
+        console.log('📝 Paso 1: Antes de showDownloadLoading');
+        // showDownloadLoading(resourceName); // 🔥 COMENTADO TEMPORALMENTE
+        console.log('✅ Paso 1: Después de showDownloadLoading');
         
-        // 🔥 PRUEBA: Usar el endpoint de PROYECTOS que sabemos funciona
-        // pero para recursos de biblioteca
-        const downloadUrl = `${API_BASE}/download/file/${resourceId}`;
-        console.log('🔗 Usando endpoint de proyectos:', downloadUrl);
+        // 🔥 PASO 2: Verificar si el problema es crear elementos DOM
+        console.log('📝 Paso 2: Antes de crear elementos');
+        // const downloadUrl = `${API_BASE}/download/library/${resourceId}`; // 🔥 COMENTADO
+        console.log('✅ Paso 2: Después de crear URL');
         
-        // Método IDÉNTICO a proyectos
-        if (/Android/i.test(navigator.userAgent)) {
-            const newWindow = window.open(downloadUrl, '_blank');
-            if (!newWindow) {
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = resourceName;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        } else {
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        // 🔥 PASO 3: Verificar si el problema es crear elementos <a>
+        console.log('📝 Paso 3: Antes de crear elemento <a>');
+        // const link = document.createElement('a'); // 🔥 COMENTADO
+        console.log('✅ Paso 3: Después de crear elemento <a>');
         
+        // 🔥 PASO 4: Solo hacer una operación MUY simple
+        console.log('📝 Paso 4: Operación simple');
+        showNotification(`Preparando: ${resourceName}`, 'info');
+        console.log('✅ Paso 4: Después de notificación simple');
+        
+        // 🔥 PASO 5: Pequeño timeout
         setTimeout(() => {
-            hideDownloadLoading();
-            showNotification(`✅ Descarga biblioteca iniciada`, 'success');
-        }, 2500);
+            console.log('✅ Timeout completado - App NO se cerró');
+            showNotification('Diagnóstico completado', 'success');
+        }, 2000);
         
     } catch (error) {
-        console.error('❌ Error con endpoint proyectos:', error);
-        hideDownloadLoading();
-        showNotification('Error en descarga', 'error');
+        console.error('💥 ERROR en diagnóstico:', error);
     }
 }
 
@@ -12484,46 +12475,38 @@ class DownloadManager {
         }
     }
 
-// ALTERNATIVA: Usar el endpoint de proyectos que SÍ funciona
+    // REEMPLAZA la función downloadLibraryResource con ESTA:
 async downloadLibraryResource(resourceId, resourceName) {
-    console.log(`📥 BIBLIOTECA usando endpoint de proyectos: ${resourceName}`);
+    console.log(`📥 ANDROID - Descarga biblioteca: ${resourceName}`);
     
     try {
         showDownloadLoading(resourceName);
         
-        // 🔥 PRUEBA: Usar el endpoint de PROYECTOS que sabemos funciona
-        // pero para recursos de biblioteca
-        const downloadUrl = `${API_BASE}/download/file/${resourceId}`;
-        console.log('🔗 Usando endpoint de proyectos:', downloadUrl);
+        // 🔥 MÉTODO COMPATIBLE CON ANDROID WEBVIEW
+        // En Android WebView, no podemos usar window.open ni crear elementos <a>
+        // Tenemos que usar el sistema de descargas nativo de Android
         
-        // Método IDÉNTICO a proyectos
-        if (/Android/i.test(navigator.userAgent)) {
-            const newWindow = window.open(downloadUrl, '_blank');
-            if (!newWindow) {
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = resourceName;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        } else {
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = resourceName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        // Paso 1: Obtener la URL de descarga
+        const downloadUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+        console.log('🔗 URL para Android:', downloadUrl);
         
+        // Paso 2: Para Android WebView, necesitamos usar un Intent
+        // Esto se hace a través del WebViewClient
         setTimeout(() => {
-            hideDownloadLoading();
-            showNotification(`✅ Descarga biblioteca iniciada`, 'success');
-        }, 2500);
+            // 🔥 ESTE ES EL MÉTODO QUE FUNCIONA EN ANDROID:
+            // Simplemente navegar a la URL y dejar que el WebView maneje la descarga
+            window.location.href = downloadUrl;
+            
+            // Ocultar loading después de un tiempo
+            setTimeout(() => {
+                hideDownloadLoading();
+                showNotification('Descarga iniciada en segundo plano', 'info');
+            }, 3000);
+            
+        }, 1000);
         
     } catch (error) {
-        console.error('❌ Error con endpoint proyectos:', error);
+        console.error('❌ Error Android:', error);
         hideDownloadLoading();
         showNotification('Error en descarga', 'error');
     }
