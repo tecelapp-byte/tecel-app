@@ -12331,65 +12331,62 @@ function createResourceFileItem(resource) {
     `;
 }
 
-// REEMPLAZA la función downloadResource con esta versión compatible:
+// DESCARGAR USANDO RUTAS QUE SÍ EXISTEN
 async function downloadResource(resourceId, fileName = null) {
+    console.log('🔍 BUSCANDO RUTA VÁLIDA PARA BIBLIOTECA');
+    
     try {
-        console.log('📥 DESCARGANDO RECURSO (COMPATIBLE ANDROID):', resourceId);
+        // 🔥 PRUEBA 1: Usar ruta de API (la que usa desktop)
+        const apiUrl = `${API_BASE}/library/download/${resourceId}`;
+        console.log('📍 Probando API URL:', apiUrl);
         
-        // Mostrar loading simple (sin modificar muchos botones)
-        showNotification('Preparando descarga...', 'info');
+        showNotification('Iniciando descarga...', 'info');
         
-        // 🔥 MÉTODO COMPATIBLE CON ANDROID:
-        // En lugar de fetch+blob, usar redirección directa
-        
-        const downloadUrl = `${API_BASE}/library/download/${resourceId}`;
-        console.log('🔗 URL directa:', downloadUrl);
-        
-        // Para Android WebView, necesitamos un enfoque especial
+        // Para Android - método especial
         if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Android - Método seguro');
+            console.log('📱 Android - Método especial');
             
-            // Método 1: Intentar con redirección simple
+            // Método A: Redirección simple (funciona si la ruta no requiere auth)
             setTimeout(() => {
-                window.location.href = downloadUrl;
+                window.location.href = apiUrl;
             }, 300);
             
         } else {
-            // Para desktop - usar el método blob (que ya funciona)
-            console.log('💻 Desktop - Método blob');
-            
-            const response = await fetch(downloadUrl, {
+            // Desktop - fetch normal (ya funciona)
+            const response = await fetch(apiUrl, {
                 headers: {
-                    'Authorization': `Bearer ${authToken}`
+                    'Authorization': `Bearer ${authToken}`,
+                    'Accept': 'application/octet-stream'
                 }
             });
             
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName || `recurso-${resourceId}`;
+                a.click();
+                
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    showNotification('Descarga completada', 'success');
+                }, 1000);
             }
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName || `recurso-${resourceId}`;
-            document.body.appendChild(a);
-            a.click();
-            
-            setTimeout(() => {
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            }, 1000);
         }
         
-        // Mostrar notificación después de iniciar
-        setTimeout(() => {
-            showNotification('Descarga iniciada', 'success');
-        }, 1500);
-        
     } catch (error) {
-        console.error('❌ Error descarga recurso:', error);
-        showNotification(`Error: ${error.message}`, 'error');
+        console.error('❌ Error con API route:', error);
+        
+        // 🔥 PRUEBA 2: Usar ruta móvil alternativa
+        console.log('🔄 Intentando ruta móvil...');
+        const mobileUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
+        
+        if (/Android/i.test(navigator.userAgent)) {
+            window.location.href = mobileUrl;
+        } else {
+            window.open(mobileUrl, '_blank');
+        }
     }
 }
 
