@@ -3084,7 +3084,7 @@ function createLibraryCard(resource) {
     
     <div class="library-card-meta">
         <span class="library-uploader">
-            <i class="fas fa-user"></i>
+            <i class="fas fa-user"></i>     
             ${resource.uploader_name || 'Usuario'}
         </span>
         <span class="library-date">
@@ -3093,10 +3093,10 @@ function createLibraryCard(resource) {
         </span>
     </div>
     
-    <div class="library-card-actions">
+<div class="library-card-actions">
         ${isFileResource ? 
             `<button class="btn-primary btn-sm" 
-                     onclick="event.stopPropagation(); downloadLibraryResource(${resource.id}, '${(resource.title || 'recurso').replace(/'/g, "\\'")}')">
+                     onclick="event.stopPropagation(); downloadResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
                 <i class="fas fa-download"></i> Descargar
             </button>` : ''}
             
@@ -12331,62 +12331,69 @@ function createResourceFileItem(resource) {
     `;
 }
 
-// DESCARGAR USANDO RUTAS QUE SÍ EXISTEN
+// 🔥 VERSIÓN MEJORADA CON MÁS CONTROLES
 async function downloadResource(resourceId, fileName = null) {
-    console.log('🔍 BUSCANDO RUTA VÁLIDA PARA BIBLIOTECA');
+    console.log('🎯 DESCARGA BIBLIOTECA MEJORADA');
+    
+    // Evitar múltiples descargas simultáneas
+    if (window.downloadInProgress) {
+        showNotification('Ya hay una descarga en curso', 'warning');
+        return;
+    }
+    
+    window.downloadInProgress = true;
     
     try {
-        // 🔥 PRUEBA 1: Usar ruta de API (la que usa desktop)
-        const apiUrl = `${API_BASE}/library/download/${resourceId}`;
-        console.log('📍 Probando API URL:', apiUrl);
+        // Construir URL
+        const downloadUrl = `https://tecel-app.onrender.com/api/mobile/download/library/${resourceId}`;
+        console.log('📍 URL:', downloadUrl);
         
-        showNotification('Iniciando descarga...', 'info');
+        const resourceName = fileName || `recurso-${resourceId}`;
         
-        // Para Android - método especial
+        // Mostrar loading
+        showDownloadLoading(resourceName);
+        
+        // 🔥 PARA ANDROID: Método especial
         if (/Android/i.test(navigator.userAgent)) {
-            console.log('📱 Android - Método especial');
+            console.log('📱 Android - Método WebView seguro');
             
-            // Método A: Redirección simple (funciona si la ruta no requiere auth)
+            // Método 1: Redirección simple
             setTimeout(() => {
-                window.location.href = apiUrl;
+                window.location.href = downloadUrl;
             }, 300);
             
         } else {
-            // Desktop - fetch normal (ya funciona)
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Accept': 'application/octet-stream'
-                }
-            });
+            // 🔥 PARA DESKTOP: Método normal (igual que proyectos)
+            console.log('💻 Desktop - Método normal');
             
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName || `recurso-${resourceId}`;
-                a.click();
-                
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    showNotification('Descarga completada', 'success');
-                }, 1000);
-            }
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = resourceName;
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // Limpiar inmediatamente
+            setTimeout(() => {
+                if (document.body.contains(link)) {
+                    document.body.removeChild(link);
+                }
+            }, 100);
         }
+        
+        // Ocultar loading y notificar
+        setTimeout(() => {
+            hideDownloadLoading();
+            window.downloadInProgress = false;
+            showNotification(`✅ Descarga iniciada: ${resourceName}`, 'success');
+        }, 2500);
         
     } catch (error) {
-        console.error('❌ Error con API route:', error);
-        
-        // 🔥 PRUEBA 2: Usar ruta móvil alternativa
-        console.log('🔄 Intentando ruta móvil...');
-        const mobileUrl = `${API_BASE}/mobile/download/library/${resourceId}`;
-        
-        if (/Android/i.test(navigator.userAgent)) {
-            window.location.href = mobileUrl;
-        } else {
-            window.open(mobileUrl, '_blank');
-        }
+        console.error('💥 Error crítico:', error);
+        hideDownloadLoading();
+        window.downloadInProgress = false;
+        showNotification('Error en la descarga', 'error');
     }
 }
 
