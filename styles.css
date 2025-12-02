@@ -11399,3 +11399,286 @@ input, select, textarea {
         padding-left: 5px;
     }
 }
+
+/* ==================== CORRECIONES ESPECÍFICAS PARA PROBLEMAS RESTANTES ==================== */
+
+/* 1. CORRECCIÓN PARA TÍTULOS EN CARDS DE IDEAS LOCAS */
+.idea-header .idea-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--dark-color);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+    max-height: 2.6em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    display: -moz-box;
+    -moz-line-clamp: 2;
+    -moz-box-orient: vertical;
+    display: box;
+    line-clamp: 2;
+    box-orient: vertical;
+    word-break: break-word;
+    hyphens: auto;
+}
+
+/* 2. CORRECCIÓN PARA "PROBLEMA QUE RESUELVE" EN DETALLES DE IDEA */
+#detail-idea-problem {
+    white-space: pre-line;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.6;
+    padding: 1rem;
+    background: rgba(255, 243, 205, 0.3);
+    border-left: 4px solid #ffc107;
+    border-radius: var(--border-radius);
+    margin: 1rem 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.problem-card p {
+    white-space: pre-line;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* 3. CORRECCIÓN PARA TÍTULOS EN CARDS DE SUGERENCIAS */
+.suggestion-header .suggestion-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--dark-color);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+    max-height: 2.6em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    display: -moz-box;
+    -moz-line-clamp: 2;
+    -moz-box-orient: vertical;
+    display: box;
+    line-clamp: 2;
+    box-orient: vertical;
+    word-break: break-word;
+    hyphens: auto;
+    flex: 1;
+    min-width: 0; /* Esto permite que el texto se envuelva */
+}
+
+.suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.suggestion-type {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 4. CORRECCIÓN PARA FORMATO EN DETALLES DE RECURSOS DE BIBLIOTECA */
+.resource-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.resource-info-item:last-child {
+    border-bottom: none;
+}
+
+.resource-info-label {
+    font-weight: 600;
+    color: var(--dark-color);
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.resource-info-value {
+    color: var(--text-color);
+    text-align: right;
+    flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 200px;
+    padding-left: 1rem;
+    box-sizing: border-box;
+}
+
+/* Específico para el formato */
+#detail-info-format {
+    font-family: 'Courier New', monospace;
+    background: var(--light-color);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+}
+
+/* 5. CORRECCIÓN ADICIONAL PARA GRID DE IDEAS - ASEGURAR CONSISTENCIA */
+.ideas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.idea-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 300px; /* Altura mínima consistente */
+}
+
+.idea-card .idea-description {
+    flex: 1;
+    min-height: 80px;
+    overflow: hidden;
+}
+
+/* 6. CORRECCIÓN PARA HEADERS EN TODAS LAS CARDS */
+.project-header,
+.idea-header,
+.suggestion-header,
+.library-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.project-header .project-title,
+.idea-header .idea-title,
+.suggestion-header .suggestion-title,
+.library-card-header .library-card-title {
+    flex: 1;
+    min-width: 0; /* Importante: permite que el texto se envuelva */
+    margin-right: 1rem;
+}
+
+/* 7. CORRECCIÓN ESPECÍFICA PARA MÓVILES */
+@media (max-width: 768px) {
+    /* Ideas Locas en móviles */
+    .idea-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .idea-header .idea-title {
+        font-size: 1.1rem;
+        -webkit-line-clamp: 3;
+        -moz-line-clamp: 3;
+        line-clamp: 3;
+        max-height: 3.9em;
+    }
+    
+    /* Sugerencias en móviles */
+    .suggestion-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .suggestion-header .suggestion-title {
+        font-size: 1.1rem;
+        -webkit-line-clamp: 3;
+        -moz-line-clamp: 3;
+        line-clamp: 3;
+        max-height: 3.9em;
+    }
+    
+    .suggestion-type {
+        align-self: flex-start;
+    }
+    
+    /* Biblioteca en móviles */
+    .resource-info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .resource-info-label {
+        min-width: auto;
+    }
+    
+    .resource-info-value {
+        max-width: 100%;
+        padding-left: 0;
+        text-align: left;
+    }
+    
+    /* Ajustar grid en móviles */
+    .ideas-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .idea-card {
+        min-height: auto;
+    }
+}
+
+/* 8. CORRECCIÓN PARA CONTENIDO DINÁMICO EN MODALES */
+.modal-body .problem-card,
+.modal-body .info-card,
+.modal-body .description-content {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-body .problem-card p,
+.modal-body .info-card p,
+.modal-body .description-content p {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+/* 9. FALLBACK PARA NAVEGADORES ANTIGUOS */
+@supports not ((-webkit-line-clamp: 2) or (line-clamp: 2)) {
+    .idea-header .idea-title,
+    .suggestion-header .suggestion-title {
+        max-height: 2.6em;
+        overflow: hidden;
+        position: relative;
+        padding-right: 20px;
+    }
+    
+    .idea-header .idea-title::after,
+    .suggestion-header .suggestion-title::after {
+        content: '...';
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to right, transparent, white 50%);
+        padding-left: 5px;
+    }
+}
+
+/* 10. ASEGURAR QUE LOS BADGES NO AFECTEN EL FLUJO */
+.status-badge,
+.type-badge,
+.idea-category,
+.suggestion-type,
+.library-type-badge {
+    flex-shrink: 0;
+    white-space: nowrap;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
