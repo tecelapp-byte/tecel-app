@@ -827,6 +827,8 @@ body {
     border: 1px solid var(--border-color);
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .project-card::before {
@@ -4626,8 +4628,8 @@ body {
     }
     
     .modal-body {
-        max-height: 60vh;
-        overflow-y: auto;
+    overflow-y: auto;
+    max-height: 70vh;
     }
     
     .hero-section {
@@ -11118,4 +11120,282 @@ input, select, textarea {
     -webkit-transform: translateZ(0); /* Aceleración hardware */
     transform: translateZ(0);
     will-change: transform;
+}
+
+/* ==================== CORRECIONES PARA ENVOLTURA DE TEXTO ==================== */
+
+/* Regla general para todos los contenedores de texto */
+.project-card,
+.idea-card,
+.suggestion-card,
+.library-card,
+.floating-card,
+.timeline-content,
+.description-content,
+.idea-hero-card,
+.modal-content,
+.form-textarea,
+.form-input,
+.info-card,
+.problem-card,
+.resource-card-header .resource-title,
+.idea-header .idea-title,
+.suggestion-header .suggestion-title,
+.project-header .project-title {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+/* Contenedores específicos que muestran descripciones largas */
+.project-description,
+.project-problem,
+.idea-description,
+.idea-problem,
+.suggestion-description,
+.library-description,
+.description-content p,
+.info-text,
+.timeline-content p {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Compatibilidad con todos los navegadores */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    display: -moz-box;
+    -moz-line-clamp: 3;
+    -moz-box-orient: vertical;
+    display: box;
+    line-clamp: 3;
+    box-orient: vertical;
+    line-height: 1.4;
+    max-height: 4.2em;
+}
+
+/* Cuando se expanden en modales, mostrar todo el texto */
+.modal .project-description,
+.modal .idea-description,
+.modal .suggestion-description,
+.modal .library-description,
+.modal .description-content p,
+.modal .info-text {
+    -webkit-line-clamp: unset;
+    -moz-line-clamp: unset;
+    line-clamp: unset;
+    max-height: none;
+    overflow: auto;
+    display: block;
+}
+
+/* Ajustes específicos para las cards de ideas en la sección principal */
+.idea-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.idea-description {
+    flex: 1;
+    min-height: 60px;
+}
+
+/* Corrección para los títulos en cards */
+.idea-title,
+.suggestion-title,
+.project-title,
+.library-card-title {
+    font-size: 1.1rem;
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+    max-height: 2.6em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    display: -moz-box;
+    -moz-line-clamp: 2;
+    -moz-box-orient: vertical;
+    display: box;
+    line-clamp: 2;
+    box-orient: vertical;
+}
+
+/* En modales, los títulos pueden ser más largos */
+.modal .idea-detail-header h3,
+.modal .suggestion-detail-header h3,
+.modal .project-detail-title {
+    -webkit-line-clamp: unset;
+    -moz-line-clamp: unset;
+    line-clamp: unset;
+    max-height: none;
+    display: block;
+}
+
+/* Corrección para problemas específicos en la vista de detalles */
+#detail-idea-description,
+#detail-suggestion-description,
+#detail-project-description,
+#detail-detailed-description,
+#detail-problem,
+#detail-objectives,
+#detail-requirements {
+    white-space: pre-line;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.6;
+    padding: 0.5rem 0;
+}
+
+/* Ajustes para textareas en formularios */
+.form-textarea {
+    min-height: 100px;
+    resize: vertical;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Corrección para la vista previa en modales */
+.preview-content p,
+.description-content p {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Ajustes responsivos para móviles */
+@media (max-width: 768px) {
+    .idea-title,
+    .suggestion-title,
+    .project-title,
+    .library-card-title {
+        font-size: 1rem;
+        -webkit-line-clamp: 2;
+        -moz-line-clamp: 2;
+        line-clamp: 2;
+        max-height: 2.4em;
+    }
+    
+    .project-description,
+    .idea-description,
+    .suggestion-description,
+    .library-description {
+        -webkit-line-clamp: 2;
+        -moz-line-clamp: 2;
+        line-clamp: 2;
+        max-height: 2.8em;
+    }
+    
+    /* En móviles, en modales mostrar scroll en lugar de todo el texto */
+    .modal .description-content {
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    
+    .modal .description-content::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .modal .description-content::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 2px;
+    }
+}
+
+/* Asegurar que los contenedores de modales no se desborden */
+.modal-content {
+    max-width: 95vw;
+}
+
+.modal-body {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* Corrección específica para el modal de conversión de idea */
+.conversion-content {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Mejoras para la visualización de participantes */
+.participant-info,
+.student-info {
+    min-width: 0;
+}
+
+.participant-info strong,
+.student-info strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Corrección para los badges de estado */
+.status-badge,
+.type-badge,
+.category-badge,
+.complexity-badge,
+.budget-badge {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Solución alternativa para navegadores que no soportan line-clamp */
+@supports not ((-webkit-line-clamp: 3) or (line-clamp: 3)) {
+    .project-description,
+    .project-problem,
+    .idea-description,
+    .idea-problem,
+    .suggestion-description,
+    .library-description,
+    .description-content p,
+    .info-text,
+    .timeline-content p {
+        max-height: 4.2em;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .project-description::after,
+    .project-problem::after,
+    .idea-description::after,
+    .idea-problem::after,
+    .suggestion-description::after,
+    .library-description::after,
+    .description-content p::after,
+    .info-text::after,
+    .timeline-content p::after {
+        content: '...';
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        background: white;
+        padding-left: 5px;
+    }
+    
+    .idea-title,
+    .suggestion-title,
+    .project-title,
+    .library-card-title {
+        max-height: 2.6em;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .idea-title::after,
+    .suggestion-title::after,
+    .project-title::after,
+    .library-card-title::after {
+        content: '...';
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        background: white;
+        padding-left: 5px;
+    }
 }
