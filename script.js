@@ -9028,29 +9028,236 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Función para obtener icono según tipo de archivo
+// Función mejorada para obtener icono según tipo de archivo - VERSIÓN COMPLETA Y CORREGIDA
 function getFileIcon(filename) {
+    if (!filename) return 'fas fa-file';
+    
     const ext = filename.split('.').pop().toLowerCase();
+    
+    // Mapa completo de extensiones con iconos de Font Awesome 5/6
     const iconMap = {
+        // 📁 Documentos
         'pdf': 'fas fa-file-pdf',
         'doc': 'fas fa-file-word',
         'docx': 'fas fa-file-word',
+        'odt': 'fas fa-file-word',
+        'rtf': 'fas fa-file-word',
+        'txt': 'fas fa-file-alt',
+        'md': 'fas fa-file-alt',
+        'log': 'fas fa-file-alt',
+        
+        // 📊 Hojas de cálculo
+        'xls': 'fas fa-file-excel',
+        'xlsx': 'fas fa-file-excel',
+        'csv': 'fas fa-file-csv',
+        'ods': 'fas fa-file-excel',
+        
+        // 🎯 Presentaciones
+        'ppt': 'fas fa-file-powerpoint',
+        'pptx': 'fas fa-file-powerpoint',
+        'odp': 'fas fa-file-powerpoint',
+        
+        // 🖼️ Imágenes
         'jpg': 'fas fa-file-image',
         'jpeg': 'fas fa-file-image',
         'png': 'fas fa-file-image',
+        'gif': 'fas fa-file-image',
+        'bmp': 'fas fa-file-image',
+        'svg': 'fas fa-image',
+        'webp': 'fas fa-file-image',
+        'ico': 'fas fa-image',
+        'tiff': 'fas fa-file-image',
+        'tif': 'fas fa-file-image',
+        'psd': 'fas fa-file-image',
+        'ai': 'fas fa-file-image',
+        
+        // 🎬 Videos
         'mp4': 'fas fa-file-video',
+        'mov': 'fas fa-file-video',
         'avi': 'fas fa-file-video',
-        'zip': 'fas fa-file-archive',
-        'rar': 'fas fa-file-archive',
-        'txt': 'fas fa-file-alt',
+        'mkv': 'fas fa-file-video',
+        'flv': 'fas fa-file-video',
+        'wmv': 'fas fa-file-video',
+        'webm': 'fas fa-file-video',
+        'm4v': 'fas fa-file-video',
+        'mpg': 'fas fa-file-video',
+        'mpeg': 'fas fa-file-video',
+        '3gp': 'fas fa-file-video',
+        'ogv': 'fas fa-file-video',
+        
+        // 🎵 Audio
+        'mp3': 'fas fa-file-audio',
+        'wav': 'fas fa-file-audio',
+        'ogg': 'fas fa-file-audio',
+        'flac': 'fas fa-file-audio',
+        'aac': 'fas fa-file-audio',
+        'wma': 'fas fa-file-audio',
+        'm4a': 'fas fa-file-audio',
+        
+        // 💻 Código fuente (Electrónica)
         'ino': 'fas fa-file-code',
         'cpp': 'fas fa-file-code',
+        'c': 'fas fa-file-code',
         'h': 'fas fa-file-code',
-        'py': 'fas fa-file-code'
+        'hpp': 'fas fa-file-code',
+        'py': 'fas fa-file-code',
+        'js': 'fas fa-file-code',
+        'html': 'fas fa-file-code',
+        'css': 'fas fa-file-code',
+        'php': 'fas fa-file-code',
+        'java': 'fas fa-file-code',
+        'json': 'fas fa-file-code',
+        'xml': 'fas fa-file-code',
+        'sql': 'fas fa-file-code',
+        'asm': 'fas fa-file-code',  // Ensamblador
+        'hex': 'fas fa-file-code',  // Archivo HEX para microcontroladores
+        'bin': 'fas fa-file-code',  // Binario
+        
+        // 📁 Comprimidos
+        'zip': 'fas fa-file-archive',
+        'rar': 'fas fa-file-archive',
+        '7z': 'fas fa-file-archive',
+        'tar': 'fas fa-file-archive',
+        'gz': 'fas fa-file-archive',
+        
+        // 📐 Diseño/CAD
+        'dwg': 'fas fa-file-contract',  // AutoCAD
+        'dxf': 'fas fa-file-contract',  // AutoCAD
+        'stl': 'fas fa-cube',          // Impresión 3D
+        'obj': 'fas fa-cube',          // Modelos 3D
+        'step': 'fas fa-cube',         // CAD 3D
+        'iges': 'fas fa-cube',         // CAD 3D
+        
+        // 🔧 Archivos de diseño electrónico
+        'sch': 'fas fa-microchip',     // Esquemático
+        'brd': 'fas fa-microchip',     // PCB
+        'kicad_pcb': 'fas fa-microchip',
+        'kicad_sch': 'fas fa-microchip',
+        'fzz': 'fas fa-microchip',     // Fritzing
+        'fz': 'fas fa-microchip',      // Fritzing
+        'eagle': 'fas fa-microchip',   // Eagle CAD
+        'ltspice': 'fas fa-bolt',      // Simulación
+        'sim': 'fas fa-bolt',          // Simulación
+        
+        // 📋 Otros importantes para electrónica
+        'datasheet': 'fas fa-file-invoice',  // Hojas de datos
+        'spec': 'fas fa-file-invoice',       // Especificaciones
+        'dat': 'fas fa-file-signature',      // Datos
+        'cfg': 'fas fa-cog',                 // Configuración
+        'ini': 'fas fa-cog',                 // Configuración
+        'config': 'fas fa-cog',              // Configuración
+        
+        // 📚 Manuales
+        'manual': 'fas fa-book',
+        'guide': 'fas fa-book',
+        'tutorial': 'fas fa-book',
+        'docbook': 'fas fa-book'
     };
+    
+    // Retornar icono específico o genérico
     return iconMap[ext] || 'fas fa-file';
 }
 
+// Función auxiliar para categorizar archivos (útil para filtros)
+function getFileCategory(filename) {
+    if (!filename) return 'other';
+    
+    const ext = filename.split('.').pop().toLowerCase();
+    
+    const categories = {
+        // Documentos
+        'document': ['pdf', 'doc', 'docx', 'odt', 'rtf', 'txt', 'md', 'log'],
+        // Hojas de cálculo
+        'spreadsheet': ['xls', 'xlsx', 'csv', 'ods'],
+        // Presentaciones
+        'presentation': ['ppt', 'pptx', 'odp'],
+        // Imágenes
+        'image': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'tif', 'psd', 'ai'],
+        // Videos
+        'video': ['mp4', 'mov', 'avi', 'mkv', 'flv', 'wmv', 'webm', 'm4v', 'mpg', 'mpeg', '3gp', 'ogv'],
+        // Audio
+        'audio': ['mp3', 'wav', 'ogg', 'flac', 'aac', 'wma', 'm4a'],
+        // Código fuente
+        'code': ['ino', 'cpp', 'c', 'h', 'hpp', 'py', 'js', 'html', 'css', 'php', 'java', 'json', 'xml', 'sql', 'asm', 'hex', 'bin'],
+        // Comprimidos
+        'archive': ['zip', 'rar', '7z', 'tar', 'gz'],
+        // Diseño/CAD
+        'cad': ['dwg', 'dxf', 'stl', 'obj', 'step', 'iges'],
+        // Electrónica
+        'electronics': ['sch', 'brd', 'kicad_pcb', 'kicad_sch', 'fzz', 'fz', 'eagle', 'ltspice', 'sim', 'datasheet', 'spec'],
+        // Configuración
+        'config': ['cfg', 'ini', 'config']
+    };
+    
+    for (const [category, extensions] of Object.entries(categories)) {
+        if (extensions.includes(ext)) {
+            return category;
+        }
+    }
+    
+    return 'other';
+}
+
+// Función para obtener color según tipo de archivo (opcional, para styling)
+function getFileColor(filename) {
+    const category = getFileCategory(filename);
+    
+    const colorMap = {
+        'document': '#4A6FA5',      // Azul documentos
+        'spreadsheet': '#2E7D32',   // Verde hojas cálculo
+        'presentation': '#C62828',  // Rojo presentaciones
+        'image': '#6A1B9A',         // Púrpura imágenes
+        'video': '#FF5722',         // Naranja videos
+        'audio': '#FF9800',         // Naranja claro audio
+        'code': '#37474F',          // Gris oscuro código
+        'archive': '#795548',       // Marrón comprimidos
+        'cad': '#00838F',           // Cyan CAD
+        'electronics': '#5D4037',   // Marrón electrónica
+        'config': '#607D8B',        // Azul grisáceo
+        'other': '#757575'          // Gris genérico
+    };
+    
+    return colorMap[category] || '#757575';
+}
+
+// Función para mostrar nombre amigable del tipo de archivo
+function getFileTypeLabel(filename) {
+    const category = getFileCategory(filename);
+    
+    const labels = {
+        'document': 'Documento',
+        'spreadsheet': 'Hoja de cálculo',
+        'presentation': 'Presentación',
+        'image': 'Imagen',
+        'video': 'Video',
+        'audio': 'Audio',
+        'code': 'Código fuente',
+        'archive': 'Archivo comprimido',
+        'cad': 'Diseño CAD',
+        'electronics': 'Archivo electrónico',
+        'config': 'Archivo de configuración',
+        'other': 'Archivo'
+    };
+    
+    return labels[category] || 'Archivo';
+}
+
+// Función auxiliar para validar si un archivo es imagen
+function isImageFile(filename) {
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'tif', 'psd', 'ai'];
+    const ext = filename.split('.').pop().toLowerCase();
+    return imageExtensions.includes(ext);
+}
+
+// Exportar funciones para uso global (opcional)
+if (typeof window !== 'undefined') {
+    window.getFileIcon = getFileIcon;
+    window.getFileCategory = getFileCategory;
+    window.getFileColor = getFileColor;
+    window.getFileTypeLabel = getFileTypeLabel;
+    window.isVideoFile = isVideoFile;
+    window.isImageFile = isImageFile;
+}
 // ==================== FUNCIONES DE PRESENTACIÓN ====================
 
 function showNotification(message, type = 'info', duration = 5000) {

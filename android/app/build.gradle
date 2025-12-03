@@ -2,44 +2,101 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.tuelectronica.tecel"
-    compileSdk rootProject.ext.compileSdkVersion
+    
+    compileSdk 35
+    buildToolsVersion "35.0.0"
+    
     defaultConfig {
         applicationId "com.tuelectronica.tecel"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdk 23
+        targetSdk 35
         versionCode 1
         versionName "1.0"
+        
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
+
+    // ✅ CONFIGURACIÓN PARA RENOMBRAR ARCHIVOS
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def versionName = variant.versionName
+            def formattedDate = new Date().format('yyyyMMdd_HHmm')
+            
+            if (variant.buildType.name == 'release') {
+                if (output.outputFile != null) {
+                    def fileName = output.outputFile.name
+                    if (fileName.endsWith('.apk')) {
+                        outputFileName = "TECEL_App_v${versionName}_${formattedDate}.apk"
+                    } else if (fileName.endsWith('.aab')) {
+                        outputFileName = "TECEL_App_v${versionName}_${formattedDate}.aab"
+                    }
+                }
+            }
+        }
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+
         release {
-            minifyEnabled false  // Deshabilitar temporalmente para debug
+            storeFile file('tecel.jks')
+            storePassword 'apptecel'
+            keyAlias 'tecel_key'
+            keyPassword 'apptecel'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
             shrinkResources false
+            debuggable true
+        }
+
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+            
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
 repositories {
-    flatDir{
+    flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+    implementation 'androidx.core:core:1.12.0'
+    
     implementation project(':capacitor-android')
-    testImplementation "junit:junit:$junitVersion"
-    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
-    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation project(':capacitor-cordova-android-plugins')
 }
 
@@ -52,4 +109,186 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// ✅ SCRIPT PARA CREAR ARCHIVOS FALTANTES
+task createMissingResources {
+    doLast {
+        println "🔧 Creando archivos de recursos faltantes..."
+        
+        // 1. Crear values/ si no existe
+        def valuesDir = file('src/main/res/values')
+        if (!valuesDir.exists()) {
+            valuesDir.mkdirs()
+            println "✅ Creada carpeta: values"
+        }
+        
+        // 2. Crear drawable/ si no existe
+        def drawableDir = file('src/main/res/drawable')
+        if (!drawableDir.exists()) {
+            drawableDir.mkdirs()
+            println "✅ Creada carpeta: drawable"
+        }
+        
+        // 3. Crear styles.xml
+        def stylesFile = file('src/main/res/values/styles.xml')
+        if (!stylesFile.exists()) {
+            stylesFile.text = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#667eea</item>
+        <item name="colorPrimaryDark">#5a67d8</item>
+        <item name="colorAccent">#fc8181</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>'''
+            println "✅ Creado: styles.xml"
+        }
+        
+        // 4. Crear colors.xml
+        def colorsFile = file('src/main/res/values/colors.xml')
+        if (!colorsFile.exists()) {
+            colorsFile.text = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#667eea</color>
+    <color name="colorPrimaryDark">#5a67d8</color>
+    <color name="colorAccent">#fc8181</color>
+    <color name="white">#FFFFFF</color>
+</resources>'''
+            println "✅ Creado: colors.xml"
+        }
+        
+        // 5. Crear strings.xml si no existe
+        def stringsFile = file('src/main/res/values/strings.xml')
+        if (!stringsFile.exists()) {
+            stringsFile.text = '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TECEL App</string>
+</resources>'''
+            println "✅ Creado: strings.xml"
+        }
+        
+        // 6. Crear splash.xml
+        def splashFile = file('src/main/res/drawable/splash.xml')
+        if (!splashFile.exists()) {
+            splashFile.text = '''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/white"/>
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher"/>
+    </item>
+</layer-list>'''
+            println "✅ Creado: splash.xml"
+        }
+        
+        println "✅ Todos los recursos creados exitosamente"
+    }
+}
+
+// ✅ TASK PARA RENOMBRAR ARCHIVOS
+task renameOutputFiles {
+    doLast {
+        def versionName = android.defaultConfig.versionName
+        def formattedDate = new Date().format('yyyyMMdd_HHmm')
+        
+        println "\n🔄 Renombrando archivos generados..."
+        
+        // Renombrar APKs
+        def apkDir = file("${project.buildDir}/outputs/apk/release")
+        if (apkDir.exists()) {
+            apkDir.eachFile { file ->
+                if (file.name.endsWith('.apk') && !file.name.contains('TECEL_App')) {
+                    def newName = "TECEL_App_v${versionName}_${formattedDate}.apk"
+                    file.renameTo(new File(file.parent, newName))
+                    println "✅ APK: $newName"
+                }
+            }
+        }
+        
+        // Renombrar AABs
+        def bundleDir = file("${project.buildDir}/outputs/bundle/release")
+        if (bundleDir.exists()) {
+            bundleDir.eachFile { file ->
+                if (file.name.endsWith('.aab') && !file.name.contains('TECEL_App')) {
+                    def newName = "TECEL_App_v${versionName}_${formattedDate}.aab"
+                    file.renameTo(new File(file.parent, newName))
+                    println "✅ AAB: $newName"
+                }
+            }
+        }
+        
+        println "\n" + "="*50
+        println "🏗️  BUILD COMPLETADO"
+        println "="*50
+        println "📱 TECEL App v${versionName}"
+        println "📅 ${formattedDate}"
+        println ""
+        println "📁 APK para instalación:"
+        println "   ${project.buildDir}/outputs/apk/release/"
+        println ""
+        println "📦 AAB para Google Play:"
+        println "   ${project.buildDir}/outputs/bundle/release/"
+        println "="*50
+    }
+}
+
+// ✅ CONECTAR TASKS
+afterEvaluate {
+    tasks.named('assembleRelease') {
+        finalizedBy 'renameOutputFiles'
+    }
+    tasks.named('bundleRelease') {
+        finalizedBy 'renameOutputFiles'
+    }
+}
+
+// ✅ TASK PRINCIPAL
+task buildProduction {
+    dependsOn 'clean', 'createMissingResources', 'assembleRelease', 'bundleRelease'
+    group = 'Build'
+    description = 'Genera APK + AAB para producción'
+    
+    doLast {
+        println "\n🎉 ¡PRODUCCIÓN LISTA!"
+        println "📱 APK: Para instalar en dispositivos"
+        println "📦 AAB: Para subir a Google Play"
+    }
+}
+
+// ✅ TASK PARA VERIFICAR RECURSOS
+task checkResources {
+    doLast {
+        println "\n🔍 Verificando recursos..."
+        
+        def requiredResources = [
+            'src/main/res/values/styles.xml',
+            'src/main/res/values/colors.xml', 
+            'src/main/res/values/strings.xml',
+            'src/main/res/drawable/splash.xml',
+            'src/main/res/xml/network_security_config.xml',
+            'src/main/res/xml/file_paths.xml'
+        ]
+        
+        requiredResources.each { resource ->
+            def file = file(resource)
+            if (file.exists()) {
+                println "✅ $resource"
+            } else {
+                println "❌ $resource"
+            }
+        }
+    }
 }
