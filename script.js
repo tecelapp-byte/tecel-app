@@ -13301,7 +13301,7 @@ function showLibrarySearchResultsInfo(matchCount, searchTerm, categoryFilter, ty
         }
         
         resultsInfo.innerHTML = `
-            <div style="align-items: center; justify-content: space-between;">
+            <div style="display: flex;align-items: center; justify-content: space-between;">
                 <span>${message}</span>
                 ${activeFilters.length > 0 ? 
                     `<button class="btn-outline btn-sm" onclick="clearLibraryFilters()" style="margin-left: 1rem;">
