@@ -1241,29 +1241,25 @@ if (mainCategorySelect) {
     ('Event listeners configurados correctamente');
 }
 
-// Función para configurar buscadores en modales de categorías
 function setupCategorySearch(category) {
     const searchId = `${category.replace('_', '-')}-search`;
-    const searchInput = document.getElementById(searchId);
+    const filterId = `${category.replace('_', '-')}-subcategory-filter`;
     
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            filterCategoryResources(category, this.value.toLowerCase());
-        });
-    }
+    // Usar delegación de eventos para mejor rendimiento
+    document.addEventListener('input', function(e) {
+        if (e.target.id === searchId) {
+            const searchTerm = e.target.value.toLowerCase();
+            const subcategory = document.getElementById(filterId)?.value || 'all';
+            filterCategoryResources(category, searchTerm, subcategory);
+        }
+    });
     
-    // Configurar filtro de subcategorías si existe
-    const subcategoryFilterId = `${category.replace('_', '-')}-subcategory-filter`;
-    const subcategoryFilter = document.getElementById(subcategoryFilterId);
-    
-    if (subcategoryFilter) {
-        subcategoryFilter.addEventListener('change', function() {
-            filterCategoryResources(category, 
-                document.getElementById(`${category.replace('_', '-')}-search`)?.value.toLowerCase() || '',
-                this.value
-            );
-        });
-    }
+    document.addEventListener('change', function(e) {
+        if (e.target.id === filterId) {
+            const searchTerm = document.getElementById(searchId)?.value.toLowerCase() || '';
+            filterCategoryResources(category, searchTerm, e.target.value);
+        }
+    });
 }
 
 // Función mejorada para búsqueda de ideas
@@ -10062,6 +10058,8 @@ function openProgramasModal() {
     }, 1000);
     
     openModal('programas-modal');
+    loadCategoryResources('programas');
+    updateModalCounter('programas');
 }
 
 // Función para abrir modal de Habilidades Técnicas - USANDO FUNCIONES EXISTENTES
@@ -10089,6 +10087,8 @@ function openHabilidadesTecnicasModal() {
     }, 1000);
     
     openModal('habilidades-tecnicas-modal');
+    loadCategoryResources('habilidades_tecnicas');
+    updateModalCounter('habilidades_tecnicas');    
 }
 
 // Función para abrir modal de Habilidades Blandas - USANDO FUNCIONES EXISTENTES
@@ -10116,7 +10116,22 @@ function openHabilidadesBlandasModal() {
     }, 1000);
     
     openModal('habilidades-blandas-modal');
+    loadCategoryResources('habilidades_blandas');
+    updateModalCounter('habilidades_blandas');    
 }
+
+// Función para actualizar contadores en modales
+function updateModalCounter(category) {
+    const counterElement = document.getElementById(`${category.replace('_', '-')}-resources-count`);
+    const cardCounterElement = document.getElementById(`${category.replace('_', '-')}-card-count`);
+    
+    if (counterElement && cardCounterElement) {
+        // Usar el mismo contador que la card
+        counterElement.textContent = cardCounterElement.textContent;
+        console.log(`✅ Contador actualizado para ${category}: ${cardCounterElement.textContent}`);
+    }
+}
+
 
 // Función para renderizar recursos filtrados por categoría
 function renderFilteredLibraryResources(category, containerId) {
@@ -11884,83 +11899,51 @@ function debugLibraryResources() {
 // Hacerla global para testing
 window.debugLibrary = debugLibraryResources;
 
-// Función para cargar recursos de categoría específica - VERSIÓN CORREGIDA
-async function loadCategoryResources(category, containerId) {
+// Función para cargar recursos de categoría optimizada
+async function loadCategoryResources(category) {
+    const modalId = `${category.replace('_', '-')}-modal`;
+    const container = document.getElementById(`${modalId}-container`);
+    
+    if (!container) {
+        console.error(`❌ Contenedor no encontrado para ${category}`);
+        return;
+    }
+    
+    // Mostrar loading
+    container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando recursos...</p></div>';
+    
     try {
-        console.log(`🔄 Cargando recursos para categoría: ${category}`);
+        const startTime = Date.now();
         
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.error(`❌ Contenedor no encontrado: ${containerId}`);
-            return;
-        }
+        // Cargar todos los recursos y filtrar localmente (más rápido)
+        const allResources = await loadLibraryResourcesInternal();
+        const filteredResources = allResources.filter(resource => 
+            resource.main_category === category
+        );
         
-        container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando recursos...</p></div>';
+        const endTime = Date.now();
+        console.log(`⏱️ Carga de ${category}: ${endTime - startTime}ms, ${filteredResources.length} recursos`);
         
-        // Intentar cargar todos los recursos primero y luego filtrar
-        let allResources = [];
-        
-        try {
-            // Método 1: Intentar con endpoint específico
-            const response = await fetch(`${API_BASE}/library`, {
-                headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                allResources = await response.json();
-                console.log(`✅ ${allResources.length} recursos cargados en total`);
-                
-                // Filtrar por categoría
-                const categoryResources = allResources.filter(resource => 
-                    resource.main_category === category
-                );
-                
-                console.log(`✅ ${categoryResources.length} recursos encontrados para ${category}`);
-                
-                renderCategoryResources(categoryResources, container);
-                updateCategoryCounter(category, categoryResources.length);
-                
-            } else {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-        } catch (apiError) {
-            console.log('⚠️ Error con API, usando método alternativo...');
-            
-            // Método 2: Usar libraryResources global si están cargados
-            if (libraryResources && libraryResources.length > 0) {
-                const categoryResources = libraryResources.filter(resource => 
-                    resource.main_category === category
-                );
-                
-                console.log(`✅ ${categoryResources.length} recursos encontrados para ${category} (desde cache)`);
-                renderCategoryResources(categoryResources, container);
-                updateCategoryCounter(category, categoryResources.length);
-                
-            } else {
-                // Método 3: Mostrar mensaje de error
-                throw apiError;
-            }
-        }
+        // Renderizar recursos
+        renderCategoryResources(category, filteredResources);
         
     } catch (error) {
         console.error(`❌ Error cargando recursos de ${category}:`, error);
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.innerHTML = `
-                <div class="error-state">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error cargando recursos</p>
-                    <small>${error.message}</small>
-                    <button class="btn-outline btn-sm mt-2" onclick="retryLoadCategoryResources('${category}', '${containerId}')">
-                        <i class="fas fa-redo"></i> Reintentar
-                    </button>
-                </div>
-            `;
+        container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-triangle"></i><p>Error cargando recursos</p></div>';
+    }
+}
+
+// Función interna para cargar recursos (reutilizable)
+async function loadLibraryResourcesInternal() {
+    try {
+        const response = await fetch(`${API_BASE}/library`);
+        if (response.ok) {
+            return await response.json();
         }
+        return [];
+    } catch (error) {
+        console.error('Error cargando recursos:', error);
+        return [];
     }
 }
 
@@ -12032,6 +12015,43 @@ function renderCategoryResources(resources, container) {
         }
     });
 }
+
+// Configurar filtros y buscadores en modales
+function initCategoryModalFilters() {
+    const categories = ['programas', 'habilidades_tecnicas', 'habilidades_blandas'];
+    
+    categories.forEach(category => {
+        const modalId = `${category.replace('_', '-')}-modal`;
+        const searchId = `${category.replace('_', '-')}-search`;
+        const filterId = `${category.replace('_', '-')}-subcategory-filter`;
+        
+        // Configurar buscador
+        const searchInput = document.getElementById(searchId);
+        if (searchInput) {
+            // Limpiar eventos anteriores
+            const newSearchInput = searchInput.cloneNode(true);
+            searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+            
+            newSearchInput.addEventListener('input', function() {
+                filterCategoryResources(category, this.value.toLowerCase());
+            });
+        }
+        
+        // Configurar filtro de subcategoría
+        const filterSelect = document.getElementById(filterId);
+        if (filterSelect) {
+            // Limpiar eventos anteriores
+            const newFilter = filterSelect.cloneNode(true);
+            filterSelect.parentNode.replaceChild(newFilter, filterSelect);
+            
+            newFilter.addEventListener('change', function() {
+                const searchTerm = document.getElementById(searchId)?.value.toLowerCase() || '';
+                filterCategoryResources(category, searchTerm, this.value);
+            });
+        }
+    });
+}
+
 
 // Función para reintentar carga
 function retryLoadCategoryResources(category, containerId) {
@@ -12166,67 +12186,36 @@ function updateResourceSubcategories(mainCategory) {
     console.log('✅ Subcategorías actualizadas');
 }
 
-// Función para filtrar recursos en modal de categoría
-function filterCategoryResources(category, modalId, searchTerm = null, filters) {
-    const containerMap = {
-        'programas-modal': 'programas-container',
-        'habilidades-tecnicas-modal': 'habilidades-tecnicas-container',
-        'habilidades-blandas-modal': 'habilidades-blandas-container'
-    };
+// Función mejorada para filtrar recursos
+function filterCategoryResources(category, searchTerm = '', subcategory = 'all') {
+    const modalId = `${category.replace('_', '-')}-modal`;
+    const container = document.getElementById(`${modalId}-container`);
+    const allCards = container?.querySelectorAll('.resource-card');
     
-    const containerId = containerMap[modalId];
-    const container = document.getElementById(containerId);
+    if (!allCards || allCards.length === 0) return;
     
-    if (!container) return;
+    let visibleCount = 0;
     
-    // Obtener valores actuales de los filtros
-    let currentSearch = searchTerm;
-    let currentSubcategory = 'all';
-    let currentType = 'all';
-    
-    if (!currentSearch && filters.search) {
-        const searchInput = document.getElementById(filters.search);
-        currentSearch = searchInput ? searchInput.value.toLowerCase() : '';
-    }
-    
-    if (filters.subcategory) {
-        const subcategoryFilter = document.getElementById(filters.subcategory);
-        currentSubcategory = subcategoryFilter ? subcategoryFilter.value : 'all';
-    }
-    
-    if (filters.type) {
-        const typeFilter = document.getElementById(filters.type);
-        currentType = typeFilter ? typeFilter.value : 'all';
-    }
-    
-    // Filtrar recursos
-    const categoryResources = libraryResources.filter(resource => 
-        resource.main_category === category
-    );
-    
-    const filteredResources = categoryResources.filter(resource => {
-        // Filtro de búsqueda
-        const matchesSearch = !currentSearch || 
-            resource.title.toLowerCase().includes(currentSearch) ||
-            resource.description.toLowerCase().includes(currentSearch);
+    allCards.forEach(card => {
+        const title = card.querySelector('.resource-title')?.textContent.toLowerCase() || '';
+        const description = card.querySelector('.resource-description')?.textContent.toLowerCase() || '';
+        const cardSubcategory = card.getAttribute('data-subcategory') || '';
+        const matchesSearch = !searchTerm || title.includes(searchTerm) || description.includes(searchTerm);
+        const matchesSubcategory = subcategory === 'all' || cardSubcategory === subcategory;
         
-        // Filtro de subcategoría
-        const matchesSubcategory = currentSubcategory === 'all' || 
-            resource.subcategory === currentSubcategory;
-        
-        // Filtro de tipo (solo para programas)
-        let matchesType = true;
-        if (filters.type && currentType !== 'all') {
-            matchesType = resource.resource_type === currentType;
+        if (matchesSearch && matchesSubcategory) {
+            card.style.display = 'flex';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
         }
-        
-        return matchesSearch && matchesSubcategory && matchesType;
     });
     
-    console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
-    
-    // Re-renderizar recursos filtrados
-    renderResourcesInContainer(container, filteredResources);
+    // Actualizar contador de resultados
+    const resultsElement = document.getElementById(`${modalId}-results-count`);
+    if (resultsElement) {
+        resultsElement.textContent = `${visibleCount} de ${allCards.length} recursos`;
+    }
 }
 
 // Actualizar estadísticas de categoría
