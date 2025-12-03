@@ -1200,15 +1200,15 @@ if (mainCategorySelect) {
     const habilidadesBlandasCard = document.getElementById('habilidades_blandas-card');
 
     if (programasCard) {
-        programasCard.addEventListener('click', openProgramasModal);
+        programasCard.onclick = openProgramasModal;
     }
 
     if (habilidadesTecnicasCard) {
-        habilidadesTecnicasCard.addEventListener('click', openHabilidadesTecnicasModal);
+        habilidadesTecnicasCard.onclick = openHabilidadesTecnicasModal;
     }
 
     if (habilidadesBlandasCard) {
-        habilidadesBlandasCard.addEventListener('click', openHabilidadesBlandasModal);
+        habilidadesBlandasCard.onclick = openHabilidadesBlandasModal;
     }
 
     // Configurar buscadores en modales de categorías
@@ -10037,24 +10037,127 @@ async function executeDeleteFile() {
     }
 }
 
-// Función para abrir modal de Programas
+// Función para abrir modal de Programas - MODIFICADA
 function openProgramasModal() {
     currentLibraryCategory = 'programas';
+    
+    // Cargar recursos de la categoría
     loadCategoryResources('programas');
+    
+    // Actualizar contador inicial
+    const programasCount = libraryResources.filter(r => r.main_category === 'programas').length;
+    document.getElementById('programas-modal-count').textContent = programasCount;
+    
+    // Configurar filtros específicos para programas
+    const searchInput = document.getElementById('programas-search');
+    const subcategoryFilter = document.getElementById('programas-subcategory-filter');
+    const typeFilter = document.getElementById('programas-type-filter');
+    
+    // Configurar event listeners para filtros
+    if (searchInput) {
+        searchInput.oninput = function() {
+            filterCategoryResources('programas', 'programas-modal', null, {
+                search: 'programas-search',
+                subcategory: 'programas-subcategory-filter',
+                type: 'programas-type-filter'
+            });
+        };
+    }
+    
+    if (subcategoryFilter) {
+        subcategoryFilter.onchange = function() {
+            filterCategoryResources('programas', 'programas-modal', null, {
+                search: 'programas-search',
+                subcategory: 'programas-subcategory-filter',
+                type: 'programas-type-filter'
+            });
+        };
+    }
+    
+    if (typeFilter) {
+        typeFilter.onchange = function() {
+            filterCategoryResources('programas', 'programas-modal', null, {
+                search: 'programas-search',
+                subcategory: 'programas-subcategory-filter',
+                type: 'programas-type-filter'
+            });
+        };
+    }
+    
     openModal('programas-modal');
 }
 
-// Función para abrir modal de Habilidades Técnicas
+// Función para abrir modal de Habilidades Técnicas - MODIFICADA
 function openHabilidadesTecnicasModal() {
     currentLibraryCategory = 'habilidades_tecnicas';
+    
+    // Cargar recursos de la categoría
     loadCategoryResources('habilidades_tecnicas');
+    
+    // Actualizar contador inicial
+    const tecnicasCount = libraryResources.filter(r => r.main_category === 'habilidades_tecnicas').length;
+    document.getElementById('tecnicas-modal-count').textContent = tecnicasCount;
+    
+    // Configurar filtros específicos para habilidades técnicas
+    const searchInput = document.getElementById('tecnicas-search');
+    const subcategoryFilter = document.getElementById('tecnicas-subcategory-filter');
+    
+    // Configurar event listeners para filtros
+    if (searchInput) {
+        searchInput.oninput = function() {
+            filterCategoryResources('habilidades_tecnicas', 'habilidades-tecnicas-modal', null, {
+                search: 'tecnicas-search',
+                subcategory: 'tecnicas-subcategory-filter'
+            });
+        };
+    }
+    
+    if (subcategoryFilter) {
+        subcategoryFilter.onchange = function() {
+            filterCategoryResources('habilidades_tecnicas', 'habilidades-tecnicas-modal', null, {
+                search: 'tecnicas-search',
+                subcategory: 'tecnicas-subcategory-filter'
+            });
+        };
+    }
+    
     openModal('habilidades-tecnicas-modal');
 }
 
-// Función para abrir modal de Habilidades Blandas
+// Función para abrir modal de Habilidades Blandas - MODIFICADA
 function openHabilidadesBlandasModal() {
     currentLibraryCategory = 'habilidades_blandas';
+    
+    // Cargar recursos de la categoría
     loadCategoryResources('habilidades_blandas');
+    
+    // Actualizar contador inicial
+    const blandasCount = libraryResources.filter(r => r.main_category === 'habilidades_blandas').length;
+    document.getElementById('blandas-modal-count').textContent = blandasCount;
+    
+    // Configurar filtros específicos para habilidades blandas
+    const searchInput = document.getElementById('blandas-search');
+    const subcategoryFilter = document.getElementById('blandas-subcategory-filter');
+    
+    // Configurar event listeners para filtros
+    if (searchInput) {
+        searchInput.oninput = function() {
+            filterCategoryResources('habilidades_blandas', 'habilidades-blandas-modal', null, {
+                search: 'blandas-search',
+                subcategory: 'blandas-subcategory-filter'
+            });
+        };
+    }
+    
+    if (subcategoryFilter) {
+        subcategoryFilter.onchange = function() {
+            filterCategoryResources('habilidades_blandas', 'habilidades-blandas-modal', null, {
+                search: 'blandas-search',
+                subcategory: 'blandas-subcategory-filter'
+            });
+        };
+    }
+    
     openModal('habilidades-blandas-modal');
 }
 
@@ -11931,7 +12034,7 @@ function updateResourceSubcategories(mainCategory) {
     console.log('✅ Subcategorías actualizadas');
 }
 
-// Función para filtrar recursos en modal de categoría
+// Función para filtrar recursos en modal de categoría - MODIFICADA
 function filterCategoryResources(category, modalId, searchTerm = null, filters) {
     const containerMap = {
         'programas-modal': 'programas-container',
@@ -11939,8 +12042,16 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
         'habilidades-blandas-modal': 'habilidades-blandas-container'
     };
     
+    const countMap = {
+        'programas-modal': 'programas-modal-count',
+        'habilidades-tecnicas-modal': 'tecnicas-modal-count',
+        'habilidades-blandas-modal': 'blandas-modal-count'
+    };
+    
     const containerId = containerMap[modalId];
     const container = document.getElementById(containerId);
+    const countElementId = countMap[modalId];
+    const countElement = document.getElementById(countElementId);
     
     if (!container) return;
     
@@ -11973,7 +12084,7 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
         // Filtro de búsqueda
         const matchesSearch = !currentSearch || 
             resource.title.toLowerCase().includes(currentSearch) ||
-            resource.description.toLowerCase().includes(currentSearch);
+            (resource.description && resource.description.toLowerCase().includes(currentSearch));
         
         // Filtro de subcategoría
         const matchesSubcategory = currentSubcategory === 'all' || 
@@ -11989,6 +12100,12 @@ function filterCategoryResources(category, modalId, searchTerm = null, filters) 
     });
     
     console.log(`🔍 Filtrados: ${filteredResources.length} de ${categoryResources.length} recursos`);
+    
+    // ACTUALIZAR CONTADOR DEL MODAL - AÑADIDO
+    if (countElement) {
+        countElement.textContent = filteredResources.length;
+        console.log(`📊 Contador ${modalId} actualizado: ${filteredResources.length}`);
+    }
     
     // Re-renderizar recursos filtrados
     renderResourcesInContainer(container, filteredResources);
@@ -13009,6 +13126,9 @@ async function loadLibraryResources() {
             libraryResources = await response.json();
             console.log(`✅ ${libraryResources.length} recursos cargados desde servidor`);
             
+            // ACTUALIZAR TODOS LOS CONTADORES - AÑADIDO
+            updateAllLibraryCounters();
+            
             // Usar la MISMA función de renderizado
             renderLibraryResources();
             
@@ -13048,6 +13168,44 @@ async function loadLibraryResources() {
                 </button>
             </div>
         `;
+    }
+}
+
+// AÑADE ESTA FUNCIÓN PEQUEÑA PARA ACTUALIZAR TODOS LOS CONTADORES
+function updateAllLibraryCounters() {
+    if (!libraryResources || libraryResources.length === 0) return;
+    
+    try {
+        // Contar recursos por categoría principal
+        const programasCount = libraryResources.filter(r => r.main_category === 'programas').length;
+        const tecnicasCount = libraryResources.filter(r => r.main_category === 'habilidades_tecnicas').length;
+        const blandasCount = libraryResources.filter(r => r.main_category === 'habilidades_blandas').length;
+        
+        // Actualizar cards principales
+        const programasCountElement = document.getElementById('programas-count');
+        const tecnicasCountElement = document.getElementById('tecnicas-count');
+        const blandasCountElement = document.getElementById('blandas-count');
+        
+        if (programasCountElement) programasCountElement.textContent = programasCount;
+        if (tecnicasCountElement) tecnicasCountElement.textContent = tecnicasCount;
+        if (blandasCountElement) blandasCountElement.textContent = blandasCount;
+        
+        // Actualizar contadores de modales (si están visibles)
+        const programasModalCount = document.getElementById('programas-modal-count');
+        const tecnicasModalCount = document.getElementById('tecnicas-modal-count');
+        const blandasModalCount = document.getElementById('blandas-modal-count');
+        
+        if (programasModalCount) programasModalCount.textContent = programasCount;
+        if (tecnicasModalCount) tecnicasModalCount.textContent = tecnicasCount;
+        if (blandasModalCount) blandasModalCount.textContent = blandasCount;
+        
+        console.log('📊 Contadores actualizados:', {
+            programas: programasCount,
+            tecnicas: tecnicasCount,
+            blandas: blandasCount
+        });
+    } catch (error) {
+        console.error('❌ Error actualizando contadores:', error);
     }
 }
 
