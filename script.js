@@ -12978,7 +12978,6 @@ async function loadLibraryResources() {
             <div class="loading-state" style="
                 text-align: center;
                 padding: 4rem 2rem;
-                display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
@@ -13230,7 +13229,6 @@ function performLibrarySearch() {
             (typeFilter === 'video' && resourceType.includes('video'));
         
         if (matchesSearch && matchesCategory && matchesType) {
-            card.style.display = 'flex';
             card.classList.remove('search-no-match');
             card.classList.add('search-match');
             matchCount++;
@@ -13303,7 +13301,7 @@ function showLibrarySearchResultsInfo(matchCount, searchTerm, categoryFilter, ty
         }
         
         resultsInfo.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="align-items: center; justify-content: space-between;">
                 <span>${message}</span>
                 ${activeFilters.length > 0 ? 
                     `<button class="btn-outline btn-sm" onclick="clearLibraryFilters()" style="margin-left: 1rem;">
