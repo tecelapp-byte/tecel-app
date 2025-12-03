@@ -3063,61 +3063,64 @@ function verifyDetailModalElements() {
     ('============================================');
 }
 
-// REEMPLAZAR solo la parte de acciones en createLibraryCard:
+// Función para actualizar la función createLibraryCard para incluir data attribute de categoría
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
     card.setAttribute('data-resource-id', resource.id);
+    card.setAttribute('data-main-category', resource.main_category || ''); // 🔥 NUEVO: Agregar categoría principal
     
     const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
     const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
     
+    // Obtener etiquetas amigables
     const typeLabel = getResourceTypeLabel(resource.resource_type);
-    const categoryLabel = getCategoryLabel(resource.main_category);
+    const mainCategoryLabel = getMainCategoryLabel(resource.main_category);
+    const subcategoryLabel = resource.subcategory ? ` • ${resource.subcategory}` : '';
     
     card.innerHTML = `
-    <div class="library-card-header">
-        <h3 class="library-card-title">${resource.title}</h3>
-        <span class="library-type-badge">${typeLabel}</span>
-    </div>
-    
-    <div class="library-card-category">
-        <i class="fas fa-folder"></i>
-        ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
-    </div>
-    
-    <p class="library-card-description">${resource.description}</p>
-    
-    <div class="library-card-meta">
-        <span class="library-uploader">
-            <i class="fas fa-user"></i>     
-            ${resource.uploader_name || 'Usuario'}
-        </span>
-        <span class="library-date">
-            <i class="fas fa-calendar"></i>
-            ${new Date(resource.created_at).toLocaleDateString('es-ES')}
-        </span>
-    </div>
-    
-<div class="library-card-actions">
-        ${isFileResource ? 
-            `<button class="btn-primary btn-sm" 
-                     onclick="event.stopPropagation(); downloadResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
-                <i class="fas fa-download"></i> Descargar
-            </button>` : ''}
-            
-        ${isLinkResource ? 
-            `<button class="btn-outline btn-sm" 
-                     onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
-                <i class="fas fa-external-link-alt"></i> Visitar
-            </button>` : ''}
-            
-        <button class="btn-outline btn-sm" 
-                onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
-            <i class="fas fa-eye"></i> Detalles
-        </button>
-    </div>
-`;
+        <div class="library-card-header">
+            <h3 class="library-card-title">${resource.title}</h3>
+            <span class="library-type-badge">${typeLabel}</span>
+        </div>
+        
+        <div class="library-card-category">
+            <i class="fas fa-folder"></i>
+            ${mainCategoryLabel}${subcategoryLabel}
+        </div>
+        
+        <p class="library-card-description">${resource.description}</p>
+        
+        <div class="library-card-meta">
+            <span class="library-uploader">
+                <i class="fas fa-user"></i>     
+                ${resource.uploader_name || 'Usuario'}
+            </span>
+            <span class="library-date">
+                <i class="fas fa-calendar"></i>
+                ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+            </span>
+        </div>
+        
+        <div class="library-card-actions">
+            ${isFileResource ? 
+                `<button class="btn-primary btn-sm" 
+                         onclick="event.stopPropagation(); downloadResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-download"></i> Descargar
+                </button>` : ''}
+                
+            ${isLinkResource ? 
+                `<button class="btn-outline btn-sm" 
+                         onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
+                    <i class="fas fa-external-link-alt"></i> Visitar
+                </button>` : ''}
+                
+            <button class="btn-outline btn-sm" 
+                    onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
+                <i class="fas fa-eye"></i> Detalles
+            </button>
+        </div>
+    `;
     
     // Mismo comportamiento clickeable que proyectos
     card.style.cursor = 'pointer';
@@ -12877,18 +12880,15 @@ async function updateDownloadCount(resourceId) {
     }
 }
 
-// Función para obtener etiqueta del tipo de recurso
+// Función auxiliar para obtener etiqueta de tipo de recurso
 function getResourceTypeLabel(type) {
-    const types = {
+    const labels = {
         'manual': 'Manual',
-        'presentacion': 'Presentación',
-        'guia': 'Guía',
-        'enlace': 'Enlace Externo',
+        'enlace': 'Enlace',
         'documento': 'Documento',
-        'video': 'Video',
-        'audio': 'Audio'
+        'video': 'Video'
     };
-    return types[type] || type;
+    return labels[type] || type || 'Recurso';
 }
 
 function getCategoryLabel(category) {
@@ -13057,7 +13057,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupCategoryCards();
 });
 
-// Función para inicializar el sistema de búsqueda de biblioteca
+// Función para inicializar el sistema de búsqueda de biblioteca - VERSIÓN CORREGIDA
 function initLibrarySearch() {
     console.log('🔍 Inicializando buscador de biblioteca...');
     
@@ -13071,6 +13071,53 @@ function initLibrarySearch() {
         return;
     }
     
+    // Configurar opciones del filtro de categoría principal
+    if (categoryFilter) {
+        // Limpiar opciones existentes
+        categoryFilter.innerHTML = '';
+        
+        // Agregar opciones estándar
+        const options = [
+            { value: 'all', text: 'Todas las categorías' },
+            { value: 'programas', text: 'Programas' },
+            { value: 'habilidades_tecnicas', text: 'Habilidades Técnicas' },
+            { value: 'habilidades_blandas', text: 'Habilidades Blandas' }
+        ];
+        
+        options.forEach(option => {
+            const optElement = document.createElement('option');
+            optElement.value = option.value;
+            optElement.textContent = option.text;
+            categoryFilter.appendChild(optElement);
+        });
+        
+        console.log('✅ Filtro de categoría configurado con opciones principales');
+    }
+    
+    // Configurar opciones del filtro de tipo
+    if (typeFilter) {
+        // Limpiar opciones existentes
+        typeFilter.innerHTML = '';
+        
+        // Agregar opciones estándar
+        const typeOptions = [
+            { value: 'all', text: 'Todos los tipos' },
+            { value: 'manual', text: 'Manuales' },
+            { value: 'enlace', text: 'Enlaces' },
+            { value: 'documento', text: 'Documentos' },
+            { value: 'video', text: 'Videos' }
+        ];
+        
+        typeOptions.forEach(option => {
+            const optElement = document.createElement('option');
+            optElement.value = option.value;
+            optElement.textContent = option.text;
+            typeFilter.appendChild(optElement);
+        });
+        
+        console.log('✅ Filtro de tipo configurado');
+    }
+    
     // Event listener para búsqueda en tiempo real
     searchInput.addEventListener('input', function() {
         console.log('🔎 Buscando:', this.value);
@@ -13079,19 +13126,23 @@ function initLibrarySearch() {
     
     // Event listeners para filtros
     if (categoryFilter) {
-        categoryFilter.addEventListener('change', performLibrarySearch);
-        console.log('✅ Filtro de categoría configurado');
+        categoryFilter.addEventListener('change', function() {
+            console.log('🎯 Filtro de categoría cambiado:', this.value);
+            performLibrarySearch();
+        });
     }
     
     if (typeFilter) {
-        typeFilter.addEventListener('change', performLibrarySearch);
-        console.log('✅ Filtro de tipo configurado');
+        typeFilter.addEventListener('change', function() {
+            console.log('🎯 Filtro de tipo cambiado:', this.value);
+            performLibrarySearch();
+        });
     }
     
-    console.log('✅ Buscador de biblioteca inicializado');
+    console.log('✅ Buscador de biblioteca inicializado correctamente');
 }
 
-// Función principal de búsqueda de biblioteca
+// Función principal de búsqueda de biblioteca - VERSIÓN CORREGIDA PARA CATEGORÍAS PRINCIPALES
 function performLibrarySearch() {
     console.log('🔍 Ejecutando búsqueda en biblioteca...');
     
@@ -13100,9 +13151,9 @@ function performLibrarySearch() {
     const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
     
     console.log('📊 Filtros activos:', {
-        searchTerm,
-        categoryFilter,
-        typeFilter
+        searchTerm: searchTerm || '(ninguno)',
+        categoryFilter: categoryFilter,
+        typeFilter: typeFilter
     });
     
     const libraryCards = document.querySelectorAll('#library-container .library-card');
@@ -13116,32 +13167,49 @@ function performLibrarySearch() {
     libraryCards.forEach(card => {
         const title = card.querySelector('.library-card-title')?.textContent.toLowerCase() || '';
         const description = card.querySelector('.library-card-description')?.textContent.toLowerCase() || '';
-        const categoryElement = card.querySelector('.library-card-category');
-        const category = categoryElement ? categoryElement.textContent.toLowerCase() : '';
+        
+        // Obtener la categoría principal del recurso desde el data attribute o texto
+        let resourceMainCategory = card.getAttribute('data-main-category') || '';
+        
+        // Si no tiene data attribute, intentar obtener del texto de categoría
+        if (!resourceMainCategory) {
+            const categoryElement = card.querySelector('.library-card-category');
+            if (categoryElement) {
+                const categoryText = categoryElement.textContent.toLowerCase();
+                // Mapear texto a categorías principales
+                if (categoryText.includes('programa')) resourceMainCategory = 'programas';
+                else if (categoryText.includes('técnica') || categoryText.includes('tecnica')) resourceMainCategory = 'habilidades_tecnicas';
+                else if (categoryText.includes('blanda')) resourceMainCategory = 'habilidades_blandas';
+            }
+        }
+        
+        // Obtener tipo de recurso
         const typeElement = card.querySelector('.library-type-badge');
-        const type = typeElement ? typeElement.textContent.toLowerCase() : '';
+        const resourceType = typeElement ? typeElement.textContent.toLowerCase() : '';
         
         // Verificar coincidencias de búsqueda
         const matchesSearch = !searchTerm || 
             title.includes(searchTerm) ||
-            description.includes(searchTerm) ||
-            category.includes(searchTerm);
+            description.includes(searchTerm);
         
-        // Verificar filtro de categoría
+        // Verificar filtro de categoría PRINCIPAL
         const matchesCategory = categoryFilter === 'all' || 
-            category.includes(categoryFilter) ||
-            (categoryFilter === 'programas' && category.includes('program')) ||
-            (categoryFilter === 'habilidades_tecnicas' && category.includes('técnica')) ||
-            (categoryFilter === 'habilidades_blandas' && category.includes('blanda'));
+            resourceMainCategory === categoryFilter;
         
         // Verificar filtro de tipo
         const matchesType = typeFilter === 'all' || 
-            type.includes(typeFilter) ||
-            (typeFilter === 'manual' && type.includes('manual')) ||
-            (typeFilter === 'enlace' && type.includes('enlace'));
+            (typeFilter === 'manual' && resourceType.includes('manual')) ||
+            (typeFilter === 'enlace' && resourceType.includes('enlace')) ||
+            (typeFilter === 'documento' && (
+                resourceType.includes('documento') || 
+                resourceType.includes('pdf') || 
+                resourceType.includes('word') || 
+                resourceType.includes('excel')
+            )) ||
+            (typeFilter === 'video' && resourceType.includes('video'));
         
         if (matchesSearch && matchesCategory && matchesType) {
-            card.style.display = 'block';
+            card.style.display = 'flex';
             card.classList.remove('search-no-match');
             card.classList.add('search-match');
             matchCount++;
@@ -13159,13 +13227,13 @@ function performLibrarySearch() {
     });
     
     // Mostrar información de resultados
-    showLibrarySearchResultsInfo(matchCount, searchTerm, libraryCards.length);
+    showLibrarySearchResultsInfo(matchCount, searchTerm, categoryFilter, typeFilter, libraryCards.length);
     
     console.log(`✅ Búsqueda completada: ${matchCount} de ${libraryCards.length} recursos coinciden`);
 }
 
-// Función para mostrar información de resultados de búsqueda
-function showLibrarySearchResultsInfo(matchCount, searchTerm, totalResources) {
+// Función para mostrar información de resultados de búsqueda - MEJORADA
+function showLibrarySearchResultsInfo(matchCount, searchTerm, categoryFilter, typeFilter, totalResources) {
     // Remover info anterior si existe
     const existingInfo = document.querySelector('.library-search-results-info');
     if (existingInfo) {
@@ -13175,30 +13243,54 @@ function showLibrarySearchResultsInfo(matchCount, searchTerm, totalResources) {
     const searchContainer = document.querySelector('#biblioteca .search-filter-container');
     if (!searchContainer) return;
     
-    if (searchTerm || 
-        document.getElementById('library-category-filter')?.value !== 'all' ||
-        document.getElementById('library-type-filter')?.value !== 'all') {
-        
+    const hasActiveFilters = searchTerm || categoryFilter !== 'all' || typeFilter !== 'all';
+    
+    if (hasActiveFilters) {
         const resultsInfo = document.createElement('div');
         resultsInfo.className = 'library-search-results-info';
         
-        let message = '';
+        let message = `Mostrando ${matchCount} de ${totalResources} recursos`;
+        
+        // Agregar detalles de filtros activos
+        const activeFilters = [];
         
         if (searchTerm) {
-            message = `Encontrados ${matchCount} de ${totalResources} recursos para "${searchTerm}"`;
-        } else {
-            message = `Mostrando ${matchCount} recursos filtrados`;
+            activeFilters.push(`"${searchTerm}"`);
         }
         
-        resultsInfo.textContent = message;
-        resultsInfo.style.cssText = `
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background: var(--surface-color);
-            border-radius: 8px;
-            border-left: 4px solid var(--primary-color);
-            font-size: 0.9rem;
-            color: var(--text-color);
+        if (categoryFilter !== 'all') {
+            const categoryLabels = {
+                'programas': 'Programas',
+                'habilidades_tecnicas': 'Habilidades Técnicas', 
+                'habilidades_blandas': 'Habilidades Blandas'
+            };
+            activeFilters.push(categoryLabels[categoryFilter] || categoryFilter);
+        }
+        
+        if (typeFilter !== 'all') {
+            const typeLabels = {
+                'manual': 'Manuales',
+                'enlace': 'Enlaces',
+                'documento': 'Documentos',
+                'video': 'Videos'
+            };
+            activeFilters.push(typeLabels[typeFilter] || typeFilter);
+        }
+        
+        if (activeFilters.length > 0) {
+            message += ` (filtrados por: ${activeFilters.join(', ')})`;
+        }
+        
+        resultsInfo.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span>${message}</span>
+                ${activeFilters.length > 0 ? 
+                    `<button class="btn-outline btn-sm" onclick="clearLibraryFilters()" style="margin-left: 1rem;">
+                        <i class="fas fa-times"></i> Limpiar filtros
+                    </button>` : 
+                    ''
+                }
+            </div>
         `;
         
         searchContainer.parentNode.insertBefore(resultsInfo, searchContainer.nextSibling);
@@ -13297,7 +13389,6 @@ function initLibrarySystem() {
     console.log('✅ Sistema de biblioteca inicializado completamente');
 }
 
-// Actualizar la función renderLibraryResources existente
 // Función para renderizar recursos de biblioteca con filtros aplicados
 function renderLibraryResources() {
     const container = document.getElementById('library-container');
@@ -13322,6 +13413,8 @@ function renderLibraryResources() {
     const categoryFilter = document.getElementById('library-category-filter')?.value || 'all';
     const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
     
+    console.log('🎯 Aplicando filtros:', { searchTerm, categoryFilter, typeFilter });
+    
     // Filtrar recursos
     const filteredResources = libraryResources.filter(resource => {
         const title = resource.title?.toLowerCase() || '';
@@ -13336,18 +13429,19 @@ function renderLibraryResources() {
             description.includes(searchTerm) ||
             subcategory.includes(searchTerm);
         
-        // Aplicar filtro de categoría
+        // Aplicar filtro de categoría PRINCIPAL (Programas, Habilidades Técnicas, Habilidades Blandas)
         const matchesCategory = categoryFilter === 'all' || 
-            mainCategory === categoryFilter ||
-            (categoryFilter === 'programas' && mainCategory.includes('program')) ||
-            (categoryFilter === 'habilidades_tecnicas' && mainCategory.includes('tecnic')) ||
-            (categoryFilter === 'habilidades_blandas' && mainCategory.includes('bland'));
+            mainCategory === categoryFilter;
         
         // Aplicar filtro de tipo
         const matchesType = typeFilter === 'all' ||
             resourceType === typeFilter ||
-            (typeFilter === 'manual' && resourceType === 'manual') ||
-            (typeFilter === 'enlace' && resourceType === 'enlace');
+            (typeFilter === 'documento' && (
+                resourceType.includes('documento') || 
+                resourceType.includes('pdf') || 
+                resourceType.includes('doc')
+            )) ||
+            (typeFilter === 'video' && resourceType.includes('video'));
         
         return matchesSearch && matchesCategory && matchesType;
     });
@@ -13385,6 +13479,7 @@ function clearLibraryFilters() {
     
     renderLibraryResources();
     showNotification('Filtros limpiados', 'info');
+    console.log('🧹 Filtros de biblioteca limpiados');
 }
 
 // Función para configurar el formulario de nuevo recurso
@@ -13653,14 +13748,14 @@ function createEnhancedLibraryCard(resource) {
     return card;
 }
 
-// Helper para obtener label de categoría principal
-function getMainCategoryLabel(mainCategory) {
+// Función auxiliar para obtener etiqueta de categoría principal
+function getMainCategoryLabel(category) {
     const labels = {
         'programas': 'Programas',
-        'habilidades_tecnicas': 'Habilidades Técnicas', 
+        'habilidades_tecnicas': 'Habilidades Técnicas',
         'habilidades_blandas': 'Habilidades Blandas'
     };
-    return labels[mainCategory] || mainCategory;
+    return labels[category] || category || 'Sin categoría';
 }
 
 // Función de respaldo universal para descargas
