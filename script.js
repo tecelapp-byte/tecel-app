@@ -13259,9 +13259,6 @@ async function loadLibraryResources() {
                         // Actualizar estadísticas
             updateLibraryStats();
             
-            // Actualizar contadores de categorías
-            updateCategoryCounters();
-            
             // Renderizar en la biblioteca principal
             renderLibraryResources();
             // Actualizar contadores de categorías
