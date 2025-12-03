@@ -11728,7 +11728,7 @@ function debugLibraryResources() {
 // Hacerla global para testing
 window.debugLibrary = debugLibraryResources;
 
-// Función para cargar recursos de categoría específica
+// Función para cargar recursos de categoría específica - VERSIÓN CORREGIDA
 async function loadCategoryResources(category, containerId) {
     try {
         console.log(`🔄 Cargando recursos para categoría: ${category}`);
@@ -11741,38 +11741,69 @@ async function loadCategoryResources(category, containerId) {
         
         container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando recursos...</p></div>';
         
-        const response = await fetch(`${API_BASE}/library/category/${category}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Intentar cargar todos los recursos primero y luego filtrar
+        let allResources = [];
         
-        if (response.ok) {
-            const resources = await response.json();
-            console.log(`✅ ${resources.length} recursos cargados para ${category}`);
+        try {
+            // Método 1: Intentar con endpoint específico
+            const response = await fetch(`${API_BASE}/library`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            if (resources.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-book"></i><p>No hay recursos en esta categoría</p></div>';
+            if (response.ok) {
+                allResources = await response.json();
+                console.log(`✅ ${allResources.length} recursos cargados en total`);
+                
+                // Filtrar por categoría
+                const categoryResources = allResources.filter(resource => 
+                    resource.main_category === category
+                );
+                
+                console.log(`✅ ${categoryResources.length} recursos encontrados para ${category}`);
+                
+                renderCategoryResources(categoryResources, container);
+                updateCategoryCounter(category, categoryResources.length);
+                
             } else {
-                container.innerHTML = '';
-                resources.forEach(resource => {
-                    const resourceElement = createCategoryResourceCard(resource);
-                    container.appendChild(resourceElement);
-                });
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
             }
             
-            // Actualizar contador
-            updateCategoryCounter(category, resources.length);
+        } catch (apiError) {
+            console.log('⚠️ Error con API, usando método alternativo...');
             
-        } else {
-            throw new Error(`Error ${response.status}`);
+            // Método 2: Usar libraryResources global si están cargados
+            if (libraryResources && libraryResources.length > 0) {
+                const categoryResources = libraryResources.filter(resource => 
+                    resource.main_category === category
+                );
+                
+                console.log(`✅ ${categoryResources.length} recursos encontrados para ${category} (desde cache)`);
+                renderCategoryResources(categoryResources, container);
+                updateCategoryCounter(category, categoryResources.length);
+                
+            } else {
+                // Método 3: Mostrar mensaje de error
+                throw apiError;
+            }
         }
+        
     } catch (error) {
         console.error(`❌ Error cargando recursos de ${category}:`, error);
         const container = document.getElementById(containerId);
         if (container) {
-            container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-triangle"></i><p>Error cargando recursos</p></div>';
+            container.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error cargando recursos</p>
+                    <small>${error.message}</small>
+                    <button class="btn-outline btn-sm mt-2" onclick="retryLoadCategoryResources('${category}', '${containerId}')">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
         }
     }
 }
@@ -11808,42 +11839,48 @@ function setupCategoryModalFilters(category) {
     }
 }
 
-// Función para renderizar recursos en modal de categoría
-function renderCategoryResources(category, resources) {
-    const containerId = `${category.replace('_', '-')}-container`;
-    const container = document.getElementById(containerId);
-    const countElement = document.getElementById(`${category}-modal-count`);
-    
-    if (!container) {
-        console.error('❌ Contenedor no encontrado:', containerId);
-        return;
-    }
-    
+// Función para renderizar recursos de categoría
+function renderCategoryResources(resources, container) {
     container.innerHTML = '';
     
     if (resources.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-inbox"></i>
-                <h3>No hay recursos en esta categoría</h3>
-                <p>¡Sé el primero en subir un recurso!</p>
+                <i class="fas fa-book"></i>
+                <p>No hay recursos en esta categoría</p>
+                <small>¡Sé el primero en subir un recurso!</small>
             </div>
         `;
         return;
     }
     
-    // Actualizar contador
-    if (countElement) {
-        countElement.textContent = resources.length;
-    }
-    
-    // Renderizar recursos
     resources.forEach(resource => {
-        const card = createLibraryCard(resource);
-        container.appendChild(card);
+        try {
+            // Usar la misma función que en la biblioteca principal
+            const resourceElement = createLibraryCard(resource);
+            container.appendChild(resourceElement);
+        } catch (cardError) {
+            console.error('❌ Error creando tarjeta:', cardError);
+            
+            // Tarjeta de fallback simple
+            const fallbackCard = document.createElement('div');
+            fallbackCard.className = 'library-card error-card';
+            fallbackCard.innerHTML = `
+                <div class="library-card-header">
+                    <h3 class="library-card-title">${resource.title || 'Recurso sin título'}</h3>
+                </div>
+                <p class="library-card-description">${resource.description || 'Sin descripción'}</p>
+                <small class="text-error">Error al cargar detalles completos</small>
+            `;
+            container.appendChild(fallbackCard);
+        }
     });
-    
-    console.log(`✅ ${resources.length} recursos renderizados en ${category}`);
+}
+
+// Función para reintentar carga
+function retryLoadCategoryResources(category, containerId) {
+    console.log(`🔄 Reintentando carga de ${category}...`);
+    loadCategoryResources(category, containerId);
 }
 
 // Crear card de recurso para categoría
@@ -12920,24 +12957,34 @@ async function updateDownloadCount(resourceId) {
     }
 }
 
-// Función auxiliar para obtener etiqueta de tipo de recurso
+// Función para obtener etiqueta de tipo de recurso
 function getResourceTypeLabel(type) {
-    const labels = {
-        'manual': 'Manual',
-        'enlace': 'Enlace',
+    const typeLabels = {
         'documento': 'Documento',
-        'video': 'Video'
+        'video': 'Video',
+        'enlace': 'Enlace',
+        'software': 'Software',
+        'presentacion': 'Presentación',
+        'manual': 'Manual',
+        'carpeta': 'Carpeta'
     };
-    return labels[type] || type || 'Recurso';
+    return typeLabels[type] || 'Recurso';
 }
 
+// Función para obtener etiqueta de categoría
 function getCategoryLabel(category) {
-    const labels = {
-        'programas': 'Programas y Software',
-        'habilidades_tecnicas': 'Habilidades Técnicas', 
-        'habilidades_blandas': 'Habilidades Blandas'
+    const categoryLabels = {
+        'programas': 'Programas',
+        'habilidades_tecnicas': 'Habilidades Técnicas',
+        'habilidades_blandas': 'Habilidades Blandas',
+        'electronica': 'Electrónica',
+        'programacion': 'Programación',
+        'robotica': 'Robótica',
+        'iot': 'IoT',
+        'proyectos': 'Proyectos',
+        'manuales': 'Manuales'
     };
-    return labels[category] || category;
+    return categoryLabels[category] || category;
 }
 
 function getSubcategoryLabel(mainCategory, subcategory) {
