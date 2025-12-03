@@ -369,6 +369,12 @@ function initializeApp() {
             debugDownloadSystem(); // Para diagnóstico
         }, 1000);
 
+        // Inicializar sistema de biblioteca MEJORADO
+        setTimeout(() => {
+            initLibrarySystem();
+            setupNewResourceForm();
+        }, 1000);
+
         // Inicializar sistema de descargas (solo estilos si es móvil)
         initDownloadSystem();
         
@@ -11885,53 +11891,43 @@ function createCategoryResourceCard(resource) {
     return card;
 }
 
-// Función para actualizar subcategorías según la categoría principal
+// Función para actualizar subcategorías cuando cambia la categoría principal
 function updateResourceSubcategories(mainCategory) {
-    const subcategorySelect = document.getElementById('resource-subcategory');
-    if (!subcategorySelect) return;
-    
     console.log('🔄 Actualizando subcategorías para:', mainCategory);
     
-    // Limpiar opciones actuales
-    subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría</option>';
+    const subcategorySelect = document.getElementById('resource-subcategory');
+    if (!subcategorySelect) {
+        console.error('❌ No se encontró el select de subcategorías');
+        return;
+    }
     
-    if (!mainCategory) return;
+    // Limpiar opciones actuales (excepto la primera)
+    subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
     
-    // Definir subcategorías según la categoría principal
-    const subcategories = {
-        programas: [
-            { value: 'programacion', label: 'Programación' },
-            { value: 'simulacion', label: 'Simulación' },
-            { value: 'diseno', label: 'Diseño' },
-            { value: 'utilidades', label: 'Utilidades' }
-        ],
-        habilidades_tecnicas: [
-            { value: 'electronica', label: 'Electrónica' },
-            { value: 'programacion', label: 'Programación' },
-            { value: 'robotica', label: 'Robótica' },
-            { value: 'iot', label: 'IoT' },
-            { value: 'proyectos', label: 'Proyectos' },
-            { value: 'manuales', label: 'Manuales' }
-        ],
-        habilidades_blandas: [
-            { value: 'comunicacion', label: 'Comunicación' },
-            { value: 'trabajo_equipo', label: 'Trabajo en Equipo' },
-            { value: 'liderazgo', label: 'Liderazgo' },
-            { value: 'presentaciones', label: 'Presentaciones' },
-            { value: 'gestion_proyectos', label: 'Gestión de Proyectos' }
-        ]
-    };
+    // Definir subcategorías según la categoría principal seleccionada
+    const subcategories = librarySubcategories[mainCategory] || [];
     
-    // Agregar opciones
-    const categorySubcategories = subcategories[mainCategory] || [];
-    categorySubcategories.forEach(subcat => {
+    console.log(`📋 ${subcategories.length} subcategorías disponibles para ${mainCategory}`);
+    
+    if (subcategories.length === 0) {
+        console.warn('⚠️ No hay subcategorías definidas para esta categoría');
+        subcategorySelect.disabled = true;
+        subcategorySelect.innerHTML += '<option value="">No hay subcategorías disponibles</option>';
+        return;
+    }
+    
+    // Habilitar el select
+    subcategorySelect.disabled = false;
+    
+    // Agregar opciones de subcategoría
+    subcategories.forEach(subcategory => {
         const option = document.createElement('option');
-        option.value = subcat.value;
-        option.textContent = subcat.label;
+        option.value = subcategory.value;
+        option.textContent = subcategory.label;
         subcategorySelect.appendChild(option);
     });
     
-    console.log(`✅ ${categorySubcategories.length} subcategorías cargadas`);
+    console.log('✅ Subcategorías actualizadas');
 }
 
 // Función para filtrar recursos en modal de categoría
@@ -13061,6 +13057,154 @@ document.addEventListener('DOMContentLoaded', function() {
     setupCategoryCards();
 });
 
+// Función para inicializar el sistema de búsqueda de biblioteca
+function initLibrarySearch() {
+    console.log('🔍 Inicializando buscador de biblioteca...');
+    
+    // Buscador principal
+    const searchInput = document.getElementById('search-library');
+    const categoryFilter = document.getElementById('library-category-filter');
+    const typeFilter = document.getElementById('library-type-filter');
+    
+    if (!searchInput) {
+        console.error('❌ No se encontró el buscador de biblioteca');
+        return;
+    }
+    
+    // Event listener para búsqueda en tiempo real
+    searchInput.addEventListener('input', function() {
+        console.log('🔎 Buscando:', this.value);
+        performLibrarySearch();
+    });
+    
+    // Event listeners para filtros
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', performLibrarySearch);
+        console.log('✅ Filtro de categoría configurado');
+    }
+    
+    if (typeFilter) {
+        typeFilter.addEventListener('change', performLibrarySearch);
+        console.log('✅ Filtro de tipo configurado');
+    }
+    
+    console.log('✅ Buscador de biblioteca inicializado');
+}
+
+// Función principal de búsqueda de biblioteca
+function performLibrarySearch() {
+    console.log('🔍 Ejecutando búsqueda en biblioteca...');
+    
+    const searchTerm = document.getElementById('search-library')?.value.toLowerCase().trim() || '';
+    const categoryFilter = document.getElementById('library-category-filter')?.value || 'all';
+    const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
+    
+    console.log('📊 Filtros activos:', {
+        searchTerm,
+        categoryFilter,
+        typeFilter
+    });
+    
+    const libraryCards = document.querySelectorAll('#library-container .library-card');
+    let matchCount = 0;
+    
+    if (libraryCards.length === 0) {
+        console.warn('⚠️ No hay tarjetas de biblioteca para filtrar');
+        return;
+    }
+    
+    libraryCards.forEach(card => {
+        const title = card.querySelector('.library-card-title')?.textContent.toLowerCase() || '';
+        const description = card.querySelector('.library-card-description')?.textContent.toLowerCase() || '';
+        const categoryElement = card.querySelector('.library-card-category');
+        const category = categoryElement ? categoryElement.textContent.toLowerCase() : '';
+        const typeElement = card.querySelector('.library-type-badge');
+        const type = typeElement ? typeElement.textContent.toLowerCase() : '';
+        
+        // Verificar coincidencias de búsqueda
+        const matchesSearch = !searchTerm || 
+            title.includes(searchTerm) ||
+            description.includes(searchTerm) ||
+            category.includes(searchTerm);
+        
+        // Verificar filtro de categoría
+        const matchesCategory = categoryFilter === 'all' || 
+            category.includes(categoryFilter) ||
+            (categoryFilter === 'programas' && category.includes('program')) ||
+            (categoryFilter === 'habilidades_tecnicas' && category.includes('técnica')) ||
+            (categoryFilter === 'habilidades_blandas' && category.includes('blanda'));
+        
+        // Verificar filtro de tipo
+        const matchesType = typeFilter === 'all' || 
+            type.includes(typeFilter) ||
+            (typeFilter === 'manual' && type.includes('manual')) ||
+            (typeFilter === 'enlace' && type.includes('enlace'));
+        
+        if (matchesSearch && matchesCategory && matchesType) {
+            card.style.display = 'block';
+            card.classList.remove('search-no-match');
+            card.classList.add('search-match');
+            matchCount++;
+            
+            // Remover el highlight después de un tiempo
+            setTimeout(() => {
+                card.classList.remove('search-match');
+            }, 2000);
+            
+        } else {
+            card.style.display = 'none';
+            card.classList.add('search-no-match');
+            card.classList.remove('search-match');
+        }
+    });
+    
+    // Mostrar información de resultados
+    showLibrarySearchResultsInfo(matchCount, searchTerm, libraryCards.length);
+    
+    console.log(`✅ Búsqueda completada: ${matchCount} de ${libraryCards.length} recursos coinciden`);
+}
+
+// Función para mostrar información de resultados de búsqueda
+function showLibrarySearchResultsInfo(matchCount, searchTerm, totalResources) {
+    // Remover info anterior si existe
+    const existingInfo = document.querySelector('.library-search-results-info');
+    if (existingInfo) {
+        existingInfo.remove();
+    }
+    
+    const searchContainer = document.querySelector('#biblioteca .search-filter-container');
+    if (!searchContainer) return;
+    
+    if (searchTerm || 
+        document.getElementById('library-category-filter')?.value !== 'all' ||
+        document.getElementById('library-type-filter')?.value !== 'all') {
+        
+        const resultsInfo = document.createElement('div');
+        resultsInfo.className = 'library-search-results-info';
+        
+        let message = '';
+        
+        if (searchTerm) {
+            message = `Encontrados ${matchCount} de ${totalResources} recursos para "${searchTerm}"`;
+        } else {
+            message = `Mostrando ${matchCount} recursos filtrados`;
+        }
+        
+        resultsInfo.textContent = message;
+        resultsInfo.style.cssText = `
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: var(--surface-color);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            font-size: 0.9rem;
+            color: var(--text-color);
+        `;
+        
+        searchContainer.parentNode.insertBefore(resultsInfo, searchContainer.nextSibling);
+    }
+}
+
 // Función para actualizar los contadores de categorías de biblioteca
 function updateLibraryCategoryCounters() {
     if (!libraryResources || libraryResources.length === 0) return;
@@ -13080,64 +13224,143 @@ function updateLibraryCategoryCounters() {
     });
 }
 
-// Inicialización completa del sistema de biblioteca
+// Función para inicializar el sistema de recursos/biblioteca
 function initLibrarySystem() {
-    console.log('🔄 Inicializando sistema de biblioteca...');
+    console.log('📚 Inicializando sistema de biblioteca...');
     
-    try {
-        initEnhancedLibrary();
-        initLibraryFileUpload();
-        setupCategoryModals();
-        console.log('✅ Sistema de biblioteca inicializado correctamente');
-    } catch (error) {
-        console.error('❌ Error inicializando biblioteca:', error);
-        setTimeout(initLibrarySystem, 1000);
+    // 1. Inicializar búsqueda
+    initLibrarySearch();
+    initEnhancedLibrary();
+    initLibraryFileUpload();
+    setupCategoryModals();
+    
+    // 2. Configurar cambio de categoría principal para subcategorías
+    const mainCategorySelect = document.getElementById('resource-main-category');
+    if (mainCategorySelect) {
+        console.log('✅ Select de categoría principal encontrado');
+        
+        // Configurar event listener
+        mainCategorySelect.addEventListener('change', function() {
+            console.log('🎯 Categoría principal cambiada:', this.value);
+            updateResourceSubcategories(this.value);
+        });
+        
+        // Ejecutar una vez al cargar para establecer el estado inicial
+        if (mainCategorySelect.value) {
+            setTimeout(() => {
+                updateResourceSubcategories(mainCategorySelect.value);
+            }, 100);
+        }
+    } else {
+        console.error('❌ No se encontró el select de categoría principal');
     }
+    
+    // 3. Configurar cambio de tipo de recurso
+    const resourceTypeSelect = document.getElementById('resource-type');
+    if (resourceTypeSelect) {
+        console.log('✅ Select de tipo de recurso encontrado');
+        
+        resourceTypeSelect.addEventListener('change', handleResourceTypeChange);
+        
+        // Ejecutar una vez al cargar
+        setTimeout(handleResourceTypeChange, 100);
+    }
+    
+    // 4. Configurar botón de subir recurso
+    const addResourceBtn = document.getElementById('add-resource-btn');
+    if (addResourceBtn) {
+        console.log('✅ Botón de agregar recurso encontrado');
+        
+        // Remover listeners antiguos para evitar duplicados
+        const newBtn = addResourceBtn.cloneNode(true);
+        addResourceBtn.parentNode.replaceChild(newBtn, addResourceBtn);
+        
+        // Agregar nuevo listener
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🎯 Botón de agregar recurso clickeado');
+            
+            if (!currentUser) {
+                showNotification('Debes iniciar sesión para subir recursos', 'warning');
+                return;
+            }
+            
+            openModal('new-resource-modal');
+        });
+    }
+    
+    // 5. Inicializar contadores de categoría
+    setTimeout(updateLibraryCategoryCounters, 500);
+    
+    console.log('✅ Sistema de biblioteca inicializado completamente');
 }
 
 // Actualizar la función renderLibraryResources existente
+// Función para renderizar recursos de biblioteca con filtros aplicados
 function renderLibraryResources() {
     const container = document.getElementById('library-container');
-    if (!container) {
-        console.error('❌ Contenedor de biblioteca no encontrado');
-        return;
-    }
+    if (!container) return;
     
     container.innerHTML = '';
     
     if (libraryResources.length === 0) {
-        document.getElementById('library-empty').style.display = 'block';
+        container.innerHTML = `
+            <div class="no-data">
+                <i class="fas fa-book"></i>
+                <h3>No hay recursos disponibles</h3>
+                <p>¡Sé el primero en compartir un recurso!</p>
+                ${currentUser ? '<button class="btn-primary" onclick="openModal(\'new-resource-modal\')">Agregar Recurso</button>' : ''}
+            </div>
+        `;
         return;
     }
     
-    document.getElementById('library-empty').style.display = 'none';
-    
-    // Aplicar filtros
-    const searchTerm = document.getElementById('search-library')?.value.toLowerCase() || '';
+    // Obtener filtros actuales
+    const searchTerm = document.getElementById('search-library')?.value.toLowerCase().trim() || '';
     const categoryFilter = document.getElementById('library-category-filter')?.value || 'all';
     const typeFilter = document.getElementById('library-type-filter')?.value || 'all';
     
+    // Filtrar recursos
     const filteredResources = libraryResources.filter(resource => {
+        const title = resource.title?.toLowerCase() || '';
+        const description = resource.description?.toLowerCase() || '';
+        const mainCategory = resource.main_category?.toLowerCase() || '';
+        const subcategory = resource.subcategory?.toLowerCase() || '';
+        const resourceType = resource.resource_type?.toLowerCase() || '';
+        
+        // Aplicar filtro de búsqueda
         const matchesSearch = !searchTerm || 
-            resource.title.toLowerCase().includes(searchTerm) ||
-            resource.description.toLowerCase().includes(searchTerm) ||
-            (resource.main_category && resource.main_category.toLowerCase().includes(searchTerm));
+            title.includes(searchTerm) ||
+            description.includes(searchTerm) ||
+            subcategory.includes(searchTerm);
         
+        // Aplicar filtro de categoría
         const matchesCategory = categoryFilter === 'all' || 
-            (resource.main_category && resource.main_category === categoryFilter);
+            mainCategory === categoryFilter ||
+            (categoryFilter === 'programas' && mainCategory.includes('program')) ||
+            (categoryFilter === 'habilidades_tecnicas' && mainCategory.includes('tecnic')) ||
+            (categoryFilter === 'habilidades_blandas' && mainCategory.includes('bland'));
         
-        const matchesType = typeFilter === 'all' || 
-            (resource.resource_type && resource.resource_type === typeFilter);
+        // Aplicar filtro de tipo
+        const matchesType = typeFilter === 'all' ||
+            resourceType === typeFilter ||
+            (typeFilter === 'manual' && resourceType === 'manual') ||
+            (typeFilter === 'enlace' && resourceType === 'enlace');
         
         return matchesSearch && matchesCategory && matchesType;
     });
     
+    console.log(`📊 Mostrando ${filteredResources.length} de ${libraryResources.length} recursos (filtrados)`);
+    
     if (filteredResources.length === 0) {
         container.innerHTML = `
-            <div class="empty-state">
+            <div class="no-results">
                 <i class="fas fa-search"></i>
                 <h3>No se encontraron recursos</h3>
-                <p>Intenta con otros términos de búsqueda</p>
+                <p>Intenta con otros términos de búsqueda o filtros</p>
+                <button class="btn-outline" onclick="clearLibraryFilters()">Limpiar filtros</button>
             </div>
         `;
         return;
@@ -13145,11 +13368,68 @@ function renderLibraryResources() {
     
     // Renderizar recursos filtrados
     filteredResources.forEach(resource => {
-        const card = createLibraryCard(resource);
-        container.appendChild(card);
+        const resourceCard = createLibraryCard(resource);
+        container.appendChild(resourceCard);
+    });
+}
+
+// Función para limpiar filtros de biblioteca
+function clearLibraryFilters() {
+    const searchInput = document.getElementById('search-library');
+    const categoryFilter = document.getElementById('library-category-filter');
+    const typeFilter = document.getElementById('library-type-filter');
+    
+    if (searchInput) searchInput.value = '';
+    if (categoryFilter) categoryFilter.value = 'all';
+    if (typeFilter) typeFilter.value = 'all';
+    
+    renderLibraryResources();
+    showNotification('Filtros limpiados', 'info');
+}
+
+// Función para configurar el formulario de nuevo recurso
+function setupNewResourceForm() {
+    console.log('📝 Configurando formulario de nuevo recurso...');
+    
+    const form = document.getElementById('resource-form');
+    const mainCategorySelect = document.getElementById('resource-main-category');
+    const subcategorySelect = document.getElementById('resource-subcategory');
+    const resourceTypeSelect = document.getElementById('resource-type');
+    
+    if (!form || !mainCategorySelect || !subcategorySelect || !resourceTypeSelect) {
+        console.error('❌ Elementos del formulario no encontrados');
+        return;
+    }
+    
+    // 1. Configurar cambio de categoría principal
+    mainCategorySelect.addEventListener('change', function() {
+        console.log('🎯 Categoría principal seleccionada:', this.value);
+        updateResourceSubcategories(this.value);
     });
     
-    console.log(`✅ ${filteredResources.length} recursos renderizados`);
+    // 2. Configurar cambio de tipo de recurso
+    resourceTypeSelect.addEventListener('change', handleResourceTypeChange);
+    
+    // 3. Configurar envío del formulario
+    form.addEventListener('submit', submitNewResource);
+    
+    // 4. Configurar botón cancelar
+    const cancelBtn = document.getElementById('cancel-resource');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            closeModal(document.getElementById('new-resource-modal'));
+            form.reset();
+            // Resetear subcategorías
+            subcategorySelect.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
+            subcategorySelect.disabled = true;
+        });
+    }
+    
+    // 5. Inicializar estado
+    updateResourceSubcategories(mainCategorySelect.value || 'programas');
+    handleResourceTypeChange();
+    
+    console.log('✅ Formulario de nuevo recurso configurado');
 }
 
 // SISTEMA DE ARCHIVOS PARA BIBLIOTECA - VERSIÓN CORREGIDA
@@ -13424,25 +13704,41 @@ function getFileExtension(url) {
     return extension ? '.' + extension : '';
 }
 
-// Función para manejar la visibilidad de campos según el tipo de recurso
+// Función para manejar el cambio de tipo de recurso
 function handleResourceTypeChange() {
-    const resourceType = document.getElementById('resource-type').value;
+    console.log('🔄 Cambiando tipo de recurso...');
+    
+    const resourceType = document.getElementById('resource-type')?.value;
     const fileGroup = document.getElementById('resource-file-group');
     const urlGroup = document.getElementById('resource-url-group');
     
-    console.log('🔄 Cambiando tipo de recurso a:', resourceType);
+    if (!resourceType) {
+        console.warn('⚠️ Tipo de recurso no seleccionado');
+        return;
+    }
     
-    // Ocultar ambos grupos primero
-    if (fileGroup) fileGroup.style.display = 'none';
-    if (urlGroup) urlGroup.style.display = 'none';
+    const isLink = resourceType === 'enlace';
     
-    // Mostrar el grupo correspondiente
-    if (resourceType === 'enlace') {
-        if (urlGroup) urlGroup.style.display = 'block';
-        console.log('🔗 Mostrando campo de URL');
-    } else {
-        if (fileGroup) fileGroup.style.display = 'block';
-        console.log('📁 Mostrando campo de archivo');
+    console.log(`📊 Tipo seleccionado: ${resourceType} (es enlace: ${isLink})`);
+    
+    if (fileGroup) {
+        if (isLink) {
+            fileGroup.style.display = 'none';
+            console.log('📁 Grupo de archivos oculto');
+        } else {
+            fileGroup.style.display = 'block';
+            console.log('📁 Grupo de archivos visible');
+        }
+    }
+    
+    if (urlGroup) {
+        if (isLink) {
+            urlGroup.style.display = 'block';
+            console.log('🔗 Grupo de URL visible');
+        } else {
+            urlGroup.style.display = 'none';
+            console.log('🔗 Grupo de URL oculto');
+        }
     }
 }
 
