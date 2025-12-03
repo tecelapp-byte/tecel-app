@@ -9242,22 +9242,6 @@ function getFileTypeLabel(filename) {
     return labels[category] || 'Archivo';
 }
 
-// Función auxiliar para validar si un archivo es imagen
-function isImageFile(filename) {
-    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'tif', 'psd', 'ai'];
-    const ext = filename.split('.').pop().toLowerCase();
-    return imageExtensions.includes(ext);
-}
-
-// Exportar funciones para uso global (opcional)
-if (typeof window !== 'undefined') {
-    window.getFileIcon = getFileIcon;
-    window.getFileCategory = getFileCategory;
-    window.getFileColor = getFileColor;
-    window.getFileTypeLabel = getFileTypeLabel;
-    window.isVideoFile = isVideoFile;
-    window.isImageFile = isImageFile;
-}
 // ==================== FUNCIONES DE PRESENTACIÓN ====================
 
 function showNotification(message, type = 'info', duration = 5000) {
@@ -12604,6 +12588,27 @@ async function downloadResource(resourceId, fileName = null) {
     }
 }
 
+
+// 🔥 INICIALIZAR EL NUEVO SISTEMA
+let downloadManager;
+
+function initDownloadSystem() {
+    console.log('🔧 Inicializando nuevo sistema de descargas...');
+    downloadManager = new DownloadManager();
+    
+    // Reemplazar funciones globales
+    window.downloadProjectFile = (projectId, fileId, fileName) => {
+        downloadManager.downloadProjectFile(projectId, fileId, fileName);
+    };
+    
+    window.downloadLibraryResource = (resourceId, resourceName) => {
+        downloadManager.downloadLibraryResource(resourceId, resourceName);
+    };
+    
+    console.log('✅ Nuevo sistema de descargas listo');
+}
+
+
 // ==================== SISTEMA DE DESCARGAS MEJORADO ====================
 
 // 🔥 DESACTIVAR TODAS LAS DESCARGAS VIEJAS TEMPORALMENTE
@@ -12841,26 +12846,6 @@ async androidSafeDownload(downloadUrl, fileName) {
             loader.remove();
         }
     }
-}
-
-
-// 🔥 INICIALIZAR EL NUEVO SISTEMA
-let downloadManager;
-
-function initDownloadSystem() {
-    console.log('🔧 Inicializando nuevo sistema de descargas...');
-    downloadManager = new DownloadManager();
-    
-    // Reemplazar funciones globales
-    window.downloadProjectFile = (projectId, fileId, fileName) => {
-        downloadManager.downloadProjectFile(projectId, fileId, fileName);
-    };
-    
-    window.downloadLibraryResource = (resourceId, resourceName) => {
-        downloadManager.downloadLibraryResource(resourceId, resourceName);
-    };
-    
-    console.log('✅ Nuevo sistema de descargas listo');
 }
 
 
