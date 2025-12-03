@@ -1196,8 +1196,8 @@ if (mainCategorySelect) {
 
     // Configurar modales de categorías de biblioteca
     const programasCard = document.getElementById('programas-card');
-    const habilidadesTecnicasCard = document.getElementById('habilidades_tecnicas-card'); // con guión bajo
-    const habilidadesBlandasCard = document.getElementById('habilidades_blandas-card'); // con guión bajo
+    const habilidadesTecnicasCard = document.getElementById('habilidades_tecnicas-card');
+    const habilidadesBlandasCard = document.getElementById('habilidades_blandas-card');
 
     if (programasCard) {
         programasCard.addEventListener('click', openProgramasModal);
@@ -10039,26 +10039,24 @@ async function executeDeleteFile() {
 
 // Función para abrir modal de Programas
 function openProgramasModal() {
-    console.log('🎯 Abriendo modal de Programas');
-    loadCategoryResources('programas', 'programas-container');
+    currentLibraryCategory = 'programas';
+    loadCategoryResources('programas');
     openModal('programas-modal');
 }
 
 // Función para abrir modal de Habilidades Técnicas
 function openHabilidadesTecnicasModal() {
-    console.log('🎯 Abriendo modal de Habilidades Técnicas');
-    loadCategoryResources('habilidades_tecnicas', 'habilidades-tecnicas-container');
+    currentLibraryCategory = 'habilidades_tecnicas';
+    loadCategoryResources('habilidades_tecnicas');
     openModal('habilidades-tecnicas-modal');
 }
 
 // Función para abrir modal de Habilidades Blandas
 function openHabilidadesBlandasModal() {
-    console.log('🎯 Abriendo modal de Habilidades Blandas');
-    loadCategoryResources('habilidades_blandas', 'habilidades-blandas-container');
+    currentLibraryCategory = 'habilidades_blandas';
+    loadCategoryResources('habilidades_blandas');
     openModal('habilidades-blandas-modal');
 }
-
-
 
 // ==================== DATOS DE EJEMPLO ====================
 
@@ -11728,53 +11726,13 @@ function debugLibraryResources() {
 // Hacerla global para testing
 window.debugLibrary = debugLibraryResources;
 
-// Función para cargar recursos de categoría específica
-async function loadCategoryResources(category, containerId) {
-    try {
-        console.log(`🔄 Cargando recursos para categoría: ${category}`);
-        
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.error(`❌ Contenedor no encontrado: ${containerId}`);
-            return;
-        }
-        
-        container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Cargando recursos...</p></div>';
-        
-        const response = await fetch(`${API_BASE}/library/category/${category}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            const resources = await response.json();
-            console.log(`✅ ${resources.length} recursos cargados para ${category}`);
-            
-            if (resources.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-book"></i><p>No hay recursos en esta categoría</p></div>';
-            } else {
-                container.innerHTML = '';
-                resources.forEach(resource => {
-                    const resourceElement = createCategoryResourceCard(resource);
-                    container.appendChild(resourceElement);
-                });
-            }
-            
-            // Actualizar contador
-            updateCategoryCounter(category, resources.length);
-            
-        } else {
-            throw new Error(`Error ${response.status}`);
-        }
-    } catch (error) {
-        console.error(`❌ Error cargando recursos de ${category}:`, error);
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-triangle"></i><p>Error cargando recursos</p></div>';
-        }
-    }
+// Función para cargar recursos por categoría
+function loadCategoryResources(category) {
+    const filteredResources = libraryResources.filter(resource => 
+        resource.main_category === category
+    );
+    
+    renderCategoryResources(category, filteredResources);
 }
 
 // Configurar filtros para modales de categoría
