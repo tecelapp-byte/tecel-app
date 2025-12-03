@@ -12964,70 +12964,93 @@ document.getElementById('resource-detail-modal').addEventListener('click', funct
     }
 });
 
-// Modificar la función existente loadLibraryResources para incluir las nuevas categorías
+// Modificar la función loadLibraryResources para usar la misma estructura
 async function loadLibraryResources() {
+    const container = document.getElementById('library-container');
+    if (!container) {
+        console.error('❌ Contenedor de biblioteca no encontrado');
+        return;
+    }
+    
     try {
-        console.log('📚 Cargando recursos de biblioteca...');
+        // Mostrar estado de carga con la MISMA estética
+        container.innerHTML = `
+            <div class="loading-state" style="
+                text-align: center;
+                padding: 4rem 2rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 300px;
+            ">
+                <div class="loading-spinner" style="
+                    width: 50px;
+                    height: 50px;
+                    border: 4px solid var(--surface-dark);
+                    border-top: 4px solid var(--primary-color);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin-bottom: 1.5rem;
+                "></div>
+                <p style="color: var(--text-light); font-size: 1rem;">Cargando recursos...</p>
+                <style>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            </div>
+        `;
+        
+        console.log('🔄 Cargando recursos de biblioteca...');
         const response = await fetch(`${API_BASE}/library`);
         
         if (response.ok) {
             libraryResources = await response.json();
-            console.log(`✅ ${libraryResources.length} recursos cargados`);
+            console.log(`✅ ${libraryResources.length} recursos cargados desde servidor`);
+            
+            // Usar la MISMA función de renderizado
             renderLibraryResources();
-            updateLibraryStats();
-            setupLibraryCategoryCards();
-            // Event listener para botones de descarga en las cards
-            document.addEventListener('click', function(e) {
-                // Botón descargar en cards
-                if (e.target.closest('.download-resource')) {
-                    const btn = e.target.closest('.download-resource');
-                    const resourceId = btn.getAttribute('data-resource-id');
-                    const fileName = btn.getAttribute('data-file-name');
-                    downloadResource(resourceId, fileName);
-                }
-                
-                // Botón visitar en cards
-                if (e.target.closest('.visit-resource')) {
-                    const btn = e.target.closest('.visit-resource');
-                    const url = btn.getAttribute('data-url');
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                }
-                
-                // Botón ver detalles en cards
-                if (e.target.closest('.view-resource-details')) {
-                    const btn = e.target.closest('.view-resource-details');
-                    const resourceId = btn.getAttribute('data-resource-id');
-                    
-                    // Verificar que el modal esté listo
-                    const modal = document.getElementById('resource-detail-modal');
-                    if (!modal) {
-                        console.error('❌ Modal no encontrado al hacer clic');
-                        showNotification('Error: El modal no está disponible', 'error');
-                        return;
-                    }
-                    
-                    showResourceDetails(resourceId);
-                }
-                
-                // Botón eliminar en cards
-                if (e.target.closest('.delete-resource')) {
-                    const btn = e.target.closest('.delete-resource');
-                    const resourceId = btn.getAttribute('data-resource-id');
-                    deleteResource(resourceId);
-                }
-            });
+            
+            // Actualizar contadores de categorías
+            updateLibraryCategoryCounters();
         } else {
-            throw new Error('Error cargando recursos');
+            console.error('❌ Error cargando recursos:', response.status, response.statusText);
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
-        console.error('❌ Error cargando recursos de biblioteca:', error);
-        // Usar datos de ejemplo si hay error
-        libraryResources = getSampleLibraryResources();
-        renderLibraryResources();
-        updateLibraryStats();
+        console.error('❌ Error cargando recursos desde API:', error);
+        container.innerHTML = `
+            <div class="error-state" style="
+                text-align: center;
+                padding: 4rem 2rem;
+                color: var(--error-color);
+            ">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3 style="margin-bottom: 0.5rem;">Error cargando recursos</h3>
+                <p style="color: var(--text-light); margin-bottom: 2rem;">${error.message}</p>
+                <button class="btn-outline btn-sm" onclick="loadLibraryResources()" style="
+                    padding: 0.75rem 1.5rem;
+                    background: transparent;
+                    color: var(--error-color);
+                    border: 2px solid var(--error-color);
+                    border-radius: 6px;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                "
+                onmouseover="this.style.background='var(--error-color)'; this.style.color='white'"
+                onmouseout="this.style.background='transparent'; this.style.color='var(--error-color)'">
+                    <i class="fas fa-redo"></i> Reintentar
+                </button>
+            </div>
+        `;
     }
 }
-
 
 // En tu función que carga las categorías, asegúrate de tener esto:
 function setupCategoryCards() {
@@ -13387,22 +13410,19 @@ function initLibrarySystem() {
     console.log('✅ Sistema de biblioteca inicializado completamente');
 }
 
-// Función para renderizar recursos de biblioteca con filtros aplicados
+// Función principal para renderizar recursos de biblioteca - VERSIÓN UNIFICADA
 function renderLibraryResources() {
     const container = document.getElementById('library-container');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Contenedor de biblioteca no encontrado');
+        return;
+    }
     
+    // Limpiar contenedor
     container.innerHTML = '';
     
     if (libraryResources.length === 0) {
-        container.innerHTML = `
-            <div class="no-data">
-                <i class="fas fa-book"></i>
-                <h3>No hay recursos disponibles</h3>
-                <p>¡Sé el primero en compartir un recurso!</p>
-                ${currentUser ? '<button class="btn-primary" onclick="openModal(\'new-resource-modal\')">Agregar Recurso</button>' : ''}
-            </div>
-        `;
+        container.innerHTML = createEmptyLibraryState();
         return;
     }
     
@@ -13414,7 +13434,119 @@ function renderLibraryResources() {
     console.log('🎯 Aplicando filtros:', { searchTerm, categoryFilter, typeFilter });
     
     // Filtrar recursos
-    const filteredResources = libraryResources.filter(resource => {
+    const filteredResources = filterLibraryResources(libraryResources, searchTerm, categoryFilter, typeFilter);
+    
+    console.log(`📊 Mostrando ${filteredResources.length} de ${libraryResources.length} recursos (filtrados)`);
+    
+    if (filteredResources.length === 0) {
+        container.innerHTML = createNoResultsState(searchTerm, categoryFilter, typeFilter);
+        return;
+    }
+    
+    // Renderizar recursos filtrados CON LA MISMA ESTÉTICA
+    renderLibraryCards(container, filteredResources);
+    
+    // Mostrar información de resultados
+    showLibrarySearchResultsInfo(filteredResources.length, searchTerm, categoryFilter, typeFilter, libraryResources.length);
+}
+
+// Función para renderizar tarjetas de biblioteca (USADA TANTO INICIAL COMO AL FILTRAR)
+function renderLibraryCards(container, resources) {
+    // Limpiar contenedor
+    container.innerHTML = '';
+    
+    // Crear contenedor grid para mantener la misma estructura
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'library-grid';
+    gridContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem 0;
+    `;
+    
+    // Agregar cada recurso usando la MISMA función createLibraryCard
+    resources.forEach(resource => {
+        const resourceCard = createLibraryCard(resource);
+        gridContainer.appendChild(resourceCard);
+    });
+    
+    container.appendChild(gridContainer);
+}
+
+// Función para crear estado vacío
+function createEmptyLibraryState() {
+    return `
+        <div class="empty-library-state" style="text-align: center; padding: 4rem 2rem;">
+            <div style="font-size: 4rem; color: var(--text-light); margin-bottom: 1rem;">
+                <i class="fas fa-book"></i>
+            </div>
+            <h3 style="color: var(--text-color); margin-bottom: 0.5rem;">No hay recursos disponibles</h3>
+            <p style="color: var(--text-light); margin-bottom: 2rem;">¡Sé el primero en compartir un recurso!</p>
+            ${currentUser ? 
+                `<button class="btn-primary" onclick="openModal('new-resource-modal')" style="padding: 0.75rem 1.5rem;">
+                    <i class="fas fa-plus"></i> Agregar Recurso
+                </button>` : 
+                ''
+            }
+        </div>
+    `;
+}
+
+// Función para crear estado sin resultados
+function createNoResultsState(searchTerm, categoryFilter, typeFilter) {
+    let filterMessage = '';
+    const filters = [];
+    
+    if (searchTerm) filters.push(`"${searchTerm}"`);
+    if (categoryFilter !== 'all') {
+        const categoryLabels = {
+            'programas': 'Programas',
+            'habilidades_tecnicas': 'Habilidades Técnicas', 
+            'habilidades_blandas': 'Habilidades Blandas'
+        };
+        filters.push(categoryLabels[categoryFilter] || categoryFilter);
+    }
+    if (typeFilter !== 'all') {
+        const typeLabels = {
+            'manual': 'Manuales',
+            'enlace': 'Enlaces',
+            'documento': 'Documentos',
+            'video': 'Videos'
+        };
+        filters.push(typeLabels[typeFilter] || typeFilter);
+    }
+    
+    if (filters.length > 0) {
+        filterMessage = ` con los filtros: ${filters.join(', ')}`;
+    }
+    
+    return `
+        <div class="no-results-state" style="text-align: center; padding: 4rem 2rem;">
+            <div style="font-size: 4rem; color: var(--text-light); margin-bottom: 1rem;">
+                <i class="fas fa-search"></i>
+            </div>
+            <h3 style="color: var(--text-color); margin-bottom: 0.5rem;">No se encontraron recursos</h3>
+            <p style="color: var(--text-light); margin-bottom: 1rem;">No hay recursos que coincidan${filterMessage}</p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+                <button class="btn-outline" onclick="clearLibraryFilters()" style="padding: 0.75rem 1.5rem;">
+                    <i class="fas fa-times"></i> Limpiar filtros
+                </button>
+                ${currentUser ? 
+                    `<button class="btn-primary" onclick="openModal('new-resource-modal')" style="padding: 0.75rem 1.5rem;">
+                        <i class="fas fa-plus"></i> Agregar Nuevo Recurso
+                    </button>` : 
+                    ''
+                }
+            </div>
+        </div>
+    `;
+}
+
+
+// Función auxiliar para filtrar recursos
+function filterLibraryResources(resources, searchTerm, categoryFilter, typeFilter) {
+    return resources.filter(resource => {
         const title = resource.title?.toLowerCase() || '';
         const description = resource.description?.toLowerCase() || '';
         const mainCategory = resource.main_category?.toLowerCase() || '';
@@ -13427,7 +13559,7 @@ function renderLibraryResources() {
             description.includes(searchTerm) ||
             subcategory.includes(searchTerm);
         
-        // Aplicar filtro de categoría PRINCIPAL (Programas, Habilidades Técnicas, Habilidades Blandas)
+        // Aplicar filtro de categoría PRINCIPAL
         const matchesCategory = categoryFilter === 'all' || 
             mainCategory === categoryFilter;
         
@@ -13442,26 +13574,6 @@ function renderLibraryResources() {
             (typeFilter === 'video' && resourceType.includes('video'));
         
         return matchesSearch && matchesCategory && matchesType;
-    });
-    
-    console.log(`📊 Mostrando ${filteredResources.length} de ${libraryResources.length} recursos (filtrados)`);
-    
-    if (filteredResources.length === 0) {
-        container.innerHTML = `
-            <div class="no-results">
-                <i class="fas fa-search"></i>
-                <h3>No se encontraron recursos</h3>
-                <p>Intenta con otros términos de búsqueda o filtros</p>
-                <button class="btn-outline" onclick="clearLibraryFilters()">Limpiar filtros</button>
-            </div>
-        `;
-        return;
-    }
-    
-    // Renderizar recursos filtrados
-    filteredResources.forEach(resource => {
-        const resourceCard = createLibraryCard(resource);
-        container.appendChild(resourceCard);
     });
 }
 
