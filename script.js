@@ -3063,64 +3063,62 @@ function verifyDetailModalElements() {
     ('============================================');
 }
 
-// Función para actualizar la función createLibraryCard para incluir data attribute de categoría
+// REEMPLAZAR solo la parte de acciones en createLibraryCard:
 function createLibraryCard(resource) {
     const card = document.createElement('div');
     card.className = 'library-card';
     card.setAttribute('data-resource-id', resource.id);
-    card.setAttribute('data-main-category', resource.main_category || ''); // 🔥 NUEVO: Agregar categoría principal
+    card.setAttribute('data-main-category', resource.main_category || '');
     
     const isFileResource = resource.resource_type !== 'enlace' && resource.file_url;
     const isLinkResource = resource.resource_type === 'enlace' && resource.external_url;
     
-    // Obtener etiquetas amigables
     const typeLabel = getResourceTypeLabel(resource.resource_type);
-    const mainCategoryLabel = getMainCategoryLabel(resource.main_category);
-    const subcategoryLabel = resource.subcategory ? ` • ${resource.subcategory}` : '';
+    const categoryLabel = getCategoryLabel(resource.main_category);
     
     card.innerHTML = `
-        <div class="library-card-header">
-            <h3 class="library-card-title">${resource.title}</h3>
-            <span class="library-type-badge">${typeLabel}</span>
-        </div>
-        
-        <div class="library-card-category">
-            <i class="fas fa-folder"></i>
-            ${mainCategoryLabel}${subcategoryLabel}
-        </div>
-        
-        <p class="library-card-description">${resource.description}</p>
-        
-        <div class="library-card-meta">
-            <span class="library-uploader">
-                <i class="fas fa-user"></i>     
-                ${resource.uploader_name || 'Usuario'}
-            </span>
-            <span class="library-date">
-                <i class="fas fa-calendar"></i>
-                ${new Date(resource.created_at).toLocaleDateString('es-ES')}
-            </span>
-        </div>
-        
-        <div class="library-card-actions">
-            ${isFileResource ? 
-                `<button class="btn-primary btn-sm" 
-                         onclick="event.stopPropagation(); downloadResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
-                    <i class="fas fa-download"></i> Descargar
-                </button>` : ''}
-                
-            ${isLinkResource ? 
-                `<button class="btn-outline btn-sm" 
-                         onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
-                    <i class="fas fa-external-link-alt"></i> Visitar
-                </button>` : ''}
-                
-            <button class="btn-outline btn-sm" 
-                    onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
-                <i class="fas fa-eye"></i> Detalles
-            </button>
-        </div>
-    `;
+    <div class="library-card-header">
+        <h3 class="library-card-title">${resource.title}</h3>
+        <span class="library-type-badge">${typeLabel}</span>
+    </div>
+    
+    <div class="library-card-category">
+        <i class="fas fa-folder"></i>
+        ${categoryLabel}${resource.subcategory ? ` • ${resource.subcategory}` : ''}
+    </div>
+    
+    <p class="library-card-description">${resource.description}</p>
+    
+    <div class="library-card-meta">
+        <span class="library-uploader">
+            <i class="fas fa-user"></i>     
+            ${resource.uploader_name || 'Usuario'}
+        </span>
+        <span class="library-date">
+            <i class="fas fa-calendar"></i>
+            ${new Date(resource.created_at).toLocaleDateString('es-ES')}
+        </span>
+    </div>
+    
+<div class="library-card-actions">
+        ${isFileResource ? 
+            `<button class="btn-primary btn-sm" 
+                     onclick="event.stopPropagation(); downloadResource(${resource.id}, '${resource.title.replace(/'/g, "\\'")}')">
+                <i class="fas fa-download"></i> Descargar
+            </button>` : ''}
+            
+        ${isLinkResource ? 
+            `<button class="btn-outline btn-sm" 
+                     onclick="event.stopPropagation(); window.open('${resource.external_url}', '_blank')">
+                <i class="fas fa-external-link-alt"></i> Visitar
+            </button>` : ''}
+            
+        <button class="btn-outline btn-sm" 
+                onclick="event.stopPropagation(); showResourceDetails(${resource.id})">
+            <i class="fas fa-eye"></i> Detalles
+        </button>
+    </div>
+`;
     
     // Mismo comportamiento clickeable que proyectos
     card.style.cursor = 'pointer';
